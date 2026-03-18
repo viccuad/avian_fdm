@@ -37,8 +37,16 @@ pub struct AeroZone {
     pub control_role: Option<ControlSurfaceRole>,
     /// How this zone's mass is determined at `PostStartup`. See [`ZoneMass`].
     pub zone_mass: ZoneMass,
-    /// Extra drag coefficient added per unit of damage (1 − health).
-    /// Represents structural drag from deformation and exposed internals.
+    /// Drag pressure (Pa) added per unit of damage while the zone is still
+    /// attached. Represents structural drag from deformation and exposed internals.
+    ///
+    /// When `health == 0.0` the zone has detached from the airframe and this
+    /// contributes nothing. The drag curve peaks just before detachment:
+    ///
+    /// ```text
+    /// struct_drag = damage_drag_coeff × (1 − health)   when health > 0
+    ///             = 0                                   when health == 0 (gone)
+    /// ```
     pub damage_drag_coeff: f64,
     /// Structural parent zone. If the named entity's [`AeroZoneHealth::value`]
     /// reaches `0.0`, this zone is treated as fully destroyed (`0.0`) regardless

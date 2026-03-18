@@ -306,16 +306,14 @@ mod tests {
         assert!((cg.x - (-2.0)).abs() < 1e-12, "CG should be at left zone, got {cg:?}");
     }
 
-    /// Structural drag increases as health decreases.
+    /// Structural drag ramps up with damage, then drops to zero when gone.
     #[test]
     fn damage_drag_increases_with_damage() {
-        let zone = AeroZone { damage_drag_coeff: 1.0, ..make_zone(0.0) };
-        let full_drag = zone.damage_drag_coeff * (1.0 - 1.0_f64); // health=1.0 → 0
-        let half_drag = zone.damage_drag_coeff * (1.0 - 0.5_f64); // health=0.5 → 0.5
-        let zero_drag = zone.damage_drag_coeff * (1.0 - 0.0_f64); // health=0.0 → 1.0
-        assert!((full_drag - 0.0).abs() < 1e-12);
-        assert!((half_drag - 0.5).abs() < 1e-12);
-        assert!((zero_drag - 1.0).abs() < 1e-12);
+        let coeff = 1.0_f64;
+        let drag_at = |h: f64| if h > 0.0 { coeff * (1.0 - h) } else { 0.0 };
+        assert!((drag_at(1.0) - 0.0).abs() < 1e-12); // intact: no drag
+        assert!((drag_at(0.5) - 0.5).abs() < 1e-12); // half-damaged: half drag
+        assert!((drag_at(0.0) - 0.0).abs() < 1e-12); // gone: no drag (detached)
     }
 
     /// Structural cascade pre-pass: destroying parent zeroes child.
