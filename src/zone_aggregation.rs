@@ -84,6 +84,15 @@ pub fn init_zone_volumes(
 /// evaluates their `AeroCoeff` tables at the current `(α, Re)` from
 /// [`FlightState`], and writes summed totals to [`AircraftAggregate`] and
 /// [`AircraftMass`].
+///
+/// ## Structural cascade pre-pass
+///
+/// Before summing coefficients, an iterative pre-pass propagates zero-health
+/// from structural parents to their children. A zone whose
+/// `AeroZone::structural_parent` points to a destroyed zone (`health == 0.0`)
+/// is itself treated as destroyed, regardless of its own health. The pass
+/// repeats until no further changes occur — necessary for chains longer than
+/// one hop (root → surface → tip).
 pub fn aggregate_zones(
     mut aircraft_query: Query<(
         Entity,
@@ -91,22 +100,49 @@ pub fn aggregate_zones(
         &mut AircraftAggregate,
         &mut AircraftMass,
     )>,
-    zone_query: Query<(&AeroZone, &AeroZoneHealth, &Transform, &ChildOf)>,
+    zone_query: Query<(Entity, &AeroZone, &AeroZoneHealth, &Transform, &ChildOf)>,
 ) {
     // Build per-aircraft aggregates. Sort children by entity for determinism
     // (prerequisite for Group I lockstep netcode).
-    let mut zone_list: Vec<(Entity, &AeroZone, &AeroZoneHealth, DVec3)> = zone_query
+    // Tuple: (aircraft_entity, zone_entity, &AeroZone, eff_health, body_pos, mass_kg_full)
+    let mut zone_list: Vec<(Entity, Entity, &AeroZone, f64, DVec3, f64)> = zone_query
         .iter()
-        .map(|(z, h, t, parent)| {
+        .map(|(entity, z, h, t, parent)| {
             let pos = DVec3::new(
                 t.translation.x as f64,
                 t.translation.y as f64,
                 t.translation.z as f64,
             );
-            (parent.parent(), z, h, pos)
+            (parent.parent(), entity, z, h.value.clamp(0.0, 1.0), pos, h.mass_kg)
         })
         .collect();
-    zone_list.sort_by_key(|(parent, _, _, _)| *parent); // group by aircraft
+    zone_list.sort_by_key(|(parent, _, _, _, _, _)| *parent); // group by aircraft
+
+    // --- Structural cascade pre-pass ---
+    // Propagate zero-health downward through the structural_parent chain.
+    // Iterate until no changes — handles chains of arbitrary depth (≤ ~5).
+    loop {
+        let mut changed = false;
+        // Snapshot: zone entity → current effective health.
+        let health_snapshot: std::collections::HashMap<Entity, f64> = zone_list
+            .iter()
+            .map(|(_, entity, _, eff_health, _, _)| (*entity, *eff_health))
+            .collect();
+
+        for (_, _, zone, eff_health, _, _) in zone_list.iter_mut() {
+            if let Some(parent_entity) = zone.structural_parent {
+                if health_snapshot.get(&parent_entity).copied().unwrap_or(1.0) == 0.0
+                    && *eff_health != 0.0
+                {
+                    *eff_health = 0.0;
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
 
     for (aircraft_entity, fs, mut agg, mut mass) in aircraft_query.iter_mut() {
         let alpha = fs.alpha_rad;
@@ -130,8 +166,10 @@ pub fn aggregate_zones(
 
         let mut zone_masses: Vec<(DVec3, f64)> = Vec::new();
 
-        for (parent, zone, health, pos) in zone_list.iter().filter(|(p, _, _, _)| *p == aircraft_entity) {
-            let h = health.value.clamp(0.0, 1.0);
+        for (_, _, zone, eff_health, pos, mass_kg_full) in
+            zone_list.iter().filter(|(p, _, _, _, _, _)| *p == aircraft_entity)
+        {
+            let h = *eff_health; // already clamped and cascade-propagated
 
             cl    += zone.cl.evaluate(alpha, re) * h;
             cd    += zone.cd.evaluate(alpha, re) * h;
@@ -139,7 +177,11 @@ pub fn aggregate_zones(
             cm    += zone.cm.evaluate(alpha, re) * h;
             croll += zone.croll.evaluate(alpha, re) * h;
             cn    += zone.cn.evaluate(alpha, re) * h;
-            struct_drag += zone.damage_drag_coeff * (1.0 - h);
+            // Structural drag ramps up as the zone degrades. At health=0 the
+            // piece has detached and is gone — no further drag contribution.
+            if h > 0.0 {
+                struct_drag += zone.damage_drag_coeff * (1.0 - h);
+            }
 
             // Control surface effectiveness: multiplicative decay with damage.
             match &zone.control_role {
@@ -150,7 +192,7 @@ pub fn aggregate_zones(
                 None => {}
             }
 
-            let m = health.mass_kg * h;
+            let m = mass_kg_full * h;
             total_mass += m;
             cg_num += *pos * m;
             zone_masses.push((*pos, m));
@@ -217,6 +259,7 @@ mod tests {
             control_role: None,
             zone_mass: ZoneMass::Direct(1.0),
             damage_drag_coeff: 0.0,
+            structural_parent: None,
         }
     }
 
@@ -274,5 +317,78 @@ mod tests {
         assert!((half_drag - 0.5).abs() < 1e-12);
         assert!((zero_drag - 1.0).abs() < 1e-12);
     }
-}
 
+    /// Structural cascade pre-pass: destroying parent zeroes child.
+    #[test]
+    fn cascade_parent_zeroes_child() {
+        use bevy::prelude::Entity;
+        use std::collections::HashMap;
+
+        // Simulate the cascade pre-pass logic directly.
+        // Three zones: root (no parent), surface (parent=root), tip (parent=surface).
+        let root_entity    = Entity::from_raw_u32(1).unwrap();
+        let surface_entity = Entity::from_raw_u32(2).unwrap();
+        let tip_entity     = Entity::from_raw_u32(3).unwrap();
+
+        // root is destroyed; surface and tip are healthy.
+        // Format: (zone_entity, structural_parent, eff_health)
+        let mut zones: Vec<(Entity, Option<Entity>, f64)> = vec![
+            (root_entity,    None,                0.0), // destroyed
+            (surface_entity, Some(root_entity),   1.0),
+            (tip_entity,     Some(surface_entity), 1.0),
+        ];
+
+        // Run the cascade loop.
+        loop {
+            let mut changed = false;
+            let snapshot: HashMap<Entity, f64> =
+                zones.iter().map(|(e, _, h)| (*e, *h)).collect();
+
+            for (_, parent, eff_health) in zones.iter_mut() {
+                if let Some(p) = parent {
+                    if snapshot.get(p).copied().unwrap_or(1.0) == 0.0 && *eff_health != 0.0 {
+                        *eff_health = 0.0;
+                        changed = true;
+                    }
+                }
+            }
+            if !changed { break; }
+        }
+
+        assert_eq!(zones[0].2, 0.0, "root should be 0.0");
+        assert_eq!(zones[1].2, 0.0, "surface should cascade to 0.0");
+        assert_eq!(zones[2].2, 0.0, "tip should cascade to 0.0");
+    }
+
+    /// Cascade stops when parent is healthy — child retains its own health.
+    #[test]
+    fn cascade_no_propagation_when_parent_healthy() {
+        use bevy::prelude::Entity;
+        use std::collections::HashMap;
+
+        let root_entity    = Entity::from_raw_u32(1).unwrap();
+        let surface_entity = Entity::from_raw_u32(2).unwrap();
+
+        let mut zones: Vec<(Entity, Option<Entity>, f64)> = vec![
+            (root_entity,    None,              1.0), // healthy
+            (surface_entity, Some(root_entity), 0.5), // damaged but not due to root
+        ];
+
+        loop {
+            let mut changed = false;
+            let snapshot: HashMap<Entity, f64> =
+                zones.iter().map(|(e, _, h)| (*e, *h)).collect();
+            for (_, parent, eff_health) in zones.iter_mut() {
+                if let Some(p) = parent {
+                    if snapshot.get(p).copied().unwrap_or(1.0) == 0.0 && *eff_health != 0.0 {
+                        *eff_health = 0.0;
+                        changed = true;
+                    }
+                }
+            }
+            if !changed { break; }
+        }
+
+        assert_eq!(zones[1].2, 0.5, "surface should keep its own 0.5 health");
+    }
+}

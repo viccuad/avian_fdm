@@ -40,6 +40,23 @@ pub struct AeroZone {
     /// Extra drag coefficient added per unit of damage (1 − health).
     /// Represents structural drag from deformation and exposed internals.
     pub damage_drag_coeff: f64,
+    /// Structural parent zone. If the named entity's [`AeroZoneHealth::value`]
+    /// reaches `0.0`, this zone is treated as fully destroyed (`0.0`) regardless
+    /// of its own health — modelling cascade structural failure.
+    ///
+    /// Example wing tree:
+    /// ```text
+    /// fuselage (None) → wing_root (None) → wing_surface → wing_tip
+    /// ```
+    /// Destroying `wing_root` zeroes `wing_surface` and `wing_tip`.
+    ///
+    /// Chains of arbitrary depth are supported: `aggregate_zones` runs an
+    /// iterative pre-pass (`O(n × depth)`, depth ≤ ~5 for any real aircraft).
+    ///
+    /// Post-v1 (Group J): this becomes `structural_requires: Vec<Entity>` for
+    /// DAG dependencies (e.g. a surface that requires both its hinge and actuator).
+    #[serde(skip)] // Entity IDs are not stable across saves; reconstruct at spawn
+    pub structural_parent: Option<Entity>,
 }
 
 /// Runtime health and cached mass/volume of one aerodynamic zone.
