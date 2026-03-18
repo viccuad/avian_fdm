@@ -1,8 +1,288 @@
 //! ISA atmosphere model and wind resource.
 //!
-//! Computes [`crate::components::AtmosphereState`] each physics frame from
-//! the aircraft's geometric altitude. Implements the International Standard
-//! Atmosphere (ICAO Doc 7488) for the troposphere (0–11 km) and lower
-//! stratosphere (11–20 km), plus Sutherland's law for dynamic viscosity.
+//! Implements the International Standard Atmosphere (ICAO Doc 7488) for the
+//! troposphere (0–11 km) and lower stratosphere (11–20 km), plus Sutherland's
+//! law for dynamic viscosity.
+//!
+//! ## Why density drives everything
+//!
+//! Dynamic pressure q̄ = ½ρV² scales every aerodynamic force and moment.
+//! A 20% reduction in density (roughly 2 500 m altitude) means 20% less lift
+//! and drag at the same airspeed. Reynolds number Re = ρVc̄/μ controls which
+//! part of the CL/CD table is used — at low Re the boundary layer behaves very
+//! differently (sharper stall, higher CD₀).
+//!
+//! ## ISA derivation summary (ICAO Doc 7488)
+//!
+//! Troposphere (h ≤ 11 000 m):
+//! ```text
+//! T = T₀ − L·h          T₀ = 288.15 K,  L = 0.0065 K/m
+//! p = p₀·(T/T₀)^n       n = g/(R·L) ≈ 5.2559,  g = 9.80665 m/s²,  R = 287.05287 J/(kg·K)
+//! ρ = p/(R·T)
+//! ```
+//!
+//! Stratosphere (11 000 m < h ≤ 20 000 m):
+//! ```text
+//! T = 216.65 K  (isothermal)
+//! p = p₁₁·exp(−g·(h−h₁₁)/(R·T₁₁))
+//! ρ = p/(R·T)
+//! ```
+//!
+//! ## Sutherland's law (dynamic viscosity)
+//!
+//! Gas viscosity *increases* with temperature (unlike liquids — gas molecules
+//! collide more at higher T, transferring more momentum across flow layers).
+//!
+//! ```text
+//! μ = μ_ref·(T/T_ref)^(3/2)·(T_ref + S)/(T + S)
+//! μ_ref = 1.716×10⁻⁵ kg/(m·s),  T_ref = 273.15 K,  S = 110.4 K
+//! ```
 
-// TODO(atmosphere): implement update_atmosphere system
+use bevy::prelude::*;
+use crate::components::{AtmosphereState, FlightState, WindResource};
+
+// ── ISA constants ─────────────────────────────────────────────────────────────
+
+/// Sea-level temperature (K).
+const T0: f64 = 288.15;
+/// Sea-level pressure (Pa).
+const P0: f64 = 101_325.0;
+/// Tropospheric lapse rate (K/m).
+const L: f64 = 0.006_5;
+/// Tropopause altitude (m).
+const H_TROP: f64 = 11_000.0;
+/// Tropopause temperature (K).
+const T_TROP: f64 = 216.65;
+/// Specific gas constant for dry air (J/(kg·K)).
+const R_AIR: f64 = 287.052_87;
+/// Standard gravity (m/s²).
+const G: f64 = 9.806_65;
+/// Adiabatic index of air.
+const GAMMA: f64 = 1.4;
+
+/// Pressure exponent in the troposphere: g / (R · L).
+const TROP_EXPONENT: f64 = G / (R_AIR * L); // ≈ 5.2559
+
+/// Sutherland reference temperature (K).
+const T_REF_SUTH: f64 = 273.15;
+/// Sutherland reference dynamic viscosity (kg/(m·s)).
+const MU_REF_SUTH: f64 = 1.716e-5;
+/// Sutherland constant S (K).
+const S_SUTH: f64 = 110.4;
+
+// ── Pure ISA functions (public for testing and external use) ──────────────────
+
+/// Compute ISA temperature (K) at geometric altitude `h` (m).
+pub fn isa_temperature(h: f64) -> f64 {
+    if h <= H_TROP {
+        T0 - L * h
+    } else {
+        T_TROP
+    }
+}
+
+/// Compute ISA static pressure (Pa) at geometric altitude `h` (m).
+pub fn isa_pressure(h: f64) -> f64 {
+    if h <= H_TROP {
+        let t = isa_temperature(h);
+        P0 * (t / T0).powf(TROP_EXPONENT)
+    } else {
+        // Pressure at the tropopause boundary.
+        let p_trop = P0 * (T_TROP / T0).powf(TROP_EXPONENT);
+        p_trop * ((-G * (h - H_TROP)) / (R_AIR * T_TROP)).exp()
+    }
+}
+
+/// Compute ISA air density (kg/m³) at geometric altitude `h` (m).
+pub fn isa_density(h: f64) -> f64 {
+    let t = isa_temperature(h);
+    let p = isa_pressure(h);
+    p / (R_AIR * t)
+}
+
+/// Compute speed of sound (m/s) at temperature `t` (K).
+pub fn speed_of_sound(t: f64) -> f64 {
+    (GAMMA * R_AIR * t).sqrt()
+}
+
+/// Compute dynamic viscosity (kg/(m·s)) via Sutherland's law at temperature `t` (K).
+pub fn sutherland_viscosity(t: f64) -> f64 {
+    MU_REF_SUTH * (t / T_REF_SUTH).powf(1.5) * (T_REF_SUTH + S_SUTH) / (t + S_SUTH)
+}
+
+/// Populate an [`AtmosphereState`] for the given altitude (m).
+pub fn atmosphere_at(h: f64) -> AtmosphereState {
+    let temperature_k = isa_temperature(h);
+    let pressure_pa = isa_pressure(h);
+    let density_kgm3 = pressure_pa / (R_AIR * temperature_k);
+    let speed_of_sound_ms = speed_of_sound(temperature_k);
+    AtmosphereState { density_kgm3, pressure_pa, temperature_k, speed_of_sound_ms }
+}
+
+// ── Bevy systems ──────────────────────────────────────────────────────────────
+
+/// Updates [`AtmosphereState`] on each aircraft from its world-space altitude.
+///
+/// Reads `GlobalTransform.translation().y` as geometric altitude above sea level.
+pub fn update_atmosphere(
+    mut query: Query<(&GlobalTransform, &mut AtmosphereState)>,
+) {
+    for (transform, mut atm) in &mut query {
+        let altitude_m = transform.translation().y as f64;
+        *atm = atmosphere_at(altitude_m);
+    }
+}
+
+/// Updates [`FlightState`] on each aircraft from velocity and atmosphere.
+///
+/// Reads [`avian3d::prelude::LinearVelocity`] and [`avian3d::prelude::AngularVelocity`],
+/// converts to body frame, and derives α, β, V, q̄, Re, Mach.
+pub fn update_flight_state(
+    mut query: Query<(
+        &GlobalTransform,
+        &avian3d::prelude::LinearVelocity,
+        &AtmosphereState,
+        &crate::components::AircraftGeometry,
+        &mut FlightState,
+    )>,
+    wind: Option<Res<WindResource>>,
+) {
+    use bevy::math::{DVec3, DQuat};
+    use crate::math::world_to_body;
+
+    let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(DVec3::ZERO);
+
+    for (transform, lin_vel, atm, geom, mut fs) in &mut query {
+        let altitude_m = transform.translation().y as f64;
+
+        // World-frame velocity relative to air mass.
+        let vel_world = DVec3::new(
+            lin_vel.0.x as f64,
+            lin_vel.0.y as f64,
+            lin_vel.0.z as f64,
+        ) - wind_world;
+
+        let airspeed_ms = vel_world.length();
+
+        // Zero-airspeed guard: skip derived quantities, leave stale FlightState values.
+        // compute_aerodynamics will also guard on this and zero forces.
+        if airspeed_ms < 1e-4 {
+            fs.airspeed_ms = airspeed_ms;
+            fs.altitude_m = altitude_m;
+            fs.dynamic_pressure_pa = 0.0;
+            continue;
+        }
+
+        // Rotate velocity to body frame.
+        let q = DQuat::from_array(transform.rotation().to_array().map(|x| x as f64));
+        let vel_body = world_to_body(q, vel_world);
+
+        // Angle of attack α: angle between velocity and XY body plane, about Y axis.
+        // α = atan2(w, u)  where u = body-X component, w = body-Z component.
+        let u = vel_body.x; // forward
+        let v = vel_body.y; // right
+        let w = vel_body.z; // down (positive = flying nose-low)
+        let alpha_rad = f64::atan2(w, u);
+
+        // Sideslip β: angle between velocity and XZ body plane.
+        // β = atan2(v, sqrt(u²+w²))
+        let beta_rad = f64::atan2(v, (u * u + w * w).sqrt());
+
+        let dynamic_pressure_pa = 0.5 * atm.density_kgm3 * airspeed_ms * airspeed_ms;
+        let mu = sutherland_viscosity(atm.temperature_k);
+        let reynolds_number = atm.density_kgm3 * airspeed_ms * geom.chord_m / mu;
+        let mach = airspeed_ms / atm.speed_of_sound_ms;
+
+        *fs = FlightState {
+            alpha_rad,
+            beta_rad,
+            airspeed_ms,
+            mach,
+            dynamic_pressure_pa,
+            reynolds_number,
+            altitude_m,
+        };
+    }
+}
+
+// ── Unit tests ────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tolerance for ISA validation: ±0.1% on density, ±0.5% on pressure.
+    /// Reference values from ICAO Doc 7488 / standard ISA tables.
+    const DENS_TOL: f64 = 0.001;
+    const PRES_TOL: f64 = 0.005;
+    const TEMP_TOL: f64 = 0.001;
+
+    fn pct_err(got: f64, expected: f64) -> f64 {
+        (got - expected).abs() / expected
+    }
+
+    #[test]
+    fn isa_sea_level() {
+        // ICAO: T=288.15 K, p=101325 Pa, ρ=1.2250 kg/m³
+        let atm = atmosphere_at(0.0);
+        assert!(pct_err(atm.temperature_k, 288.15)  < TEMP_TOL, "T₀ {}", atm.temperature_k);
+        assert!(pct_err(atm.pressure_pa,   101_325.0) < PRES_TOL, "p₀ {}", atm.pressure_pa);
+        assert!(pct_err(atm.density_kgm3,  1.2250)    < DENS_TOL, "ρ₀ {}", atm.density_kgm3);
+    }
+
+    #[test]
+    fn isa_1000m() {
+        // ICAO: T=281.65 K, p=89874 Pa, ρ=1.1117 kg/m³
+        let atm = atmosphere_at(1_000.0);
+        assert!(pct_err(atm.temperature_k, 281.65)  < TEMP_TOL);
+        assert!(pct_err(atm.pressure_pa,   89_874.0) < PRES_TOL);
+        assert!(pct_err(atm.density_kgm3,  1.1117)   < DENS_TOL);
+    }
+
+    #[test]
+    fn isa_5000m() {
+        // ICAO: T=255.65 K, p=54048 Pa, ρ=0.7364 kg/m³
+        let atm = atmosphere_at(5_000.0);
+        assert!(pct_err(atm.temperature_k, 255.65)  < TEMP_TOL);
+        assert!(pct_err(atm.pressure_pa,   54_048.0) < PRES_TOL);
+        assert!(pct_err(atm.density_kgm3,  0.7364)   < DENS_TOL);
+    }
+
+    #[test]
+    fn isa_11000m_tropopause() {
+        // ICAO: T=216.65 K, p=22632 Pa, ρ=0.3639 kg/m³
+        let atm = atmosphere_at(11_000.0);
+        assert!(pct_err(atm.temperature_k, 216.65)  < TEMP_TOL);
+        assert!(pct_err(atm.pressure_pa,   22_632.0) < PRES_TOL);
+        assert!(pct_err(atm.density_kgm3,  0.3639)   < DENS_TOL);
+    }
+
+    #[test]
+    fn isa_stratosphere_is_isothermal() {
+        // Above 11 km temperature must stay at 216.65 K.
+        assert!((isa_temperature(15_000.0) - 216.65).abs() < 0.01);
+        assert!((isa_temperature(20_000.0) - 216.65).abs() < 0.01);
+    }
+
+    #[test]
+    fn speed_of_sound_sea_level() {
+        // ICAO: a₀ = 340.294 m/s at sea level
+        let a = speed_of_sound(288.15);
+        assert!((a - 340.294).abs() < 0.01, "a₀ = {a}");
+    }
+
+    #[test]
+    fn sutherland_sea_level() {
+        // Standard value: μ ≈ 1.789×10⁻⁵ kg/(m·s) at 288.15 K
+        let mu = sutherland_viscosity(288.15);
+        assert!((mu - 1.789e-5).abs() / 1.789e-5 < 0.005, "μ = {mu:.4e}");
+    }
+
+    #[test]
+    fn density_decreases_with_altitude() {
+        assert!(isa_density(0.0) > isa_density(5_000.0));
+        assert!(isa_density(5_000.0) > isa_density(11_000.0));
+        assert!(isa_density(11_000.0) > isa_density(15_000.0));
+    }
+}
+

@@ -24,4 +24,65 @@
 //! // app.add_systems(PhysicsSchedule, my_autopilot.after(update_flight_state).before(aggregate_zones));
 //! ```
 
-// TODO(systems): wire subsystem systems into PhysicsSchedule
+use bevy::prelude::*;
+use avian3d::prelude::{PhysicsSchedule, PhysicsStepSystems};
+
+use crate::atmosphere::{update_atmosphere, update_flight_state};
+use crate::aerodynamics::compute_aerodynamics;
+#[cfg(feature = "damage")]
+use crate::zone_aggregation::aggregate_zones;
+#[cfg(feature = "propulsion")]
+use crate::propulsion::compute_propulsion;
+
+/// Registers all FDM frame systems in the correct order within
+/// `PhysicsSet::Prepare`.
+pub(crate) fn register_fdm_systems(app: &mut App) {
+    // All systems chain together so each step sees the previous step's output.
+    #[cfg(all(feature = "damage", feature = "propulsion"))]
+    app.add_systems(
+        PhysicsSchedule,
+        (
+            update_atmosphere,
+            update_flight_state,
+            aggregate_zones,
+            compute_propulsion,
+            compute_aerodynamics,
+        )
+            .chain()
+            .in_set(PhysicsStepSystems::First),
+    );
+
+    #[cfg(all(feature = "damage", not(feature = "propulsion")))]
+    app.add_systems(
+        PhysicsSchedule,
+        (
+            update_atmosphere,
+            update_flight_state,
+            aggregate_zones,
+            compute_aerodynamics,
+        )
+            .chain()
+            .in_set(PhysicsStepSystems::First),
+    );
+
+    #[cfg(all(not(feature = "damage"), feature = "propulsion"))]
+    app.add_systems(
+        PhysicsSchedule,
+        (
+            update_atmosphere,
+            update_flight_state,
+            compute_propulsion,
+            compute_aerodynamics,
+        )
+            .chain()
+            .in_set(PhysicsStepSystems::First),
+    );
+
+    #[cfg(all(not(feature = "damage"), not(feature = "propulsion")))]
+    app.add_systems(
+        PhysicsSchedule,
+        (update_atmosphere, update_flight_state, compute_aerodynamics)
+            .chain()
+            .in_set(PhysicsStepSystems::First),
+    );
+}

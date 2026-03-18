@@ -50,6 +50,9 @@ impl Plugin for AircraftFdmPlugin {
 
         #[cfg(feature = "propulsion")]
         app.add_plugins(PropulsionPlugin);
+
+        // Wire all systems in the correct execution order.
+        crate::systems::register_fdm_systems(app);
     }
 }
 
