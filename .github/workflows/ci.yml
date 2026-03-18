@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  check-test-doc:
+    name: Check / Clippy / Test / Doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Linux system deps (bevy)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+
+      - name: cargo check (all features)
+        run: cargo check --all-features
+
+      - name: cargo clippy (all features)
+        run: cargo clippy --all-features
+
+      - name: cargo test (default features)
+        run: cargo test
+
+      - name: cargo test (no default features)
+        run: cargo test --no-default-features
+
+      - name: cargo test (damage + propulsion)
+        run: cargo test --features "damage,propulsion"
+
+      - name: cargo doc (all features)
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+      - name: cargo build --release (all features)
+        run: cargo build --release --all-features
+
+  jsbsim-validate:
+    name: JSBSim Validation (±1%)
+    runs-on: ubuntu-latest
+    # Advisory until jsbsim-fixture todo is complete; flip to false after.
+    continue-on-error: true
+    # Only run on pushes to main to keep PR CI fast.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Python + JSBSim
+        run: |
+          pip install jsbsim
+
+      - name: Install Linux system deps (bevy)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+
+      - name: Run JSBSim comparison test
+        run: cargo test --features presets -- jsbsim --nocapture
+        env:
+          JSBSIM_DATA_PATH: ${{ github.workspace }}/jsbsim

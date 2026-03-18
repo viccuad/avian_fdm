@@ -1,0 +1,29 @@
+[package]
+name = "avian_fdm"
+version = "0.1.0"
+edition = "2021"
+description = "6-DoF Flight Dynamics Model for Bevy + Avian 0.6"
+license = "MIT OR Apache-2.0"
+
+[features]
+default = ["damage", "propulsion"]
+damage = []
+propulsion = []
+debug-viz = ["dep:bevy_egui"]
+presets = []
+
+[dependencies]
+avian3d = "0.6"
+bevy = { version = "0.18", default-features = false, features = ["bevy_scene", "bevy_asset", "bevy_render"] }
+serde = { version = "1", features = ["derive"] }
+
+# Optional — only with debug-viz feature
+bevy_egui = { version = "0.39", optional = true }
+
+[dev-dependencies]
+bevy = { version = "0.18", features = ["bevy_winit", "bevy_pbr", "bevy_gizmos"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "fdm_hot_path"
+harness = false
