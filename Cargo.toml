@@ -13,7 +13,12 @@ debug-viz = ["dep:bevy_egui"]
 presets = []
 
 [dependencies]
-avian3d = "0.6"
+# collider-from-mesh is excluded: avian_fdm uses only analytic shapes (boxes, spheres,
+# capsules) for AeroZone colliders. Mesh-based colliders would require AssetPlugin +
+# MeshPlugin in headless apps, and are never needed for a flight dynamics library.
+avian3d = { version = "0.6", default-features = false, features = [
+    "3d", "f32", "parry-f32", "default-collider", "xpbd_joints", "parallel",
+] }
 bevy = { version = "0.18", default-features = false, features = ["bevy_scene", "bevy_asset", "bevy_render"] }
 serde = { version = "1", features = ["derive"] }
 
@@ -27,3 +32,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name = "fdm_hot_path"
 harness = false
+
+[[example]]
+name = "j3cub_minimal"
+required-features = ["presets"]

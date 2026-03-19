@@ -1,7 +1,7 @@
 //! System wiring — registers all FDM systems into Avian's `PhysicsSchedule`
 //! in the correct dependency order.
 //!
-//! ## Execution order within `PhysicsStepSystems::First`
+//! ## Execution order within `PhysicsStepSystems::BroadPhase`
 //!
 //! ```text
 //! update_atmosphere
@@ -11,9 +11,14 @@
 //!   → accumulate_zone_forces      (sums ZoneForce → ConstantForce + ConstantTorque)
 //! ```
 //!
-//! Avian's `ForceSystems::ApplyConstantForces` (runs later in the same
-//! `PhysicsSchedule`) picks up `ConstantForce`/`ConstantTorque` and writes
-//! them to `VelocityIntegrationData`.
+//! The FDM chain runs in `BroadPhase` (not `First`) to avoid a Bevy static
+//! ambiguity with Avian's `update_child_collider_position`, which writes
+//! `Position`/`Rotation` for child colliders in `First`. Both systems operate
+//! on disjoint entity sets at runtime, but the static checker cannot prove this.
+//! `BroadPhase` runs after `First`, so the ordering is guaranteed.
+//!
+//! Avian's `ForceSystems::ApplyConstantForces` runs in `Solver` (after
+//! `BroadPhase`), so forces are always written before they are read.
 //!
 //! ## Adding a custom system (e.g. autopilot)
 //!
@@ -40,6 +45,16 @@ use crate::aerodynamics::{compute_zone_forces, accumulate_zone_forces};
 use crate::propulsion::compute_engine_zone_forces;
 
 /// Registers all FDM frame systems in the correct order.
+///
+/// ## Why BroadPhase, not First?
+///
+/// Avian's `update_child_collider_position` (which writes `Position`/`Rotation`
+/// for child colliders) also runs in `PhysicsStepSystems::First`. Bevy's static
+/// ambiguity checker sees a conflict with `accumulate_zone_forces` reading
+/// `Position`/`Rotation` on *root* entities — even though the entity sets are
+/// disjoint at runtime. Placing our chain in `BroadPhase` (which runs after
+/// `First`) eliminates the false ambiguity while keeping forces written well
+/// before the `Solver` reads them via `ForceSystems::ApplyConstantForces`.
 pub(crate) fn register_fdm_systems(app: &mut App) {
     #[cfg(feature = "propulsion")]
     app.add_systems(
@@ -52,7 +67,7 @@ pub(crate) fn register_fdm_systems(app: &mut App) {
             accumulate_zone_forces,
         )
             .chain()
-            .in_set(PhysicsStepSystems::First),
+            .in_set(PhysicsStepSystems::BroadPhase),
     );
 
     #[cfg(not(feature = "propulsion"))]
@@ -65,6 +80,6 @@ pub(crate) fn register_fdm_systems(app: &mut App) {
             accumulate_zone_forces,
         )
             .chain()
-            .in_set(PhysicsStepSystems::First),
+            .in_set(PhysicsStepSystems::BroadPhase),
     );
 }

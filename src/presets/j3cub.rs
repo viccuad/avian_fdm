@@ -63,19 +63,22 @@
 //!
 //! ## Mass budget
 //!
-//! The preset targets a single-pilot loaded weight of ~440 kg:
+//! The preset targets a single-pilot loaded weight of ~440 kg.
+//! `Collider::cuboid(x, y, z)` takes **full extents** in metres; Avian
+//! converts internally to half-extents before computing volume.
 //!
-//! | Zone       | Collider                | Density (kg/m³) | ≈ Mass (kg) |
-//! |------------|-------------------------|-----------------|-------------|
-//! | Wing zones | 6 × cuboid              | 30 (foam/fabric)| 43          |
-//! | Aileron    | 2 × cuboid              | 50              | 4           |
-//! | H-stab     | cuboid                  | 100             | 5           |
-//! | Elevator   | cuboid                  | 80              | 2           |
-//! | V-tail     | cuboid                  | 100             | 3           |
-//! | Rudder     | cuboid                  | 80              | 1           |
-//! | Fuselage   | cuboid                  | 97              | ~310        |
-//! | Engine     | cuboid                  | 860             | 69          |
-//! |            |                         | **Total**       | **~437 kg** |
+//! | Zone         | Collider (x×y×z m)         | ρ (kg/m³) | Vol (m³) | ≈ Mass (kg) |
+//! |--------------|----------------------------|-----------|----------|-------------|
+//! | Wing root/mid| 4 × (0.80 × 1.88 × 0.155) | 30        | 4×0.233  | 28          |
+//! | Wing tip     | 2 × (0.80 × 1.61 × 0.155) | 30        | 2×0.200  | 12          |
+//! | Aileron      | 2 × (0.35 × 0.75 × 0.15)  | 50        | 2×0.039  | 4           |
+//! | H-stab       | (0.60 × 1.00 × 0.08)       | 100       | 0.048    | 5           |
+//! | Elevator     | (0.35 × 1.00 × 0.07)       | 80        | 0.025    | 2           |
+//! | V-tail       | (0.50 × 0.10 × 0.60)       | 100       | 0.030    | 3           |
+//! | Rudder       | (0.35 × 0.07 × 0.55)       | 80        | 0.013    | 1           |
+//! | Fuselage     | (6.50 × 0.65 × 0.75)       | 100       | 3.169    | 317         |
+//! | Engine       | (0.50 × 0.40 × 0.40)       | 860       | 0.080    | 69          |
+//! |              |                            |           | **Total**| **~441 kg** |
 
 use bevy::prelude::*;
 use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
@@ -173,12 +176,12 @@ const CD_DATA: [f64; 28] = [
 // Entry [i,j] = alpha_rows[i] × CL_alpha[j]  (CL_alpha is positive, α sign is preserved)
 const HTAIL_ALPHA_BP: [f64; 6] = [-0.3491, -0.1745, 0.0000, 0.0873, 0.1745, 0.3491];
 const HTAIL_CL_DATA: [f64; 12] = [
-     0.2866,  0.1892,   // alpha = −0.3491
-     0.1433,  0.0947,   // alpha = −0.1745
+    -0.2866, -0.1892,   // alpha = −0.3491
+    -0.1433, -0.0947,   // alpha = −0.1745
      0.0000,  0.0000,   // alpha =  0.0000
-    -0.0717, -0.0474,   // alpha =  0.0873
-    -0.1433, -0.0947,   // alpha =  0.1745
-    -0.2866, -0.1892,   // alpha =  0.3491
+     0.0717,  0.0474,   // alpha =  0.0873
+     0.1433,  0.0947,   // alpha =  0.1745
+     0.2866,  0.1892,   // alpha =  0.3491
 ];
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -226,34 +229,34 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // ── Left wing ────────────────────────────────────────────────────
             parent.spawn(wing_zone(
                 "L-root", -0.94, 0.175,
-                Collider::cuboid(0.80, 0.04, 0.94),
+                Collider::cuboid(0.80, 1.88, 0.155),
                 ColliderDensity(30.0),
             ));
             parent.spawn(wing_zone(
                 "L-mid", -2.82, 0.175,
-                Collider::cuboid(0.80, 0.04, 0.94),
+                Collider::cuboid(0.80, 1.88, 0.155),
                 ColliderDensity(30.0),
             ));
             parent.spawn(wing_zone(
                 "L-tip", -4.57, 0.150,
-                Collider::cuboid(0.80, 0.04, 0.88),
+                Collider::cuboid(0.80, 1.61, 0.155),
                 ColliderDensity(30.0),
             ));
 
             // ── Right wing ───────────────────────────────────────────────────
             parent.spawn(wing_zone(
                 "R-root", 0.94, 0.175,
-                Collider::cuboid(0.80, 0.04, 0.94),
+                Collider::cuboid(0.80, 1.88, 0.155),
                 ColliderDensity(30.0),
             ));
             parent.spawn(wing_zone(
                 "R-mid", 2.82, 0.175,
-                Collider::cuboid(0.80, 0.04, 0.94),
+                Collider::cuboid(0.80, 1.88, 0.155),
                 ColliderDensity(30.0),
             ));
             parent.spawn(wing_zone(
                 "R-tip", 4.57, 0.150,
-                Collider::cuboid(0.80, 0.04, 0.88),
+                Collider::cuboid(0.80, 1.61, 0.155),
                 ColliderDensity(30.0),
             ));
 
@@ -261,50 +264,50 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             parent.spawn(aileron_zone(
                 "L-aileron", -4.05,
                 ControlSurfaceRole::AileronLeft,
-                Collider::cuboid(0.35, 0.03, 0.75),
+                Collider::cuboid(0.35, 0.75, 0.15),
                 ColliderDensity(50.0),
             ));
             parent.spawn(aileron_zone(
                 "R-aileron", 4.05,
                 ControlSurfaceRole::AileronRight,
-                Collider::cuboid(0.35, 0.03, 0.75),
+                Collider::cuboid(0.35, 0.75, 0.15),
                 ColliderDensity(50.0),
             ));
 
             // ── Fuselage (gear drag) ──────────────────────────────────────────
             parent.spawn(fuselage_zone(
-                Collider::cuboid(2.00, 0.50, 0.30),
-                ColliderDensity(97.0),
+                Collider::cuboid(6.50, 0.65, 0.75),
+                ColliderDensity(100.0),
             ));
 
             // ── Horizontal stabiliser ─────────────────────────────────────────
             parent.spawn(hstab_zone(
-                Collider::cuboid(0.60, 0.03, 0.55),
+                Collider::cuboid(0.60, 1.00, 0.08),
                 ColliderDensity(100.0),
             ));
 
             // ── Elevator ──────────────────────────────────────────────────────
             parent.spawn(elevator_zone(
-                Collider::cuboid(0.35, 0.02, 0.55),
+                Collider::cuboid(0.35, 1.00, 0.07),
                 ColliderDensity(80.0),
             ));
 
             // ── Vertical fin ──────────────────────────────────────────────────
             parent.spawn(vtail_zone(
-                Collider::cuboid(0.50, 0.50, 0.03),
+                Collider::cuboid(0.50, 0.10, 0.60),
                 ColliderDensity(100.0),
             ));
 
             // ── Rudder ────────────────────────────────────────────────────────
             parent.spawn(rudder_zone(
-                Collider::cuboid(0.40, 0.60, 0.03),
+                Collider::cuboid(0.35, 0.07, 0.55),
                 ColliderDensity(80.0),
             ));
 
             // ── Engine ────────────────────────────────────────────────────────
             #[cfg(feature = "propulsion")]
             parent.spawn(engine_zone(
-                Collider::cuboid(0.25, 0.20, 0.20),
+                Collider::cuboid(0.50, 0.40, 0.40),
                 ColliderDensity(860.0),
             ));
         })
@@ -419,10 +422,17 @@ pub fn fuselage_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
 
 /// Horizontal stabiliser zone — provides pitch stability via tail-arm moment.
 ///
-/// CL(α, Re) = −CM_α(Re) × c̄/l_t × α, so that:
-///   Moment = CL × q × S × l_t  =  CM_α × q × S × c̄ × α  (matches JSBSim)
+/// CL(α, Re) = −CM_α(Re) × c̄/l_t × α
 ///
-/// At α > 0 (nose up), CL < 0 → downward tail force → nose-down restoring moment.
+/// JSBSim stores CM_α as **negative** (stable aircraft): −2.03/rad at Re=1.7M,
+/// −1.34/rad at Re=3.7M. Negating gives a **positive** CL at positive α:
+///   CL = −(−2.03) × 1.6/3.96 × α = +0.821 × α   (Re=1.7M)
+///
+/// At α > 0 (nose up), CL > 0 → **upward** tail force → pitch-down restoring moment.
+/// At α < 0 (nose down), CL < 0 → **downward** tail force → pitch-up restoring moment.
+///
+/// The whole-aircraft pitch moment is recovered as:
+///   M = CL × q̄ × S_ref × l_t = −CM_α × α × q̄ × S_ref × c̄  ✓
 pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
     (
         AeroZoneBundle {
@@ -603,16 +613,19 @@ mod tests {
         assert!(cl.abs() < 1e-10, "h-stab CL at alpha=0 should be 0, got {cl}");
     }
 
-    /// H-stab CL is negative at positive alpha → provides nose-down restoring moment.
+    /// H-stab CL is **positive** at positive alpha → upward tail force → pitch-down restoring moment.
+    ///
+    /// JSBSim `Pitch_alpha`: CM_α = −2.0327/rad (Re=1.7M), so
+    /// CL_hstab = −CM_α × c̄/l_t × α = +0.821 × α > 0 at positive α.
     #[test]
-    fn hstab_cl_negative_at_positive_alpha() {
+    fn hstab_cl_positive_at_positive_alpha() {
         let coeff = AeroCoeff::Table2D {
             rows: HTAIL_ALPHA_BP.to_vec(),
             cols: RE_BP.to_vec(),
             data: HTAIL_CL_DATA.to_vec(),
         };
         let cl = coeff.evaluate(0.1, RE_BP[0]);
-        assert!(cl < 0.0, "h-stab CL at positive alpha should be negative, got {cl}");
+        assert!(cl > 0.0, "h-stab CL at positive alpha should be positive (upward force at tail), got {cl}");
     }
 
     /// Aileron roll moment magnitude matches JSBSim Roll_aileron at full deflection.
