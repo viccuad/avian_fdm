@@ -1,27 +1,21 @@
 //! All ECS components, bundles, and shared data types.
-//!
-//! Every public type derives `Component` (or `Resource`), `Reflect`,
-//! `Serialize`, `Deserialize`, and `Clone` so they are first-class in Bevy
-//! scenes, RON files, and Bevy's inspector tools.
 
 pub mod aero_coeff;
-pub mod aircraft;
 pub mod aero_zone;
+pub mod aircraft;
 pub mod controls;
-pub mod engine;
+pub mod damageable;
+pub mod engine_zone;
 pub mod flight_state;
+pub mod zone_force;
 
 pub use aero_coeff::AeroCoeff;
+pub use aero_zone::{AeroZone, AeroZoneBundle, ControlSurfaceRole, materials};
 pub use aircraft::{AircraftGeometry, AircraftCoreBundle};
 pub use controls::ControlInputs;
+pub use damageable::Damageable;
 pub use flight_state::{FlightState, AtmosphereState, WindResource};
-
-#[cfg(feature = "damage")]
-pub use aircraft::{AircraftMass, AircraftAggregate, AircraftDamageBundle};
-
-#[cfg(feature = "damage")]
-pub use aero_zone::{AeroZone, AeroZoneBundle, AeroZoneHealth, ControlEffectiveness,
-                    ControlSurfaceRole, ZoneMass, materials};
+pub use zone_force::ZoneForce;
 
 #[cfg(feature = "propulsion")]
-pub use engine::{EngineConfig, PropwashState, AircraftPropulsionBundle};
+pub use engine_zone::{EngineZone, PropwashState};

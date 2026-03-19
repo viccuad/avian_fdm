@@ -2,101 +2,67 @@
 //!
 //! `avian_fdm` is a Bevy plugin that computes aerodynamic forces and moments
 //! for rigid-body aircraft simulated with the [Avian](https://crates.io/crates/avian3d)
-//! physics engine. Each physics frame the library evaluates lift, drag, side
-//! force, and the three moment axes, then writes the results to Avian's
-//! [`ExternalForce`] and [`ExternalTorque`] components — Avian's integrator
-//! then propagates the rigid body. The library never moves an entity directly.
+//! physics engine.
+//!
+//! Each physics frame the library iterates every [`components::AeroZone`]
+//! child entity, evaluates lift/drag/moments, and calls Avian's
+//! `apply_force_at_point` — Avian computes the moment arm automatically.
+//! Mass, centre of gravity, and inertia are managed entirely by Avian via
+//! [`avian3d::prelude::ColliderDensity`] on each child collider.
 //!
 //! ## What is a Flight Dynamics Model?
 //!
-//! A Flight Dynamics Model (FDM) is the mathematical description of all the
-//! forces and moments acting on an aircraft. Newton's second law in 6 degrees
-//! of freedom:
+//! A Flight Dynamics Model (FDM) is the mathematical description of all forces
+//! and moments acting on an aircraft. Newton's second law in 6 degrees of
+//! freedom:
 //!
 //! ```text
-//! F = m · a          (three translational axes)
-//! M = I · α + ω × (I · ω)   (three rotational axes)
+//! F = m · a
+//! M = I · α + ω × (I · ω)
 //! ```
 //!
-//! where **F** is the net external force vector, **m** is total mass, **a**
-//! is linear acceleration, **M** is the net external moment, **I** is the
-//! inertia tensor, **α** is angular acceleration, and **ω** is angular
-//! velocity. Avian solves these equations every substep; the FDM's only job
-//! is to compute **F** and **M** each frame.
-//!
-//! The dominant contributions to **F** and **M** are:
-//! - **Aerodynamic forces** — lift, drag, side force, and the three moment
-//!   axes, all proportional to dynamic pressure q̄ = ½ρV²
-//! - **Propulsive thrust** — modelled as an actuator disk for piston engines
-//! - **Gravity** — handled by Avian's gravity resource, not by this library
+//! where **F** is net external force, **m** total mass, **a** linear
+//! acceleration, **M** net external moment, **I** inertia tensor, **α**
+//! angular acceleration, and **ω** angular velocity. Avian solves these
+//! equations every substep; the FDM's only job is to supply **F** and **M**
+//! at each zone's world position each frame.
 //!
 //! ## Coordinate Frames
 //!
-//! ### Body frame (aircraft-fixed, SAE aerospace standard)
+//! ### Body frame (aircraft-fixed, SAE aerospace)
 //!
 //! ```text
-//!         Z (down)
-//!         │
-//!         └──── Y (right wing)
-//!        ╱
-//!       X (forward, nose)
+//!       X (forward/nose)
+//!      ╱
+//!     └──── Y (right wing)
+//!     │
+//!     Z (down)
 //! ```
 //!
-//! | Axis | Direction  | Positive rotation     |
-//! |------|------------|-----------------------|
-//! | X    | Nose       | Roll right            |
-//! | Y    | Right wing | Pitch nose up         |
-//! | Z    | Belly-down | Yaw nose right        |
+//! | Axis | Direction  | Positive rotation |
+//! |------|------------|-------------------|
+//! | X    | Nose       | Roll right        |
+//! | Y    | Right wing | Pitch nose up     |
+//! | Z    | Belly-down | Yaw nose right    |
 //!
 //! ### World frame (Bevy / Avian, Y-up right-handed)
 //!
-//! ```text
-//!         Y (up)
-//!         │
-//!         └──── X (east, arbitrary)
-//!        ╱
-//!       Z (south, arbitrary)
-//! ```
+//! At identity rotation, body X maps to world −Z (aircraft faces into screen).
 //!
-//! At identity rotation (`Transform::default()`), body X maps to world −Z:
-//! the aircraft faces into the screen in Bevy's default camera setup.
-//!
-//! All internal computation uses `f64` (`DVec3`, `DMat3`, `DQuat` from glam).
-//! The only `f64 → f32` conversion occurs when writing to Avian's components.
-//!
-//! ### Unit conventions
-//!
-//! All quantities are **SI** throughout:
-//!
-//! | Quantity   | Unit          |
-//! |------------|---------------|
-//! | Distance   | metres (m)    |
-//! | Mass       | kilograms (kg)|
-//! | Force      | Newtons (N)   |
-//! | Torque     | N·m           |
-//! | Velocity   | m/s           |
-//! | Angles     | radians (rad) |
-//! | Pressure   | Pascals (Pa)  |
-//! | Density    | kg/m³         |
-//! | Temperature| Kelvin (K)    |
+//! All internal computation uses `f64`. The only `f64 → f32` conversion is
+//! when interfacing with Avian's `f32` APIs.
 //!
 //! ## Data Flow
 //!
 //! ```text
-//! ┌─── PostStartup ────────────────────────────────────────────┐
-//! │  init_zone_volumes   compute collider_volume_m3 + mass_kg  │
-//! └────────────────────────────────────────────────────────────┘
-//!
-//! ┌─── PhysicsSet::Prepare (each physics frame) ───────────────────────┐
-//! │  update_atmosphere   → AtmosphereState (ρ, p, T, a)               │
-//! │  update_flight_state → FlightState (α, β, V, q̄, Re, Mach)         │
-//! │  aggregate_zones     → AircraftAggregate (evaluated f64 totals)    │
-//! │                         AircraftMass (total m, CG, inertia tensor) │
-//! │  compute_propulsion  → ExternalForce (thrust) + PropwashState      │
-//! │  compute_aerodynamics→ ExternalForce + ExternalTorque (aero)       │
-//! └────────────────────────────────────────────────────────────────────┘
+//! ┌─── PhysicsSet::Prepare (each physics frame) ─────────────────────────┐
+//! │  update_atmosphere    → AtmosphereState (ρ, p, T, a)                 │
+//! │  update_flight_state  → FlightState (α, β, V, q̄, Re, Mach)           │
+//! │  compute_propulsion   → apply_force_at_point (thrust) + PropwashState │
+//! │  compute_aerodynamics → apply_force_at_point per AeroZone child       │
+//! └──────────────────────────────────────────────────────────────────────-┘
 //!         │
-//!         ▼ Avian substep integrator
+//!         ▼  Avian substep integrator
 //!    position, velocity, rotation updated
 //! ```
 //!
@@ -128,30 +94,27 @@
 //!
 //! ## Feature Flags
 //!
-//! | Feature      | Default | Enables                                    |
-//! |--------------|---------|--------------------------------------------|
-//! | `damage`     | on      | Zone health, mass aggregation, CG shifting |
-//! | `propulsion` | on      | Piston engine + propwash model             |
-//! | `debug-viz`  | off     | Bevy gizmo overlays + egui HUD             |
-//! | `presets`    | off     | Reference aircraft (J3Cub)                 |
+//! | Feature      | Default | Enables                              |
+//! |--------------|---------|--------------------------------------|
+//! | `damage`     | on      | `Damageable` component + DetachPlugin |
+//! | `propulsion` | on      | Piston engine + propwash model        |
+//! | `debug-viz`  | off     | Bevy gizmo overlays + egui HUD        |
+//! | `presets`    | off     | Reference aircraft (J3Cub)            |
 
 #![deny(missing_docs)]
 
-use bevy::prelude::*;
-
 pub mod components;
 pub mod math;
-
-#[cfg(feature = "damage")]
-pub mod zone_aggregation;
-
 pub mod atmosphere;
 pub mod aerodynamics;
+pub mod systems;
+pub mod plugin;
+
+#[cfg(feature = "damage")]
+pub mod detach;
 
 #[cfg(feature = "propulsion")]
 pub mod propulsion;
-
-pub mod systems;
 
 #[cfg(feature = "debug-viz")]
 pub mod debug;
@@ -159,12 +122,10 @@ pub mod debug;
 #[cfg(feature = "presets")]
 pub mod presets;
 
-pub mod plugin;
-
 /// Re-exports for convenient glob import: `use avian_fdm::prelude::*;`
 pub mod prelude {
     pub use crate::components::{
-        AeroZone, AeroZoneBundle,
+        AeroZone, AeroZoneBundle, ControlSurfaceRole, materials,
         AircraftCoreBundle, AircraftGeometry,
         ControlInputs, FlightState, AtmosphereState,
         aero_coeff::AeroCoeff,
@@ -172,13 +133,8 @@ pub mod prelude {
     pub use crate::plugin::AircraftFdmPlugin;
 
     #[cfg(feature = "damage")]
-    pub use crate::components::{
-        AeroZoneHealth, AircraftAggregate, AircraftDamageBundle, AircraftMass,
-        ZoneMass, materials,
-    };
+    pub use crate::components::Damageable;
 
     #[cfg(feature = "propulsion")]
-    pub use crate::components::{
-        AircraftPropulsionBundle, EngineConfig, PropwashState,
-    };
+    pub use crate::components::{EngineZone, PropwashState};
 }

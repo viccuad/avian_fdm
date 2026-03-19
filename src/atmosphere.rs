@@ -141,6 +141,7 @@ pub fn update_flight_state(
     mut query: Query<(
         &GlobalTransform,
         &avian3d::prelude::LinearVelocity,
+        &avian3d::prelude::AngularVelocity,
         &AtmosphereState,
         &crate::components::AircraftGeometry,
         &mut FlightState,
@@ -152,8 +153,16 @@ pub fn update_flight_state(
 
     let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(DVec3::ZERO);
 
-    for (transform, lin_vel, atm, geom, mut fs) in &mut query {
+    for (transform, lin_vel, ang_vel, atm, geom, mut fs) in &mut query {
         let altitude_m = transform.translation().y as f64;
+
+        // Body angular rates — rotate world AngularVelocity to body frame.
+        let q = DQuat::from_array(transform.rotation().to_array().map(|x| x as f64));
+        let av_world = DVec3::new(ang_vel.0.x as f64, ang_vel.0.y as f64, ang_vel.0.z as f64);
+        let omega_body = q.inverse() * av_world;
+        let p_rads = omega_body.x;
+        let q_rads = omega_body.y;
+        let r_rads = omega_body.z;
 
         // World-frame velocity relative to air mass.
         let vel_world = DVec3::new(
@@ -165,27 +174,26 @@ pub fn update_flight_state(
         let airspeed_ms = vel_world.length();
 
         // Zero-airspeed guard: skip derived quantities, leave stale FlightState values.
-        // compute_aerodynamics will also guard on this and zero forces.
         if airspeed_ms < 1e-4 {
             fs.airspeed_ms = airspeed_ms;
             fs.altitude_m = altitude_m;
             fs.dynamic_pressure_pa = 0.0;
+            fs.p_rads = p_rads;
+            fs.q_rads = q_rads;
+            fs.r_rads = r_rads;
             continue;
         }
 
         // Rotate velocity to body frame.
-        let q = DQuat::from_array(transform.rotation().to_array().map(|x| x as f64));
         let vel_body = world_to_body(q, vel_world);
 
-        // Angle of attack α: angle between velocity and XY body plane, about Y axis.
-        // α = atan2(w, u)  where u = body-X component, w = body-Z component.
+        // Angle of attack α: atan2(w, u)
         let u = vel_body.x; // forward
         let v = vel_body.y; // right
-        let w = vel_body.z; // down (positive = flying nose-low)
+        let w = vel_body.z; // down
         let alpha_rad = f64::atan2(w, u);
 
-        // Sideslip β: angle between velocity and XZ body plane.
-        // β = atan2(v, sqrt(u²+w²))
+        // Sideslip β: atan2(v, sqrt(u²+w²))
         let beta_rad = f64::atan2(v, (u * u + w * w).sqrt());
 
         let dynamic_pressure_pa = 0.5 * atm.density_kgm3 * airspeed_ms * airspeed_ms;
@@ -201,6 +209,9 @@ pub fn update_flight_state(
             dynamic_pressure_pa,
             reynolds_number,
             altitude_m,
+            p_rads,
+            q_rads,
+            r_rads,
         };
     }
 }

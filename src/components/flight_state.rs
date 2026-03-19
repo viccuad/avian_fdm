@@ -26,6 +26,12 @@ pub struct FlightState {
     pub reynolds_number: f64,
     /// Geometric altitude above sea level (m).
     pub altitude_m: f64,
+    /// Roll rate p in body frame (rad/s). Written by `update_flight_state`.
+    pub p_rads: f64,
+    /// Pitch rate q in body frame (rad/s). Written by `update_flight_state`.
+    pub q_rads: f64,
+    /// Yaw rate r in body frame (rad/s). Written by `update_flight_state`.
+    pub r_rads: f64,
 }
 
 /// ISA atmosphere conditions at this entity's altitude.

@@ -1,160 +1,48 @@
-//! [`AeroZone`], [`AeroZoneHealth`], and related types for the zone-based
-//! damage model.
-//!
-//! Only compiled when `features = ["damage"]`.
+//! [`AeroZone`] and related types for the per-zone aerodynamic model.
 
 use bevy::prelude::*;
-use bevy::math::DVec3;
-use serde::{Deserialize, Serialize};
 use avian3d::prelude::Collider;
+use serde::{Deserialize, Serialize};
 use crate::components::aero_coeff::AeroCoeff;
+use crate::components::zone_force::ZoneForce;
 
-/// Per-zone aerodynamic coefficient contributions and material properties.
+/// Per-zone aerodynamic coefficient contributions.
 ///
-/// Authored in Blender/Skein and exported as part of the scene. This is the
-/// primary aircraft configuration surface — designers specify all aerodynamic
-/// coefficients here, per zone.
+/// Attach to any child entity that has an Avian [`Collider`]. The FDM
+/// system queries all entities with this component, evaluates the coefficients
+/// at the current flight state, and calls `apply_force_at_point` on the
+/// nearest `RigidBody` ancestor — Avian computes the moment arm automatically.
 ///
-/// Lives on each **AeroZone child entity**.
+/// Damage is tracked separately via [`super::Damageable`]. When absent, the
+/// zone is treated as fully intact.
+///
+/// Lives on each **AeroZone child entity** (child of the aircraft root).
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct AeroZone {
-    /// This zone's partial contribution to CL at full health.
+    /// Partial contribution to CL (lift coefficient).
     pub cl: AeroCoeff,
-    /// This zone's partial contribution to CD at full health.
+    /// Partial contribution to CD (drag coefficient).
     pub cd: AeroCoeff,
-    /// This zone's partial contribution to CY (side force) at full health.
+    /// Partial contribution to CY (side-force coefficient).
     pub cy: AeroCoeff,
-    /// This zone's partial contribution to CM (pitching moment) at full health.
+    /// Partial contribution to CM (pitching-moment coefficient, about c̄).
     pub cm: AeroCoeff,
-    /// This zone's partial contribution to Cl (rolling moment) at full health.
+    /// Partial contribution to Cl (rolling-moment coefficient, about b).
     pub croll: AeroCoeff,
-    /// This zone's partial contribution to Cn (yawing moment) at full health.
+    /// Partial contribution to Cn (yawing-moment coefficient, about b).
     pub cn: AeroCoeff,
-    /// If `Some`, this zone acts as a control surface of the given type.
-    /// Its derivatives are also scaled by the matching [`ControlInputs`] value
-    /// and by zone health.
+    /// If `Some`, this zone acts as a control surface. Its coefficients are
+    /// additionally scaled by the matching [`super::ControlInputs`] value.
     pub control_role: Option<ControlSurfaceRole>,
-    /// How this zone's mass is determined at `PostStartup`. See [`ZoneMass`].
-    pub zone_mass: ZoneMass,
     /// Drag pressure (Pa) added per unit of damage while the zone is still
-    /// attached. Represents structural drag from deformation and exposed internals.
-    ///
-    /// When `health == 0.0` the zone has detached from the airframe and this
-    /// contributes nothing. The drag curve peaks just before detachment:
+    /// attached (`health > 0`). Represents structural drag from deformation.
     ///
     /// ```text
     /// struct_drag = damage_drag_coeff × (1 − health)   when health > 0
-    ///             = 0                                   when health == 0 (gone)
+    ///             = 0                                   when health == 0 (detached)
     /// ```
     pub damage_drag_coeff: f64,
-    /// Structural parent zone. If the named entity's [`AeroZoneHealth::value`]
-    /// reaches `0.0`, this zone is treated as fully destroyed (`0.0`) regardless
-    /// of its own health — modelling cascade structural failure.
-    ///
-    /// Example wing tree:
-    /// ```text
-    /// fuselage (None) → wing_root (None) → wing_surface → wing_tip
-    /// ```
-    /// Destroying `wing_root` zeroes `wing_surface` and `wing_tip`.
-    ///
-    /// Chains of arbitrary depth are supported: `aggregate_zones` runs an
-    /// iterative pre-pass (`O(n × depth)`, depth ≤ ~5 for any real aircraft).
-    ///
-    /// Post-v1 (Group J): this becomes `structural_requires: Vec<Entity>` for
-    /// DAG dependencies (e.g. a surface that requires both its hinge and actuator).
-    #[serde(skip)] // Entity IDs are not stable across saves; reconstruct at spawn
-    pub structural_parent: Option<Entity>,
-}
-
-/// Runtime health and cached mass/volume of one aerodynamic zone.
-///
-/// `value` is written by the game's hit/damage system.
-/// `collider_volume_m3` and `mass_kg` are computed once at `PostStartup`
-/// and cached — never recomputed per frame.
-#[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
-#[reflect(Component, Serialize, Deserialize)]
-pub struct AeroZoneHealth {
-    /// Zone health: 1.0 = fully intact, 0.0 = completely destroyed.
-    /// Write this from your projectile/collision system.
-    pub value: f64,
-    /// Collider volume in m³, computed at `PostStartup` from `Collider::volume()`.
-    /// Zero if the collider volume API is unavailable (see implementation note).
-    pub collider_volume_m3: f64,
-    /// Mass at full health (kg), computed at `PostStartup` from [`ZoneMass`]:
-    /// - `FromDensity(d)` → `d × collider_volume_m3`
-    /// - `Direct(kg)` → `kg`
-    ///
-    /// Current frame mass contribution = `mass_kg × health.value`.
-    pub mass_kg: f64,
-}
-
-impl Default for AeroZoneHealth {
-    fn default() -> Self {
-        Self { value: 1.0, collider_volume_m3: 0.0, mass_kg: 0.0 }
-    }
-}
-
-/// How the mass of an [`AeroZone`] is determined once at `PostStartup`.
-///
-/// Choose based on how accurately the zone's Avian [`Collider`] represents
-/// the actual structural member geometry.
-#[derive(Reflect, Serialize, Deserialize, Clone, Debug, PartialEq)]
-#[reflect(Serialize, Deserialize)]
-pub enum ZoneMass {
-    /// `mass = material_density × collider_volume_m3`
-    ///
-    /// Use when the collider accurately represents the structural member
-    /// geometry — e.g. a spar modelled as a thin box, a skin panel as a flat
-    /// cuboid, a foam core as a solid block. Pass a value from the
-    /// [`materials`] module or any custom density in kg/m³.
-    FromDensity(f64),
-
-    /// `mass = the specified value in kg`
-    ///
-    /// Use when the collider is a bounding approximation (not the actual
-    /// material volume), or when the part mass is known from published
-    /// weight-and-balance data.
-    Direct(f64),
-}
-
-impl Default for ZoneMass {
-    fn default() -> Self {
-        ZoneMass::Direct(0.0)
-    }
-}
-
-/// Common structural material densities (kg/m³) for use with
-/// [`ZoneMass::FromDensity`].
-///
-/// # Example
-/// ```rust
-/// use avian_fdm::components::ZoneMass;
-/// use avian_fdm::components::materials;
-///
-/// let spar_mass = ZoneMass::FromDensity(materials::ALUMINIUM);
-/// ```
-pub mod materials {
-    /// Aluminium alloy (7075-T6: 2 800 kg/m³; 6061-T6: 2 700 kg/m³).
-    pub const ALUMINIUM: f64 = 2_700.0;
-    /// Structural steel.
-    pub const STEEL: f64 = 7_800.0;
-    /// Titanium alloy (Ti-6Al-4V).
-    pub const TITANIUM: f64 = 4_500.0;
-    /// Carbon fibre reinforced polymer (CFRP), unidirectional layup.
-    pub const CARBON_FIBRE: f64 = 1_600.0;
-    /// Glass fibre reinforced polymer (GFRP).
-    pub const GLASS_FIBRE: f64 = 1_800.0;
-    /// Balsa wood — used in RC aircraft ribs and formers.
-    pub const BALSA: f64 = 150.0;
-    /// Aircraft-grade plywood.
-    pub const PLYWOOD: f64 = 600.0;
-    /// Expanded polystyrene (EPS) foam — RC fuselages and wings.
-    pub const FOAM: f64 = 30.0;
-    /// Rubber — tyres, seals.
-    pub const RUBBER: f64 = 1_200.0;
-    /// Perspex / acrylic — canopy glazing.
-    pub const PERSPEX: f64 = 1_190.0;
 }
 
 /// Which flight control function this zone performs, if any.
@@ -171,45 +59,76 @@ pub enum ControlSurfaceRole {
     Rudder,
 }
 
-/// Per-surface control effectiveness scale factors (0–1).
+/// Common structural material densities (kg/m³) for use with Avian's
+/// [`avian3d::prelude::ColliderDensity`].
 ///
-/// Computed by `aggregate_zones` from the health of zones with matching
-/// [`ControlSurfaceRole`]. A fully damaged elevator gives `elevator = 0.0`.
-/// Multiplicative accumulation: two 50%-health elevator zones → 0.25.
-#[derive(Reflect, Serialize, Deserialize, Clone, Debug)]
-#[reflect(Serialize, Deserialize)]
-pub struct ControlEffectiveness {
-    /// Elevator effectiveness (0–1).
-    pub elevator: f64,
-    /// Left aileron effectiveness (0–1).
-    pub aileron_left: f64,
-    /// Right aileron effectiveness (0–1).
-    pub aileron_right: f64,
-    /// Rudder effectiveness (0–1).
-    pub rudder: f64,
-}
-
-impl Default for ControlEffectiveness {
-    fn default() -> Self {
-        Self { elevator: 1.0, aileron_left: 1.0, aileron_right: 1.0, rudder: 1.0 }
-    }
+/// # Example
+/// ```rust
+/// use avian_fdm::components::materials;
+/// // entity.insert(ColliderDensity(materials::ALUMINIUM as f32));
+/// let _ = materials::ALUMINIUM;
+/// ```
+pub mod materials {
+    /// Aluminium alloy (6061-T6).
+    pub const ALUMINIUM: f64 = 2_700.0;
+    /// Structural steel.
+    pub const STEEL: f64 = 7_800.0;
+    /// Titanium alloy (Ti-6Al-4V).
+    pub const TITANIUM: f64 = 4_500.0;
+    /// Carbon fibre reinforced polymer (CFRP).
+    pub const CARBON_FIBRE: f64 = 1_600.0;
+    /// Glass fibre reinforced polymer (GFRP).
+    pub const GLASS_FIBRE: f64 = 1_800.0;
+    /// Balsa wood — used in RC aircraft ribs and formers.
+    pub const BALSA: f64 = 150.0;
+    /// Aircraft-grade plywood.
+    pub const PLYWOOD: f64 = 600.0;
+    /// Expanded polystyrene (EPS) foam.
+    pub const FOAM: f64 = 30.0;
+    /// Rubber — tyres, seals.
+    pub const RUBBER: f64 = 1_200.0;
+    /// Perspex / acrylic — canopy glazing.
+    pub const PERSPEX: f64 = 1_190.0;
 }
 
 /// Bundle for one aerodynamic zone child entity.
 ///
-/// Spawn as a child of the aircraft root entity. Also requires an Avian
-/// [`Collider`] (included in this bundle) for hit detection and volume
-/// computation.
-#[derive(Bundle)]
+/// Spawn as a child of the aircraft root entity.
+///
+/// # Example
+/// ```rust,no_run
+/// # use avian_fdm::components::*;
+/// # use avian3d::prelude::*;
+/// # use bevy::prelude::*;
+/// // commands.spawn(AeroZoneBundle { zone: AeroZone { ... }, collider: Collider::cuboid(1.0, 0.1, 2.0), ..default() });
+/// ```
+#[derive(Bundle, Default)]
 pub struct AeroZoneBundle {
-    /// Aerodynamic coefficient contributions and material properties.
+    /// Aerodynamic coefficients and control role.
     pub zone: AeroZone,
-    /// Runtime health and cached mass. `value` starts at 1.0.
-    pub health: AeroZoneHealth,
-    /// Avian collider — used for hit detection and (with `FromDensity`) volume.
+    /// Per-frame force output (written by FDM, read by accumulation system).
+    pub zone_force: ZoneForce,
+    /// Avian collider — required for hit detection and for Avian to include
+    /// this zone's mass (via [`avian3d::prelude::ColliderDensity`]) in the
+    /// parent rigid body's [`avian3d::prelude::ComputedMass`].
     pub collider: Collider,
-    /// Position in the aircraft body frame.
+    /// Position/orientation relative to the aircraft root.
     pub transform: Transform,
     /// Required by Bevy for transform propagation.
     pub global_transform: GlobalTransform,
+}
+
+impl Default for AeroZone {
+    fn default() -> Self {
+        Self {
+            cl: AeroCoeff::Scalar(0.0),
+            cd: AeroCoeff::Scalar(0.0),
+            cy: AeroCoeff::Scalar(0.0),
+            cm: AeroCoeff::Scalar(0.0),
+            croll: AeroCoeff::Scalar(0.0),
+            cn: AeroCoeff::Scalar(0.0),
+            control_role: None,
+            damage_drag_coeff: 0.0,
+        }
+    }
 }

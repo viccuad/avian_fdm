@@ -1,87 +1,69 @@
-//! System wiring: registers all FDM systems into Avian's `PhysicsSchedule`
+//! System wiring — registers all FDM systems into Avian's `PhysicsSchedule`
 //! in the correct dependency order.
 //!
-//! ## Execution order within `PhysicsSet::Prepare`
+//! ## Execution order within `PhysicsStepSystems::First`
 //!
 //! ```text
 //! update_atmosphere
-//!   → update_flight_state      (needs ρ for Re)
-//!   → aggregate_zones          (needs α, Re to evaluate AeroCoeff tables)
-//!   → compute_propulsion        (needs FlightState; writes ExternalForce + PropwashState)
-//!   → compute_aerodynamics      (needs AircraftAggregate + FlightState + PropwashState)
+//!   → update_flight_state         (needs ρ for Re; also writes p/q/r body rates)
+//!   → compute_engine_zone_forces  (propulsion feature; writes ZoneForce + PropwashState)
+//!   → compute_zone_forces         (writes ZoneForce per AeroZone)
+//!   → accumulate_zone_forces      (sums ZoneForce → ConstantForce + ConstantTorque)
 //! ```
 //!
-//! All systems run before Avian's `SubstepSet` integrator.
+//! Avian's `ForceSystems::ApplyConstantForces` (runs later in the same
+//! `PhysicsSchedule`) picks up `ConstantForce`/`ConstantTorque` and writes
+//! them to `VelocityIntegrationData`.
 //!
 //! ## Adding a custom system (e.g. autopilot)
 //!
-//! Insert your system between `update_flight_state` and `aggregate_zones` to
-//! read the latest `FlightState` and write `ControlInputs` before forces are
-//! computed:
+//! Insert between `update_flight_state` and `compute_zone_forces` to read
+//! `FlightState` and write `ControlInputs`:
 //!
 //! ```rust,no_run
 //! # use bevy::prelude::*;
-//! // app.add_systems(PhysicsSchedule, my_autopilot.after(update_flight_state).before(aggregate_zones));
+//! # use avian3d::prelude::*;
+//! // app.add_systems(PhysicsSchedule,
+//! //     my_autopilot
+//! //         .after(avian_fdm::atmosphere::update_flight_state)
+//! //         .before(avian_fdm::aerodynamics::compute_zone_forces)
+//! //         .in_set(PhysicsStepSystems::First));
 //! ```
 
 use bevy::prelude::*;
 use avian3d::prelude::{PhysicsSchedule, PhysicsStepSystems};
 
 use crate::atmosphere::{update_atmosphere, update_flight_state};
-use crate::aerodynamics::compute_aerodynamics;
-#[cfg(feature = "damage")]
-use crate::zone_aggregation::aggregate_zones;
+use crate::aerodynamics::{compute_zone_forces, accumulate_zone_forces};
+
 #[cfg(feature = "propulsion")]
-use crate::propulsion::compute_propulsion;
+use crate::propulsion::compute_engine_zone_forces;
 
-/// Registers all FDM frame systems in the correct order within
-/// `PhysicsSet::Prepare`.
+/// Registers all FDM frame systems in the correct order.
 pub(crate) fn register_fdm_systems(app: &mut App) {
-    // All systems chain together so each step sees the previous step's output.
-    #[cfg(all(feature = "damage", feature = "propulsion"))]
+    #[cfg(feature = "propulsion")]
     app.add_systems(
         PhysicsSchedule,
         (
             update_atmosphere,
             update_flight_state,
-            aggregate_zones,
-            compute_propulsion,
-            compute_aerodynamics,
+            compute_engine_zone_forces,
+            compute_zone_forces,
+            accumulate_zone_forces,
         )
             .chain()
             .in_set(PhysicsStepSystems::First),
     );
 
-    #[cfg(all(feature = "damage", not(feature = "propulsion")))]
+    #[cfg(not(feature = "propulsion"))]
     app.add_systems(
         PhysicsSchedule,
         (
             update_atmosphere,
             update_flight_state,
-            aggregate_zones,
-            compute_aerodynamics,
+            compute_zone_forces,
+            accumulate_zone_forces,
         )
-            .chain()
-            .in_set(PhysicsStepSystems::First),
-    );
-
-    #[cfg(all(not(feature = "damage"), feature = "propulsion"))]
-    app.add_systems(
-        PhysicsSchedule,
-        (
-            update_atmosphere,
-            update_flight_state,
-            compute_propulsion,
-            compute_aerodynamics,
-        )
-            .chain()
-            .in_set(PhysicsStepSystems::First),
-    );
-
-    #[cfg(all(not(feature = "damage"), not(feature = "propulsion")))]
-    app.add_systems(
-        PhysicsSchedule,
-        (update_atmosphere, update_flight_state, compute_aerodynamics)
             .chain()
             .in_set(PhysicsStepSystems::First),
     );
