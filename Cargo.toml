@@ -36,3 +36,7 @@ harness = false
 [[example]]
 name = "j3cub_minimal"
 required-features = ["presets"]
+
+[[example]]
+name = "j3cub_visual"
+required-features = ["presets"]
