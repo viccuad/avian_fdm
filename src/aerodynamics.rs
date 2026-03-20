@@ -198,11 +198,12 @@ pub fn compute_aero_forces(
                 // Write per-zone output (for debug viz).
                 zone_force.force = force_world;
                 zone_force.torque = torque_world;
-                zone_force.world_point = zone_gt.translation();
+                let ac_world = zone_gt.transform_point(zone.ac_offset);
+                zone_force.world_point = ac_world;
 
                 // Accumulate onto root.
                 cf.0 += force_world;
-                ct.0 += (zone_gt.translation() - com_world).cross(force_world) + torque_world;
+                ct.0 += (ac_world - com_world).cross(force_world) + torque_world;
 
                 continue;
             }

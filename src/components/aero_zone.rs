@@ -10,8 +10,26 @@ use crate::components::zone_force::ZoneForce;
 ///
 /// Attach to any child entity that has an Avian [`Collider`]. The FDM
 /// system queries all entities with this component, evaluates the coefficients
-/// at the current flight state, and calls `apply_force_at_point` on the
-/// nearest `RigidBody` ancestor — Avian computes the moment arm automatically.
+/// at the current flight state, and accumulates force + torque onto the
+/// nearest `RigidBody` ancestor.
+///
+/// ## Aerodynamic centre offset
+///
+/// By default, aerodynamic forces are applied at the zone entity's origin
+/// (its [`Transform`] position). When building aircraft from 3D models
+/// (e.g. in Blender), it is often more convenient to place the zone entity
+/// at the geometric centre of its mesh, then specify where the aerodynamic
+/// centre is relative to that origin via [`ac_offset`](Self::ac_offset).
+///
+/// ```text
+///   Zone origin (mesh centre)
+///        │
+///        ├── ac_offset ──▶ Aerodynamic Centre
+///        │                  (force application point)
+/// ```
+///
+/// The moment-coefficient data (CM, Croll, Cn) is assumed to be referenced
+/// to the aerodynamic centre.
 ///
 /// Damage is tracked separately via [`super::Damageable`]. When absent, the
 /// zone is treated as fully intact.
@@ -32,6 +50,17 @@ pub struct AeroZone {
     pub croll: AeroCoeff,
     /// Partial contribution to Cn (yawing-moment coefficient, about b).
     pub cn: AeroCoeff,
+    /// Offset from the zone entity's local origin to the aerodynamic centre,
+    /// in the zone's local coordinate frame (metres).
+    ///
+    /// When `Vec3::ZERO` (default), the entity origin *is* the AC — i.e. the
+    /// zone's [`Transform`] position is both mesh centre and force application
+    /// point (the legacy behaviour).
+    ///
+    /// For a wing panel whose mesh is centred at mid-chord, a typical value
+    /// is `Vec3::new(0.25 * chord, 0.0, 0.0)` to place the AC at the
+    /// quarter-chord point (body-frame X = forward).
+    pub ac_offset: Vec3,
     /// If `Some`, this zone acts as a control surface. Its coefficients are
     /// additionally scaled by the matching [`super::ControlInputs`] value.
     pub control_role: Option<ControlSurfaceRole>,
@@ -127,6 +156,7 @@ impl Default for AeroZone {
             cm: AeroCoeff::Scalar(0.0),
             croll: AeroCoeff::Scalar(0.0),
             cn: AeroCoeff::Scalar(0.0),
+            ac_offset: Vec3::ZERO,
             control_role: None,
             damage_drag_coeff: 0.0,
         }
