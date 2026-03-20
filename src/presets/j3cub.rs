@@ -329,6 +329,10 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
                 wing_area_m2: WING_AREA_M2,
                 wing_span_m:  WING_SPAN_M,
                 chord_m:      CHORD_M,
+                // Nelson, "Flight Stability", Table B1 — J3Cub / light GA
+                cl_p: -0.45,
+                cm_q: -12.0,
+                cn_r: -0.12,
             },
             rigid_body: RigidBody::Dynamic,
             transform,

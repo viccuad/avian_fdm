@@ -1,18 +1,17 @@
 //! Aerodynamic force pipeline.
 //!
-//! Two-phase design:
+//! A single unified system [`compute_aero_forces`] iterates each aircraft root
+//! entity, then its child `AeroZone` entities inline. For each zone it:
 //!
-//! 1. **`compute_zone_forces`** — per `AeroZone` entity, evaluates
-//!    stability-derivative coefficients and writes a `ZoneForce` (world-space
-//!    force + application point) to the zone entity. Pure math; never touches
-//!    Avian query data.
+//! 1. Evaluates stability-derivative coefficients at the current α and Re.
+//! 2. Computes a world-space force (from CL, CD, CY) and a pure aerodynamic
+//!    torque (from CM, Croll, Cn).
+//! 3. Writes to the zone's [`ZoneForce`] component (for debug visualisation).
+//! 4. Accumulates force, moment-arm torque, and pure torque into the root's
+//!    [`ConstantForce`] / [`ConstantTorque`].
 //!
-//! 2. **`accumulate_zone_forces`** — per aircraft root entity, iterates
-//!    `Children`, sums `ZoneForce` contributions into `ConstantForce` (total
-//!    force) and `ConstantTorque` (moment arm cross-product using the root's
-//!    `ComputedCenterOfMass`), then adds dynamic-damping torques. Avian applies
-//!    `ConstantForce`/`ConstantTorque` natively in
-//!    `ForceSystems::ApplyConstantForces`.
+//! After all zones are processed, whole-aircraft dynamic damping torques are
+//! added from the per-aircraft `AircraftGeometry` derivatives (cl_p, cm_q, cn_r).
 //!
 //! ## Force construction (stability axes → world)
 //!
@@ -29,132 +28,52 @@
 //! body_to_world = root_quaternion
 //! ```
 //!
-//! ## Dynamic damping
-//!
-//! Applied once per root in `accumulate_zone_forces`:
+//! ## Per-zone pure torques
 //!
 //! ```text
-//! ΔCM = CM_q · (q·c̄/2V)    pitch damping  (Nelson Table B1: −12)
-//! ΔCl = Cl_p · (p·b/2V)    roll  damping  (−0.45)
-//! ΔCn = Cn_r · (r·b/2V)    yaw   damping  (−0.12)
+//! Torque_body = (Croll · q̄ · S · b,  CM · q̄ · S · c̄,  Cn · q̄ · S · b)
+//! ```
+//!
+//! These are pure aerodynamic couples (e.g. airfoil pitching moment about its
+//! aerodynamic centre). They are added to `ConstantTorque` alongside the
+//! moment-arm torques from force × offset.
+//!
+//! ## Dynamic damping
+//!
+//! Applied once per root after zone accumulation:
+//!
+//! ```text
+//! ΔCM = cm_q · (q·c̄/2V)    pitch damping
+//! ΔCl = cl_p · (p·b/2V)    roll  damping
+//! ΔCn = cn_r · (r·b/2V)    yaw   damping
 //! ```
 
 use bevy::prelude::*;
 use bevy::math::{DVec3, DQuat};
 use avian3d::prelude::{
-    ColliderOf, ConstantForce, ConstantTorque, Position, Rotation, ComputedCenterOfMass,
+    ConstantForce, ConstantTorque, Position, Rotation, ComputedCenterOfMass,
 };
 
 use crate::components::{
     AeroZone, AircraftGeometry, ControlInputs, ControlSurfaceRole,
-    Damageable, FlightState, WindResource, ZoneForce,
+    Damageable, FlightState, ZoneForce,
 };
 #[cfg(feature = "propulsion")]
-use crate::components::PropwashState;
-
-// ── Dynamic damping derivatives (Nelson, "Flight Stability", Table B1) ───────
-const CM_Q: f64 = -12.0;
-const CL_P: f64 = -0.45;
-const CN_R: f64 = -0.12;
+use crate::components::EngineZone;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Phase 1: evaluate per-zone aerodynamic coefficients and write `ZoneForce`.
+/// Unified aerodynamic force system: per-zone coefficient evaluation,
+/// force/torque accumulation, and dynamic damping — in a single pass.
 ///
-/// Reads `FlightState`, `AircraftGeometry`, and `ControlInputs` from the
-/// zone's parent RigidBody (via `ColliderOf.body`). Does **not** mutate any
-/// Avian physics component — it only writes to the zone's own `ZoneForce`.
-pub fn compute_zone_forces(
-    mut zone_query: Query<(
-        &AeroZone,
-        &GlobalTransform,
-        &ColliderOf,
-        &mut ZoneForce,
-        Option<&Damageable>,
-    )>,
-    root_query: Query<(&FlightState, &AircraftGeometry, &ControlInputs, &GlobalTransform)>,
-    wind: Option<Res<WindResource>>,
-) {
-    let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(DVec3::ZERO);
-    let _ = wind_world;
-
-    for (zone, zone_gt, col_of, mut zone_force, dmg) in zone_query.iter_mut() {
-        *zone_force = ZoneForce::default();
-
-        let health = dmg.map(|d| d.health).unwrap_or(1.0);
-        if health <= 0.0 {
-            continue;
-        }
-
-        // Look up root flight data. Skip if root isn't set up yet.
-        let Ok((flight, geo, ctrl, root_gt)) = root_query.get(col_of.body) else {
-            continue;
-        };
-
-        if flight.airspeed_ms < 1e-4 {
-            continue;
-        }
-
-        let alpha = flight.alpha_rad;
-        let re = flight.reynolds_number;
-        let qbar = flight.dynamic_pressure_pa;
-        let s = geo.wing_area_m2;
-
-        // ── Evaluate base coefficients ────────────────────────────────────────
-        let cl_base = zone.cl.evaluate(alpha, re);
-        let cd_base = zone.cd.evaluate(alpha, re);
-        let cy_base = zone.cy.evaluate(alpha, re);
-
-        // Control surface scaling: coefficients represent the authority at
-        // full deflection; scale linearly by actual input ∈ [−1, 1].
-        // AileronRight mirrors the aileron input (opposite direction).
-        let (scale, cd_scale) = match &zone.control_role {
-            Some(ControlSurfaceRole::Elevator) => (ctrl.elevator, ctrl.elevator.abs()),
-            Some(ControlSurfaceRole::AileronLeft) => (ctrl.aileron, ctrl.aileron.abs()),
-            Some(ControlSurfaceRole::AileronRight) => (-ctrl.aileron, ctrl.aileron.abs()),
-            Some(ControlSurfaceRole::Rudder) => (ctrl.rudder, ctrl.rudder.abs()),
-            None => (1.0, 1.0),
-        };
-
-        let cl = cl_base * scale * health;
-        // Drag from deformation adds across [1, 0] health, then disappears at 0.
-        let extra_cd = zone.damage_drag_coeff * (1.0 - health) / qbar.max(1e-4);
-        let cd = (cd_base * cd_scale + extra_cd) * health;
-        let cy = cy_base * scale * health;
-
-        // ── Force in stability axes → body → world ────────────────────────────
-        // Stability axes: X_s into relative wind, Z_s perpendicular (lift-up).
-        // Rotate to body by −α about body Y, then body → world by root quat.
-        let force_stab = DVec3::new(
-            -cd * qbar * s,  // drag opposes motion (−X_s)
-            cy * qbar * s,   // side force (Y_s = body Y)
-            -cl * qbar * s,  // lift upward (−Z_s)
-        );
-
-        let q_world = DQuat::from_array(root_gt.rotation().to_array().map(|x| x as f64));
-        let stab_to_body = DQuat::from_rotation_y(-alpha);
-        let force_world_f64 = q_world * (stab_to_body * force_stab);
-
-        if !force_world_f64.is_finite() {
-            warn_once!("Non-finite aero force on zone — zeroed");
-            continue;
-        }
-
-        zone_force.force = Vec3::new(
-            force_world_f64.x as f32,
-            force_world_f64.y as f32,
-            force_world_f64.z as f32,
-        );
-        zone_force.world_point = zone_gt.translation();
-    }
-}
-
-/// Phase 2: sum `ZoneForce` from all children into root `ConstantForce` /
-/// `ConstantTorque`, plus whole-aircraft dynamic damping torques.
+/// Iterates each aircraft root entity, then its children inline. Writes
+/// per-zone `ZoneForce` as a side-effect for debug visualisation. Writes
+/// totals to `ConstantForce` / `ConstantTorque` on the root.
 ///
-/// Runs once per aircraft root entity. `ConstantForce`/`ConstantTorque` are
-/// reset to zero first so stale values never accumulate across frames.
-pub fn accumulate_zone_forces(
+/// Engine zones (with `EngineZone` component) are skipped — their `ZoneForce`
+/// is already written by `compute_engine_zone_forces`. Their force and torque
+/// contributions are included during the child accumulation loop.
+pub fn compute_aero_forces(
     mut root_query: Query<(
         &mut ConstantForce,
         &mut ConstantTorque,
@@ -163,67 +82,166 @@ pub fn accumulate_zone_forces(
         &ComputedCenterOfMass,
         &FlightState,
         &AircraftGeometry,
+        &ControlInputs,
         &Children,
     )>,
-    zone_force_query: Query<&ZoneForce>,
+    mut zone_query: Query<(
+        &AeroZone,
+        &GlobalTransform,
+        &mut ZoneForce,
+        Option<&Damageable>,
+    )>,
+    // Engine zones are read-only here — their ZoneForce was already written
+    // by compute_engine_zone_forces. We just need to include their contribution
+    // in the accumulation pass.
     #[cfg(feature = "propulsion")]
-    propwash_query: Query<&PropwashState>,
+    engine_zone_query: Query<&ZoneForce, (With<EngineZone>, Without<AeroZone>)>,
 ) {
-    for (mut cf, mut ct, pos, rot, com, flight, geo, children) in root_query.iter_mut() {
+    for (mut cf, mut ct, pos, rot, com, flight, geo, ctrl, children)
+        in root_query.iter_mut()
+    {
         // Reset each frame — we recompute from scratch.
         cf.0 = Vec3::ZERO;
         ct.0 = Vec3::ZERO;
 
+        // Skip entire aircraft if airspeed is negligible.
+        if flight.airspeed_ms < 1e-4 {
+            continue;
+        }
+
+        let alpha = flight.alpha_rad;
+        let re = flight.reynolds_number;
+        let qbar = flight.dynamic_pressure_pa;
+        let s = geo.wing_area_m2;
+        let b = geo.wing_span_m;
+        let c = geo.chord_m;
+
+        let q_world = DQuat::from_array(rot.0.to_array().map(|x| x as f64));
+        let stab_to_body = DQuat::from_rotation_y(-alpha);
+
         // Global centre of mass (f32, Avian-native).
         let com_world: Vec3 = pos.0 + rot.0 * com.0;
 
-        // Sum zone force contributions.
+        // ── Per-zone: evaluate coefficients, compute force+torque, accumulate ──
         for child in children.iter() {
-            let Ok(zf) = zone_force_query.get(child) else { continue };
-            if zf.force == Vec3::ZERO {
+            // ── AeroZone children ──────────────────────────────────────────
+            if let Ok((zone, zone_gt, mut zone_force, dmg)) = zone_query.get_mut(child) {
+                *zone_force = ZoneForce::default();
+
+                let health = dmg.map(|d| d.health).unwrap_or(1.0);
+                if health <= 0.0 {
+                    continue;
+                }
+
+                // ── Evaluate base coefficients ────────────────────────────
+                let cl_base = zone.cl.evaluate(alpha, re);
+                let cd_base = zone.cd.evaluate(alpha, re);
+                let cy_base = zone.cy.evaluate(alpha, re);
+                let cm_base = zone.cm.evaluate(alpha, re);
+                let croll_base = zone.croll.evaluate(alpha, re);
+                let cn_base = zone.cn.evaluate(alpha, re);
+
+                // Control surface scaling: coefficients represent authority at
+                // full deflection; scale linearly by actual input ∈ [−1, 1].
+                // AileronRight mirrors the aileron input (opposite direction).
+                let (scale, cd_scale) = match &zone.control_role {
+                    Some(ControlSurfaceRole::Elevator) => (ctrl.elevator, ctrl.elevator.abs()),
+                    Some(ControlSurfaceRole::AileronLeft) => (ctrl.aileron, ctrl.aileron.abs()),
+                    Some(ControlSurfaceRole::AileronRight) => (-ctrl.aileron, ctrl.aileron.abs()),
+                    Some(ControlSurfaceRole::Rudder) => (ctrl.rudder, ctrl.rudder.abs()),
+                    None => (1.0, 1.0),
+                };
+
+                let cl = cl_base * scale * health;
+                // Drag from deformation adds across [1, 0] health, disappears at 0.
+                let extra_cd = zone.damage_drag_coeff * (1.0 - health) / qbar.max(1e-4);
+                let cd = (cd_base * cd_scale + extra_cd) * health;
+                let cy = cy_base * scale * health;
+                let cm = cm_base * scale * health;
+                let croll = croll_base * scale * health;
+                let cn = cn_base * scale * health;
+
+                // ── Force: stability axes → body → world ──────────────────
+                let force_stab = DVec3::new(
+                    -cd * qbar * s,  // drag opposes motion (−X_s)
+                    cy * qbar * s,   // side force (Y_s = body Y)
+                    -cl * qbar * s,  // lift upward (−Z_s)
+                );
+                let force_world_f64 = q_world * (stab_to_body * force_stab);
+
+                // ── Pure torque: body → world ─────────────────────────────
+                // These are aerodynamic couples (e.g. airfoil CM_ac) that
+                // exist independently of the zone's position offset.
+                let torque_body = DVec3::new(
+                    croll * qbar * s * b,  // rolling moment → body X
+                    cm * qbar * s * c,     // pitching moment → body Y
+                    cn * qbar * s * b,     // yawing moment → body Z
+                );
+                let torque_world_f64 = q_world * torque_body;
+
+                if !force_world_f64.is_finite() || !torque_world_f64.is_finite() {
+                    warn_once!("Non-finite aero force/torque on zone — zeroed");
+                    continue;
+                }
+
+                let force_world = Vec3::new(
+                    force_world_f64.x as f32,
+                    force_world_f64.y as f32,
+                    force_world_f64.z as f32,
+                );
+                let torque_world = Vec3::new(
+                    torque_world_f64.x as f32,
+                    torque_world_f64.y as f32,
+                    torque_world_f64.z as f32,
+                );
+
+                // Write per-zone output (for debug viz).
+                zone_force.force = force_world;
+                zone_force.torque = torque_world;
+                zone_force.world_point = zone_gt.translation();
+
+                // Accumulate onto root.
+                cf.0 += force_world;
+                ct.0 += (zone_gt.translation() - com_world).cross(force_world) + torque_world;
+
                 continue;
             }
-            cf.0 += zf.force;
-            ct.0 += (zf.world_point - com_world).cross(zf.force);
+
+            // ── Engine zone children (propulsion feature) ─────────────────
+            // ZoneForce was already written by compute_engine_zone_forces.
+            // We just accumulate the force + moment arm torque here.
+            #[cfg(feature = "propulsion")]
+            if let Ok(zf) = engine_zone_query.get(child) {
+                if zf.force != Vec3::ZERO {
+                    cf.0 += zf.force;
+                    ct.0 += (zf.world_point - com_world).cross(zf.force);
+                }
+                continue;
+            }
         }
 
         // ── Dynamic damping torques (whole-aircraft, applied once) ────────────
-        if flight.airspeed_ms >= 1e-4 {
-            let v = flight.airspeed_ms;
-            let qbar = flight.dynamic_pressure_pa;
-            let s = geo.wing_area_m2;
-            let b = geo.wing_span_m;
-            let c = geo.chord_m;
+        let v = flight.airspeed_ms;
 
-            let pb_2v = flight.p_rads * b / (2.0 * v);
-            let qc_2v = flight.q_rads * c / (2.0 * v);
-            let rb_2v = flight.r_rads * b / (2.0 * v);
+        let pb_2v = flight.p_rads * b / (2.0 * v);
+        let qc_2v = flight.q_rads * c / (2.0 * v);
+        let rb_2v = flight.r_rads * b / (2.0 * v);
 
-            // Damping moments in body frame.
-            let damp_body = DVec3::new(
-                CL_P * pb_2v * qbar * s * b,  // roll damping → body X
-                CM_Q * qc_2v * qbar * s * c,  // pitch damping → body Y
-                CN_R * rb_2v * qbar * s * b,  // yaw damping → body Z
+        // Damping moments in body frame using per-aircraft derivatives.
+        let damp_body = DVec3::new(
+            geo.cl_p * pb_2v * qbar * s * b,  // roll damping → body X
+            geo.cm_q * qc_2v * qbar * s * c,  // pitch damping → body Y
+            geo.cn_r * rb_2v * qbar * s * b,  // yaw damping → body Z
+        );
+
+        // Rotate to world frame.
+        let damp_world = q_world * damp_body;
+        if damp_world.is_finite() {
+            ct.0 += Vec3::new(
+                damp_world.x as f32,
+                damp_world.y as f32,
+                damp_world.z as f32,
             );
-
-            // Rotate to world frame.
-            let q_world = DQuat::from_array(rot.0.to_array().map(|x| x as f64));
-            let damp_world = q_world * damp_body;
-            if damp_world.is_finite() {
-                ct.0 += Vec3::new(
-                    damp_world.x as f32,
-                    damp_world.y as f32,
-                    damp_world.z as f32,
-                );
-            }
-        }
-
-        // ── Propwash lift increment ────────────────────────────────────────────
-        #[cfg(feature = "propulsion")]
-        {
-            // Look up PropwashState on this root entity (if it exists).
-            // Detailed propwash coupling is Group A (post-v1).
-            let _ = &propwash_query;
         }
     }
 }
@@ -231,7 +249,6 @@ pub fn accumulate_zone_forces(
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::components::aero_coeff::AeroCoeff;
 
     /// Dynamic pressure proportionality: doubling airspeed quadruples force.

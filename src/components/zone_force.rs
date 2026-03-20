@@ -1,15 +1,14 @@
-//! [`ZoneForce`] — per-zone force output written by the FDM compute systems
-//! and read by the accumulation system. Internal component; not part of the
-//! public API.
+//! [`ZoneForce`] — per-zone force and torque output written by the FDM
+//! `compute_aero_forces` system (and `compute_engine_zone_forces` for thrust).
+//! Also read by the debug visualisation for per-zone force arrows.
 
 use bevy::prelude::*;
 
-/// World-space force and application point computed for one zone each frame.
+/// World-space force, pure torque, and application point for one zone.
 ///
-/// Written by `compute_zone_forces` / `compute_engine_zone_forces`.
-/// Read by `accumulate_zone_forces`, which sums contributions into the root
-/// entity's [`avian3d::prelude::ConstantForce`] and
-/// [`avian3d::prelude::ConstantTorque`].
+/// Written by `compute_aero_forces` / `compute_engine_zone_forces`.
+/// Read by `compute_aero_forces` (for engine zones during accumulation)
+/// and by the debug visualisation.
 ///
 /// Zero-initialised at spawn. Set to `default()` (zeroed) when the zone is
 /// destroyed (`Damageable.health == 0.0`) or otherwise inactive.
@@ -17,8 +16,12 @@ use bevy::prelude::*;
 /// **Do not read or write this component from game code.**
 #[derive(Component, Default, Clone, Copy, Debug)]
 pub struct ZoneForce {
-    /// World-space force contribution (N). f32 matches Avian's `Vector` type.
+    /// World-space force contribution (N) — from CL, CD, CY coefficients.
     pub force: Vec3,
+    /// World-space pure aerodynamic torque (N·m) — from CM, Croll, Cn
+    /// coefficients. This is a couple (moment without net force), distinct
+    /// from the moment-arm torque computed as (zone_pos − CG) × force.
+    pub torque: Vec3,
     /// World-space point at which the force acts (for moment arm calculation).
     pub world_point: Vec3,
 }

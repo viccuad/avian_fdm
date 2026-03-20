@@ -337,9 +337,10 @@
 //! 6. Rotate to world: `F_world = q_root · R_y(−α) · F_stab`
 //! 7. Write to [`components::ZoneForce`] on the zone entity.
 //!
-//! [`aerodynamics::accumulate_zone_forces`] then sums all `ZoneForce` values
-//! into [`avian3d::prelude::ConstantForce`] / [`avian3d::prelude::ConstantTorque`]
-//! on the root.
+//! All of this happens in [`aerodynamics::compute_aero_forces`], which also
+//! evaluates per-zone pure torques from CM/Croll/Cn coefficients and sums
+//! everything into [`avian3d::prelude::ConstantForce`] /
+//! [`avian3d::prelude::ConstantTorque`] on the root.
 //!
 //! ### Dynamic damping
 //!
@@ -547,15 +548,14 @@
 //! │                                 ControlInputs, EngineZone                │
 //! │                          writes: ZoneForce(engine), PropwashState        │
 //! │                                                                           │
-//! │  4. compute_zone_forces  reads: FlightState, AeroZone, ControlInputs,   │
-//! │                                 Damageable, GlobalTransform(zone)        │
-//! │                          writes: ZoneForce per AeroZone child            │
-//! │                                                                           │
-//! │  5. accumulate_zone_forces                                               │
-//! │                          reads: ZoneForce (all children),                │
+//! │  4. compute_aero_forces                                                  │
+//! │                          reads: FlightState, AircraftGeometry,           │
+//! │                                 ControlInputs, AeroZone, Damageable,    │
+//! │                                 GlobalTransform(zone), Children,        │
 //! │                                 Position(root), Rotation(root),          │
 //! │                                 ComputedCenterOfMass(root)               │
-//! │                          writes: ConstantForce(root),                    │
+//! │                          writes: ZoneForce per child (side-effect),     │
+//! │                                  ConstantForce(root),                    │
 //! │                                  ConstantTorque(root)                   │
 //! └──────────────────────────────────────────────────────────────────────────┘
 //!         │
@@ -567,20 +567,20 @@
 //!
 //! ### Inserting a custom system (e.g. autopilot)
 //!
-//! Place it between `update_flight_state` and `compute_zone_forces`:
+//! Place it between `update_flight_state` and `compute_aero_forces`:
 //!
 //! ```rust,no_run
 //! # use bevy::prelude::*;
 //! # use avian3d::prelude::{PhysicsSchedule, PhysicsStepSystems};
 //! # use avian_fdm::prelude::*;
 //! # use avian_fdm::atmosphere::update_flight_state;
-//! # use avian_fdm::aerodynamics::compute_zone_forces;
+//! # use avian_fdm::aerodynamics::compute_aero_forces;
 //! # fn my_autopilot() {}
 //! // app.add_systems(
 //! //     PhysicsSchedule,
 //! //     my_autopilot
 //! //         .after(update_flight_state)
-//! //         .before(compute_zone_forces)
+//! //         .before(compute_aero_forces)
 //! //         .in_set(PhysicsStepSystems::BroadPhase),
 //! // );
 //! ```

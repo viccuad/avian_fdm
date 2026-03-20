@@ -15,7 +15,7 @@
 //! ```
 //!
 //! `V_ind` is stored in [`PropwashState`] on the root entity and read by
-//! `accumulate_zone_forces` for propwash effects.
+//! `compute_aero_forces` for propwash effects (Group A, post-v1).
 //!
 //! Only compiled with `features = ["propulsion"]`.
 

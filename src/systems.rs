@@ -7,8 +7,7 @@
 //! update_atmosphere
 //!   → update_flight_state         (needs ρ for Re; also writes p/q/r body rates)
 //!   → compute_engine_zone_forces  (propulsion feature; writes ZoneForce + PropwashState)
-//!   → compute_zone_forces         (writes ZoneForce per AeroZone)
-//!   → accumulate_zone_forces      (sums ZoneForce → ConstantForce + ConstantTorque)
+//!   → compute_aero_forces         (per-zone eval + accumulation + damping)
 //! ```
 //!
 //! The FDM chain runs in `BroadPhase` (not `First`) to avoid a Bevy static
@@ -22,7 +21,7 @@
 //!
 //! ## Adding a custom system (e.g. autopilot)
 //!
-//! Insert between `update_flight_state` and `compute_zone_forces` to read
+//! Insert between `update_flight_state` and `compute_aero_forces` to read
 //! `FlightState` and write `ControlInputs`:
 //!
 //! ```rust,no_run
@@ -31,15 +30,15 @@
 //! // app.add_systems(PhysicsSchedule,
 //! //     my_autopilot
 //! //         .after(avian_fdm::atmosphere::update_flight_state)
-//! //         .before(avian_fdm::aerodynamics::compute_zone_forces)
-//! //         .in_set(PhysicsStepSystems::First));
+//! //         .before(avian_fdm::aerodynamics::compute_aero_forces)
+//! //         .in_set(PhysicsStepSystems::BroadPhase));
 //! ```
 
 use bevy::prelude::*;
 use avian3d::prelude::{PhysicsSchedule, PhysicsStepSystems};
 
 use crate::atmosphere::{update_atmosphere, update_flight_state};
-use crate::aerodynamics::{compute_zone_forces, accumulate_zone_forces};
+use crate::aerodynamics::compute_aero_forces;
 
 #[cfg(feature = "propulsion")]
 use crate::propulsion::compute_engine_zone_forces;
@@ -50,7 +49,7 @@ use crate::propulsion::compute_engine_zone_forces;
 ///
 /// Avian's `update_child_collider_position` (which writes `Position`/`Rotation`
 /// for child colliders) also runs in `PhysicsStepSystems::First`. Bevy's static
-/// ambiguity checker sees a conflict with `accumulate_zone_forces` reading
+/// ambiguity checker sees a conflict with `compute_aero_forces` reading
 /// `Position`/`Rotation` on *root* entities — even though the entity sets are
 /// disjoint at runtime. Placing our chain in `BroadPhase` (which runs after
 /// `First`) eliminates the false ambiguity while keeping forces written well
@@ -63,8 +62,7 @@ pub(crate) fn register_fdm_systems(app: &mut App) {
             update_atmosphere,
             update_flight_state,
             compute_engine_zone_forces,
-            compute_zone_forces,
-            accumulate_zone_forces,
+            compute_aero_forces,
         )
             .chain()
             .in_set(PhysicsStepSystems::BroadPhase),
@@ -76,8 +74,7 @@ pub(crate) fn register_fdm_systems(app: &mut App) {
         (
             update_atmosphere,
             update_flight_state,
-            compute_zone_forces,
-            accumulate_zone_forces,
+            compute_aero_forces,
         )
             .chain()
             .in_set(PhysicsStepSystems::BroadPhase),
