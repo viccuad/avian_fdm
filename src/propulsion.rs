@@ -38,17 +38,17 @@ pub fn compute_engine_zone_forces(
         &GlobalTransform,
         &ColliderOf,
         &mut ZoneForce,
+        &mut PropwashState,
         Option<&Damageable>,
     )>,
     mut root_query: Query<(
         &ControlInputs,
         &AtmosphereState,
         &FlightState,
-        &mut PropwashState,
         &GlobalTransform,
     )>,
 ) {
-    for (engine, engine_gt, col_of, mut zone_force, dmg) in engine_query.iter_mut() {
+    for (engine, engine_gt, col_of, mut zone_force, mut propwash, dmg) in engine_query.iter_mut() {
         *zone_force = ZoneForce::default();
 
         let health = dmg.map(|d| d.health).unwrap_or(1.0);
@@ -56,7 +56,7 @@ pub fn compute_engine_zone_forces(
             continue;
         }
 
-        let Ok((ctrl, atmos, _flight, mut propwash, root_gt)) =
+        let Ok((ctrl, atmos, _flight, root_gt)) =
             root_query.get_mut(col_of.body) else { continue };
 
         // 1. Throttle → thrust fraction.

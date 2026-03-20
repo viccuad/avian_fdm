@@ -107,7 +107,10 @@ pub const CHORD_M: f64 = 1.600;
 /// Horizontal tail moment arm (m): ≈ 13 ft estimated from vtailarm in J3Cub.xml.
 const H_TAIL_ARM_M: f64 = 3.96;
 
-/// Wing aerodynamic-centre x-offset from CG (m). The AERORP is 0.1 m aft of CG.
+/// Wing aerodynamic-centre x-offset from entity root (m).
+/// The Avian-computed CG lands at ≈ −0.172 m (fuselage centroid at −0.45 m),
+/// so the wing AC is ≈ 0.072 m **forward** of the CG — 4.5 % MAC, matching
+/// the J3Cub's documented forward-of-neutral-point CG range.
 const WING_AC_X: f64 = -0.10;
 
 /// Wing height above CG in body frame (m, negative = up since +Z = down).
@@ -403,6 +406,10 @@ pub fn aileron_zone(
 /// Fuselage zone: parasitic drag only (gear drag + skin friction).
 ///
 /// No lift contribution. CD = 0.004 from JSBSim `Drag_gear` + small skin term.
+///
+/// Placed 0.45 m **aft** of the entity root so that Avian's computed CG lands at
+/// ≈ −0.172 m from root — putting the wing AC (−0.10 m) 0.072 m forward of the
+/// actual CG (4.5 % MAC), which is within the published J3Cub CG envelope.
 pub fn fuselage_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
     (
         AeroZoneBundle {
@@ -413,7 +420,7 @@ pub fn fuselage_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
             },
             zone_force: ZoneForce::default(),
             collider,
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            transform: Transform::from_xyz(-0.45, 0.0, 0.0),
             global_transform: GlobalTransform::default(),
         },
         density,

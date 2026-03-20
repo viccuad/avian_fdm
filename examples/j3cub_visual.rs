@@ -23,7 +23,7 @@
 use avian_fdm::prelude::*;
 use avian_fdm::presets::j3cub;
 use avian3d::prelude::{
-    ColliderOf, ComputedCenterOfMass, ComputedMass, ConstantForce, LinearVelocity, PhysicsPlugins,
+    ComputedCenterOfMass, ComputedMass, ConstantForce, LinearVelocity, PhysicsPlugins,
     Rotation,
 };
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
@@ -146,7 +146,7 @@ fn spawn_scene(mut commands: Commands) {
     commands.spawn((
         Text::new(
             "■ Cyan   per-zone aero forces\n\
-             ■ Green  thrust (engine zone)\n\
+             ■ Green  thrust\n\
              ■ Yellow total aero+thrust (from CG)\n\
              ■ Red    weight\n\
              ■ White  net force (≈0 at trim)\n\
@@ -233,11 +233,18 @@ fn draw_aircraft_outline(
         Isometry3d::new(t + r * body_offset, Quat::from_array(r.to_array()))
     };
 
-    // Fuselage (6.5 m × 0.75 m × 0.65 m).
+    // Fuselage (6.5 m × 0.75 m × 0.65 m) — centroid 0.45 m aft of entity root.
     gizmos.primitive_3d(
         &Cuboid::new(6.5, 0.75, 0.65),
-        iso_at(Vec3::ZERO),
+        iso_at(Vec3::new(-0.45, 0.0, 0.0)),
         Color::srgba(0.95, 0.85, 0.3, 0.7),
+    );
+
+    // Engine / cowl block (Continental A-65: 0.5 m × 0.4 m × 0.4 m).
+    gizmos.primitive_3d(
+        &Cuboid::new(0.50, 0.40, 0.40),
+        iso_at(Vec3::new(1.65, 0.0, 0.04)),
+        Color::srgba(0.6, 0.6, 0.6, 0.9),
     );
 
     // Left wing (spans y = 0 → −5.37 m in body frame, centred at −2.685 m).
@@ -268,13 +275,13 @@ fn draw_aircraft_outline(
     );
 }
 
-/// Draws per-zone forces (cyan) plus total-force, weight and net-force arrows.
+/// Draws per-zone forces (cyan/green) plus total-force, weight and net-force arrows.
 fn draw_forces(
     mut gizmos: Gizmos,
-    // Include local Transform and ColliderOf so we can recompute the current
-    // world position from the root aircraft Transform, avoiding the 1-2 frame
-    // lag that GlobalTransform has relative to the Avian physics position.
-    zone_query: Query<(&ZoneForce, &Transform, &ColliderOf, Option<&EngineZone>)>,
+    // No ColliderOf — Avian adds it lazily and it may be absent on the engine
+    // zone, causing a silent query miss. With one aircraft, root_query.single()
+    // gives us the root Transform for all world-position calculations.
+    zone_query: Query<(&ZoneForce, &Transform, Has<EngineZone>)>,
     root_query: Query<
         (
             &Transform,
@@ -286,53 +293,43 @@ fn draw_forces(
         With<AircraftGeometry>,
     >,
 ) {
+    let Ok((root_tf, rot, cf, mass, com)) = root_query.single() else { return };
+
     // ── Per-zone force arrows ─────────────────────────────────────────────────
-    for (zf, zone_local_tf, col_of, engine) in &zone_query {
+    for (zf, zone_local_tf, is_engine) in &zone_query {
         if zf.force.length_squared() < 100.0 {
-            // skip tiny / inactive zones (< 10 N)
-            continue;
+            continue; // skip tiny / inactive zones (< 10 N)
         }
-        // Recompute current world position from the root's current Transform.
-        // This matches draw_aircraft_outline and avoids the GlobalTransform lag.
-        let Ok((root_tf, ..)) = root_query.get(col_of.body) else { continue };
+        // Compute world position from root's current Transform (no GlobalTransform lag).
         let start = root_tf.transform_point(zone_local_tf.translation);
-        let end = start + zf.force * FORCE_SCALE;
-        if engine.is_some() {
-            // Thrust arrow in bright green — separate from aero so it's clearly visible.
-            gizmos.arrow(start, end, Color::srgb(0.1, 1.0, 0.1));
+        if is_engine {
+            gizmos.arrow(start, start + zf.force * FORCE_SCALE, Color::srgb(0.1, 1.0, 0.1));
         } else {
-            gizmos.arrow(start, end, Color::srgb(0.0, 0.9, 0.9));
+            gizmos.arrow(start, start + zf.force * FORCE_SCALE, Color::srgb(0.0, 0.9, 0.9));
         }
     }
 
     // ── Per-aircraft arrows from CG ───────────────────────────────────────────
-    for (tf, rot, cf, mass, com) in &root_query {
-        // CG in world space (ComputedCenterOfMass is in local/body frame).
-        let cg = tf.translation + rot.0 * com.0;
+    let cg = root_tf.translation + rot.0 * com.0;
 
-        // Total aerodynamic + propulsive force (yellow).
-        // Note: at cruise, lift (~4300 N up) dominates thrust-drag (~400 N forward),
-        // so this arrow is nearly vertical — that is physically correct.
-        let aero_end = cg + cf.0 * FORCE_SCALE;
-        gizmos.arrow(cg, aero_end, Color::srgb(1.0, 1.0, 0.0));
+    // Total aerodynamic + propulsive force (yellow).
+    gizmos.arrow(cg, cg + cf.0 * FORCE_SCALE, Color::srgb(1.0, 1.0, 0.0));
 
-        // Weight (red, downward).
-        let weight = Vec3::new(0.0, -mass.value() * 9.806_65, 0.0);
-        let weight_end = cg + weight * FORCE_SCALE;
-        gizmos.arrow(cg, weight_end, Color::srgb(1.0, 0.2, 0.2));
+    // Weight (red, downward).
+    let weight = Vec3::new(0.0, -mass.value() * 9.806_65, 0.0);
+    gizmos.arrow(cg, cg + weight * FORCE_SCALE, Color::srgb(1.0, 0.2, 0.2));
 
-        // Net force = aero + weight (white) — near-zero means close to trim.
-        let net = cf.0 + weight;
-        if net.length_squared() > 1.0 {
-            gizmos.arrow(cg, cg + net * FORCE_SCALE, Color::WHITE);
-        }
-
-        // Draw CG marker as a small cross.
-        let half = 0.5;
-        gizmos.line(cg - Vec3::X * half, cg + Vec3::X * half, Color::WHITE);
-        gizmos.line(cg - Vec3::Y * half, cg + Vec3::Y * half, Color::WHITE);
-        gizmos.line(cg - Vec3::Z * half, cg + Vec3::Z * half, Color::WHITE);
+    // Net force = aero + weight (white) — near-zero at trim.
+    let net = cf.0 + weight;
+    if net.length_squared() > 1.0 {
+        gizmos.arrow(cg, cg + net * FORCE_SCALE, Color::WHITE);
     }
+
+    // CG marker cross.
+    let h = 0.5;
+    gizmos.line(cg - Vec3::X * h, cg + Vec3::X * h, Color::WHITE);
+    gizmos.line(cg - Vec3::Y * h, cg + Vec3::Y * h, Color::WHITE);
+    gizmos.line(cg - Vec3::Z * h, cg + Vec3::Z * h, Color::WHITE);
 }
 
 /// Updates the flight-state HUD in the upper-left corner.
