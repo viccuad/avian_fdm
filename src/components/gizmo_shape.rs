@@ -1,9 +1,24 @@
-//! [`GizmoShape`] — optional visual representation for debug wireframe drawing.
+//! [`GizmoShape`] — optional visual override for debug wireframe drawing.
 //!
-//! Attach to any zone entity alongside [`super::AeroZone`] or
-//! [`super::EngineZone`] to control how it appears in the gizmo debug view.
-//! Zones without a `GizmoShape` are drawn using their [`avian3d::prelude::Collider`]
-//! extents as a fallback cuboid.
+//! ## Hybrid visualisation approach
+//!
+//! Most zones are drawn directly from their [`avian3d::prelude::Collider`]
+//! shape — no `GizmoShape` needed. This ensures the debug wireframe always
+//! matches what the physics engine sees.
+//!
+//! Attach `GizmoShape` **only** when the collider shape doesn't represent the
+//! desired visual:
+//!
+//! | Use case              | Example           | GizmoShape variant |
+//! |-----------------------|-------------------|--------------------|
+//! | Tapered surface       | Vertical fin      | `Quad`             |
+//! | Line-like structure   | Wing strut        | `Strut`            |
+//! | Different shape class | Engine cowl       | `Cylinder`         |
+//! | Round instead of box  | Wheel             | `Sphere`           |
+//!
+//! Aerodynamic surfaces (wings, h-stab, ailerons, elevator) use thin colliders
+//! (≈ 2 cm) whose cuboid outline naturally looks like a flat panel — they need
+//! no `GizmoShape` at all.
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};

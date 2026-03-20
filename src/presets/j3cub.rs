@@ -67,24 +67,39 @@
 //! `Collider::cuboid(x, y, z)` takes **full extents** in metres; Avian
 //! converts internally to half-extents before computing volume.
 //!
-//! | Zone         | Collider (x×y×z m)         | ρ (kg/m³) | Vol (m³) | ≈ Mass (kg) |
-//! |--------------|----------------------------|-----------|----------|-------------|
-//! | Wing root/mid| 4 × (0.80 × 1.88 × 0.155) | 30        | 4×0.233  | 28          |
-//! | Wing tip     | 2 × (0.80 × 1.61 × 0.155) | 30        | 2×0.200  | 12          |
-//! | Aileron      | 2 × (0.35 × 0.75 × 0.15)  | 50        | 2×0.039  | 4           |
-//! | Fuse forward | (3.00 × 0.60 × 0.70)       | 125       | 1.260    | 158         |
-//! | Fuse aft     | (2.90 × 0.40 × 0.35)       | 110       | 0.406    | 45          |
-//! | Cabin        | (1.20 × 0.68 × 0.50)       | 130       | 0.408    | 53          |
-//! | Wing struts  | 2 × (2.60 × 0.04 × 0.04)  | 2700      | 2×0.004  | 22          |
-//! | Gear legs    | 2 × (0.65 × 0.04 × 0.04)  | 7800      | 2×0.001  | 16          |
-//! | Wheels       | 2 × (0.30 × 0.10 × 0.30)  | 1200      | 2×0.009  | 22          |
-//! | Tailwheel    | (0.12 × 0.06 × 0.12)       | 1200      | 0.001    | 1           |
-//! | H-stab       | (0.60 × 1.00 × 0.08)       | 100       | 0.048    | 5           |
-//! | Elevator     | (0.35 × 1.00 × 0.07)       | 80        | 0.025    | 2           |
-//! | V-tail       | (0.50 × 0.10 × 0.60)       | 100       | 0.030    | 3           |
-//! | Rudder       | (0.35 × 0.07 × 0.55)       | 80        | 0.013    | 1           |
-//! | Engine       | (0.50 × 0.40 × 0.40)       | 860       | 0.080    | 69          |
-//! |              |                            |           | **Total**| **~441 kg** |
+//! ## Hybrid mass approach
+//!
+//! **Aerodynamic surfaces** (wings, ailerons, h-stab, elevator) use thin
+//! colliders (z = 0.02 m) with adjusted density so that `ρ × volume` yields
+//! the correct mass. The thin collider doubles as the debug wireframe — no
+//! separate `GizmoShape` needed. Inertia error from the thin z² term is
+//! < 1 % for span-dominated surfaces (see Section H, plan notes).
+//!
+//! **Volumetric parts** (fuselage, cabin, engine) use realistically-sized
+//! colliders with physical densities. Their collider shape IS the debug viz.
+//!
+//! **Visual overrides** (`GizmoShape`) are only used when the collider shape
+//! doesn't match the desired visual: tapered fins (Quad), struts (Strut),
+//! wheels (Sphere), engine cowl (Cylinder).
+//!
+//! | Zone         | Collider (x×y×z m)         | ρ (kg/m³) | ≈ Mass (kg) | Viz source   |
+//! |--------------|----------------------------|-----------|-------------|--------------|
+//! | Wing root/mid| 4 × (0.80 × 1.88 × 0.02)  | 232.5     | 28          | Collider     |
+//! | Wing tip     | 2 × (0.80 × 1.61 × 0.02)  | 232.5     | 12          | Collider     |
+//! | Aileron      | 2 × (0.35 × 0.75 × 0.02)  | 375.0     | 4           | Collider     |
+//! | Fuse forward | (3.00 × 0.60 × 0.70)       | 125       | 158         | Collider     |
+//! | Fuse aft     | (2.90 × 0.40 × 0.35)       | 110       | 45          | Collider     |
+//! | Cabin        | (1.20 × 0.68 × 0.50)       | 130       | 53          | Collider     |
+//! | Wing struts  | 2 × (2.60 × 0.04 × 0.04)  | 2700      | 22          | GizmoShape   |
+//! | Gear legs    | 2 × (0.65 × 0.04 × 0.04)  | 7800      | 16          | GizmoShape   |
+//! | Wheels       | 2 × (0.30 × 0.10 × 0.30)  | 1200      | 22          | GizmoShape   |
+//! | Tailwheel    | (0.12 × 0.06 × 0.12)       | 1200      | 1           | GizmoShape   |
+//! | H-stab       | (0.60 × 1.00 × 0.02)       | 400       | 5           | Collider     |
+//! | Elevator     | (0.35 × 1.00 × 0.02)       | 280       | 2           | Collider     |
+//! | V-tail       | (0.50 × 0.10 × 0.60)       | 100       | 3           | GizmoShape   |
+//! | Rudder       | (0.35 × 0.07 × 0.55)       | 80        | 1           | GizmoShape   |
+//! | Engine       | (0.50 × 0.40 × 0.40)       | 860       | 69          | GizmoShape   |
+//! |              |                            |           | **~441 kg** |              |
 
 use bevy::prelude::*;
 use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
@@ -238,52 +253,53 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
         ))
         .with_children(|parent| {
             // ── Left wing ────────────────────────────────────────────────────
-            parent.spawn((wing_zone(
+            // Thin collider (z=0.02 m) — see module docs on hybrid approach.
+            parent.spawn(wing_zone(
                 "L-root", -0.94, 0.175,
-                Collider::cuboid(0.80, 1.88, 0.155),
-                ColliderDensity(30.0),
-            ), GizmoShape::Box { x: 1.60, y: 3.76, z: 0.04 }));
-            parent.spawn((wing_zone(
+                Collider::cuboid(0.80, 1.88, 0.02),
+                ColliderDensity(232.5),
+            ));
+            parent.spawn(wing_zone(
                 "L-mid", -2.82, 0.175,
-                Collider::cuboid(0.80, 1.88, 0.155),
-                ColliderDensity(30.0),
-            ), GizmoShape::Box { x: 1.60, y: 3.76, z: 0.04 }));
-            parent.spawn((wing_zone(
+                Collider::cuboid(0.80, 1.88, 0.02),
+                ColliderDensity(232.5),
+            ));
+            parent.spawn(wing_zone(
                 "L-tip", -4.57, 0.150,
-                Collider::cuboid(0.80, 1.61, 0.155),
-                ColliderDensity(30.0),
-            ), GizmoShape::Box { x: 1.60, y: 3.22, z: 0.04 }));
+                Collider::cuboid(0.80, 1.61, 0.02),
+                ColliderDensity(232.5),
+            ));
 
             // ── Right wing ───────────────────────────────────────────────────
-            parent.spawn((wing_zone(
+            parent.spawn(wing_zone(
                 "R-root", 0.94, 0.175,
-                Collider::cuboid(0.80, 1.88, 0.155),
-                ColliderDensity(30.0),
-            ), GizmoShape::Box { x: 1.60, y: 3.76, z: 0.04 }));
-            parent.spawn((wing_zone(
+                Collider::cuboid(0.80, 1.88, 0.02),
+                ColliderDensity(232.5),
+            ));
+            parent.spawn(wing_zone(
                 "R-mid", 2.82, 0.175,
-                Collider::cuboid(0.80, 1.88, 0.155),
-                ColliderDensity(30.0),
-            ), GizmoShape::Box { x: 1.60, y: 3.76, z: 0.04 }));
-            parent.spawn((wing_zone(
+                Collider::cuboid(0.80, 1.88, 0.02),
+                ColliderDensity(232.5),
+            ));
+            parent.spawn(wing_zone(
                 "R-tip", 4.57, 0.150,
-                Collider::cuboid(0.80, 1.61, 0.155),
-                ColliderDensity(30.0),
-            ), GizmoShape::Box { x: 1.60, y: 3.22, z: 0.04 }));
+                Collider::cuboid(0.80, 1.61, 0.02),
+                ColliderDensity(232.5),
+            ));
 
             // ── Ailerons ─────────────────────────────────────────────────────
-            parent.spawn((aileron_zone(
+            parent.spawn(aileron_zone(
                 "L-aileron", -4.05,
                 ControlSurfaceRole::AileronLeft,
-                Collider::cuboid(0.35, 0.75, 0.15),
-                ColliderDensity(50.0),
-            ), GizmoShape::Box { x: 0.70, y: 1.50, z: 0.04 }));
-            parent.spawn((aileron_zone(
+                Collider::cuboid(0.35, 0.75, 0.02),
+                ColliderDensity(375.0),
+            ));
+            parent.spawn(aileron_zone(
                 "R-aileron", 4.05,
                 ControlSurfaceRole::AileronRight,
-                Collider::cuboid(0.35, 0.75, 0.15),
-                ColliderDensity(50.0),
-            ), GizmoShape::Box { x: 0.70, y: 1.50, z: 0.04 }));
+                Collider::cuboid(0.35, 0.75, 0.02),
+                ColliderDensity(375.0),
+            ));
 
             // ── Fuselage forward (firewall to rear seat) ─────────────────────
             // Main structural mass — includes pilot, fuel tank, instruments.
@@ -301,7 +317,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(125.0),
-                GizmoShape::Box { x: 3.00, y: 0.60, z: 0.70 },
             ));
 
             // ── Fuselage aft (tail boom) ─────────────────────────────────────
@@ -319,7 +334,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(110.0),
-                GizmoShape::Box { x: 2.90, y: 0.40, z: 0.35 },
             ));
 
             // ── Cabin / windshield ───────────────────────────────────────────
@@ -337,7 +351,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(130.0),
-                GizmoShape::Box { x: 1.20, y: 0.68, z: 0.50 },
             ));
 
             // ── Wing struts ──────────────────────────────────────────────────
@@ -428,16 +441,16 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             ));
 
             // ── Horizontal stabiliser ─────────────────────────────────────────
-            parent.spawn((hstab_zone(
-                Collider::cuboid(0.60, 1.00, 0.08),
-                ColliderDensity(100.0),
-            ), GizmoShape::Box { x: 1.20, y: 2.00, z: 0.04 }));
+            parent.spawn(hstab_zone(
+                Collider::cuboid(0.60, 1.00, 0.02),
+                ColliderDensity(400.0),
+            ));
 
             // ── Elevator ──────────────────────────────────────────────────────
-            parent.spawn((elevator_zone(
-                Collider::cuboid(0.35, 1.00, 0.07),
-                ColliderDensity(80.0),
-            ), GizmoShape::Box { x: 0.70, y: 2.00, z: 0.04 }));
+            parent.spawn(elevator_zone(
+                Collider::cuboid(0.35, 1.00, 0.02),
+                ColliderDensity(280.0),
+            ));
 
             // ── Vertical fin ──────────────────────────────────────────────────
             parent.spawn((

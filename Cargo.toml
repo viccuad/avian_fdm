@@ -28,6 +28,7 @@ bevy_egui = { version = "0.39", optional = true }
 [dev-dependencies]
 bevy = { version = "0.18", features = ["bevy_winit", "bevy_pbr", "bevy_gizmos"] }
 criterion = { version = "0.5", features = ["html_reports"] }
+parry3d = "0.26"
 
 [[bench]]
 name = "fdm_hot_path"

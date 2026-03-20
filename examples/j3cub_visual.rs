@@ -23,7 +23,7 @@
 use avian_fdm::prelude::*;
 use avian_fdm::presets::j3cub;
 use avian3d::prelude::{
-    ComputedCenterOfMass, ComputedMass, ConstantForce, LinearVelocity, PhysicsPlugins,
+    Collider, ComputedCenterOfMass, ComputedMass, ConstantForce, LinearVelocity, PhysicsPlugins,
     Rotation,
 };
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
@@ -219,15 +219,16 @@ fn orbit_camera(
 // comparable to the aircraft fuselage length, so it's easy to read.
 const FORCE_SCALE: f32 = 1.0 / 600.0;
 
-/// Draws all zone entities using their [`GizmoShape`] component (if present)
-/// or their collider extents as a fallback cuboid.  Zones are color-coded:
+/// Draws all zone entities using their [`Collider`] shape directly, with
+/// optional [`GizmoShape`] overrides for non-standard visuals.  Zones are
+/// color-coded by type:
 ///
 /// | Colour | Meaning |
 /// |--------|---------|
-/// | Cyan   | AeroZone (aerodynamic surface) |
+/// | Cyan   | Lifting surface (wing, h-stab) |
 /// | Green  | Control surface (aileron/elevator/rudder) |
 /// | Grey   | Engine zone |
-/// | Orange | Structural (drag-only, no lift) |
+/// | Orange | Structural / drag-only (fuselage, struts) |
 ///
 /// Damaged zones fade toward red; fully destroyed zones disappear.
 fn draw_aircraft_outline(
@@ -236,11 +237,14 @@ fn draw_aircraft_outline(
     zone_query: Query<(
         &Transform,
         Option<&AeroZone>,
+        Option<&Collider>,
         Option<&GizmoShape>,
         Option<&Damageable>,
         Option<&EngineZone>,
     ), Or<(With<AeroZone>, With<EngineZone>)>>,
 ) {
+    use parry3d::shape::TypedShape;
+
     let Ok(ac) = root_query.single() else { return };
     let t = ac.translation;
     let r = ac.rotation;
@@ -253,7 +257,7 @@ fn draw_aircraft_outline(
         )
     };
 
-    for (zone_tf, aero, shape, dmg, engine) in &zone_query {
+    for (zone_tf, aero, collider, shape, dmg, engine) in &zone_query {
         let health = dmg.map(|d| d.health as f32).unwrap_or(1.0);
         if health <= 0.0 { continue; }
 
@@ -281,58 +285,93 @@ fn draw_aircraft_outline(
 
         let pos = zone_tf.translation;
 
-        match shape {
-            Some(GizmoShape::Box { x, y, z }) => {
-                gizmos.primitive_3d(
-                    &Cuboid::new(*x, *y, *z),
-                    iso_at(pos, Quat::IDENTITY),
-                    color,
-                );
+        // Priority: GizmoShape override > Collider shape > nothing.
+        if let Some(gs) = shape {
+            match gs {
+                GizmoShape::Box { x, y, z } => {
+                    gizmos.primitive_3d(
+                        &Cuboid::new(*x, *y, *z),
+                        iso_at(pos, Quat::IDENTITY),
+                        color,
+                    );
+                }
+                GizmoShape::Cylinder { radius, length } => {
+                    gizmos.primitive_3d(
+                        &Cylinder::new(*radius, *length),
+                        iso_at(pos, Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
+                        color,
+                    );
+                }
+                GizmoShape::Cone { radius, length } => {
+                    gizmos.primitive_3d(
+                        &Cone { radius: *radius, height: *length },
+                        iso_at(pos, Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)),
+                        color,
+                    );
+                }
+                GizmoShape::Sphere { radius } => {
+                    gizmos.primitive_3d(
+                        &bevy::math::primitives::Sphere::new(*radius),
+                        iso_at(pos, Quat::IDENTITY),
+                        color,
+                    );
+                }
+                GizmoShape::Quad { corners } => {
+                    let pts: Vec<Vec3> = corners.iter()
+                        .chain(std::iter::once(&corners[0]))
+                        .map(|c| to_world(pos + *c))
+                        .collect();
+                    gizmos.linestrip(pts, color);
+                }
+                GizmoShape::Strut { start, end } => {
+                    gizmos.line(
+                        to_world(pos + *start),
+                        to_world(pos + *end),
+                        color,
+                    );
+                }
             }
-            Some(GizmoShape::Cylinder { radius, length }) => {
-                gizmos.primitive_3d(
-                    &Cylinder::new(*radius, *length),
-                    iso_at(pos, Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
-                    color,
-                );
-            }
-            Some(GizmoShape::Cone { radius, length }) => {
-                gizmos.primitive_3d(
-                    &Cone { radius: *radius, height: *length },
-                    iso_at(pos, Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)),
-                    color,
-                );
-            }
-            Some(GizmoShape::Sphere { radius }) => {
-                gizmos.primitive_3d(
-                    &bevy::math::primitives::Sphere::new(*radius),
-                    iso_at(pos, Quat::IDENTITY),
-                    color,
-                );
-            }
-            Some(GizmoShape::Quad { corners }) => {
-                let pts: Vec<Vec3> = corners.iter()
-                    .chain(std::iter::once(&corners[0]))
-                    .map(|c| to_world(pos + *c))
-                    .collect();
-                gizmos.linestrip(pts, color);
-            }
-            Some(GizmoShape::Strut { start, end }) => {
-                gizmos.line(
-                    to_world(pos + *start),
-                    to_world(pos + *end),
-                    color,
-                );
-            }
-            None => {
-                // Fallback: draw as a cuboid matching common collider size.
-                // We don't have direct access to collider extents here, so
-                // use a small default marker.
-                gizmos.primitive_3d(
-                    &Cuboid::new(0.3, 0.3, 0.3),
-                    iso_at(pos, Quat::IDENTITY),
-                    color,
-                );
+        } else if let Some(col) = collider {
+            // Draw the collider shape directly — what you see IS what the
+            // physics engine sees.
+            match col.shape_scaled().as_typed_shape() {
+                TypedShape::Cuboid(c) => {
+                    let he = c.half_extents;
+                    gizmos.primitive_3d(
+                        &Cuboid::new(he.x as f32 * 2.0, he.y as f32 * 2.0, he.z as f32 * 2.0),
+                        iso_at(pos, Quat::IDENTITY),
+                        color,
+                    );
+                }
+                TypedShape::Ball(b) => {
+                    gizmos.primitive_3d(
+                        &bevy::math::primitives::Sphere::new(b.radius as f32),
+                        iso_at(pos, Quat::IDENTITY),
+                        color,
+                    );
+                }
+                TypedShape::Cylinder(c) => {
+                    gizmos.primitive_3d(
+                        &Cylinder::new(c.radius as f32, c.half_height as f32 * 2.0),
+                        iso_at(pos, Quat::IDENTITY),
+                        color,
+                    );
+                }
+                TypedShape::Capsule(c) => {
+                    gizmos.primitive_3d(
+                        &Capsule3d::new(c.radius as f32, c.half_height() as f32 * 2.0),
+                        iso_at(pos, Quat::IDENTITY),
+                        color,
+                    );
+                }
+                _ => {
+                    // Unsupported collider shape — draw a small marker.
+                    gizmos.primitive_3d(
+                        &Cuboid::new(0.1, 0.1, 0.1),
+                        iso_at(pos, Quat::IDENTITY),
+                        color,
+                    );
+                }
             }
         }
     }
