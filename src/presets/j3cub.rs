@@ -85,10 +85,10 @@
 //! | Zone         | Collider (x×y×z m)         | ρ (kg/m³) | ≈ Mass (kg) | Viz source   |
 //! |--------------|----------------------------|-----------|-------------|--------------|
 //! | Wing root/mid| 4 × (0.80 × 1.88 × 0.02)  | 232.5     | 28          | Collider     |
-//! | Wing tip     | 2 × (0.80 × 1.61 × 0.02)  | 232.5     | 12          | Collider     |
-//! | Aileron      | 2 × (0.35 × 0.75 × 0.02)  | 375.0     | 4           | Collider     |
-//! | Fuse forward | (3.00 × 0.60 × 0.70)       | 125       | 158         | Collider     |
-//! | Fuse aft     | (2.90 × 0.40 × 0.35)       | 110       | 45          | Collider     |
+//! | Wing tip     | 2 × (0.45 × 0.86 × 0.02)  | 517       | 8           | Collider     |
+//! | Aileron      | 2 × (0.35 × 0.75 × 0.02)  | 381       | 4           | Collider     |
+//! | Fuse forward | (2.00 × 0.60 × 0.70)       | 188       | 158         | Collider     |
+//! | Fuse aft     | (2.70 × 0.40 × 0.35)       | 119       | 45          | Collider     |
 //! | Cabin        | (1.20 × 0.68 × 0.50)       | 130       | 53          | Collider     |
 //! | Wing struts  | 2 × (2.60 × 0.04 × 0.04)  | 2700      | 22          | GizmoShape   |
 //! | Gear legs    | 2 × (0.65 × 0.04 × 0.04)  | 7800      | 16          | GizmoShape   |
@@ -99,7 +99,9 @@
 //! | V-tail       | (0.50 × 0.10 × 0.60)       | 100       | 3           | GizmoShape   |
 //! | Rudder       | (0.35 × 0.07 × 0.55)       | 80        | 1           | GizmoShape   |
 //! | Engine       | (0.50 × 0.40 × 0.40)       | 860       | 69          | GizmoShape   |
-//! |              |                            |           | **~441 kg** |              |
+//! |              |                            |           | **~437 kg** |              |
+//!
+//! All zones are tiled without collider overlap — no double-counted mass.
 
 use bevy::prelude::*;
 use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
@@ -255,55 +257,68 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // ── Left wing ────────────────────────────────────────────────────
             // Thin collider (z=0.02 m) — see module docs on hybrid approach.
             parent.spawn(wing_zone(
-                "L-root", -0.94, 0.175,
+                "L-root", WING_AC_X, -0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(232.5),
             ));
             parent.spawn(wing_zone(
-                "L-mid", -2.82, 0.175,
+                "L-mid", WING_AC_X, -2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(232.5),
             ));
+            // Tip front (LE half of chord, inboard of aileron spanwise).
+            // x = WING_AC_X + (full_chord - tip_chord) / 2 = -0.10 + 0.175 = 0.075
             parent.spawn(wing_zone(
-                "L-tip", -4.57, 0.150,
-                Collider::cuboid(0.80, 1.61, 0.02),
-                ColliderDensity(232.5),
+                "L-tip", 0.075, -4.19, 0.150,
+                Collider::cuboid(0.45, 0.86, 0.02),
+                ColliderDensity(517.0),
             ));
 
             // ── Right wing ───────────────────────────────────────────────────
             parent.spawn(wing_zone(
-                "R-root", 0.94, 0.175,
+                "R-root", WING_AC_X, 0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(232.5),
             ));
             parent.spawn(wing_zone(
-                "R-mid", 2.82, 0.175,
+                "R-mid", WING_AC_X, 2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(232.5),
             ));
             parent.spawn(wing_zone(
-                "R-tip", 4.57, 0.150,
-                Collider::cuboid(0.80, 1.61, 0.02),
-                ColliderDensity(232.5),
+                "R-tip", 0.075, 4.19, 0.150,
+                Collider::cuboid(0.45, 0.86, 0.02),
+                ColliderDensity(517.0),
             ));
 
             // ── Ailerons ─────────────────────────────────────────────────────
+            // Trailing-edge strip, outboard — tiled behind tip front and
+            // spanning from mid panel end (3.76) to wingtip (5.37).
+            // Aileron span = 0.75m per side, center at 3.76 + 0.86 + 0.75/2 = 4.995
+            // WRONG — that places them outside the wing. The aileron sits at
+            // the SAME spanwise station as the tip, occupying the TE strip:
+            // tip_main covers y = [3.76, 4.62], aileron covers y = [3.87, 4.62]
+            // sharing the outboard span. Actually the tip+aileron tile the
+            // outboard region: tip is the LE strip, aileron is the TE strip,
+            // both at the SAME Y range.
+            // Center Y = same as tip = 4.19.
             parent.spawn(aileron_zone(
-                "L-aileron", -4.05,
+                "L-aileron", -4.19,
                 ControlSurfaceRole::AileronLeft,
-                Collider::cuboid(0.35, 0.75, 0.02),
-                ColliderDensity(375.0),
+                Collider::cuboid(0.35, 0.86, 0.02),
+                ColliderDensity(381.0),
             ));
             parent.spawn(aileron_zone(
-                "R-aileron", 4.05,
+                "R-aileron", 4.19,
                 ControlSurfaceRole::AileronRight,
-                Collider::cuboid(0.35, 0.75, 0.02),
-                ColliderDensity(375.0),
+                Collider::cuboid(0.35, 0.86, 0.02),
+                ColliderDensity(381.0),
             ));
 
             // ── Fuselage forward (firewall to rear seat) ─────────────────────
             // Main structural mass — includes pilot, fuel tank, instruments.
             // Skin friction drag only; gear drag is on the gear zones below.
+            // Tiled in X with fuse_aft: fwd covers [−1.00, 1.00].
             parent.spawn((
                 AeroZoneBundle {
                     zone: AeroZone {
@@ -312,15 +327,16 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         ..default()
                     },
                     zone_force: ZoneForce::default(),
-                    collider: Collider::cuboid(3.00, 0.60, 0.70),
-                    transform: Transform::from_xyz(-0.50, 0.0, 0.0),
+                    collider: Collider::cuboid(2.00, 0.60, 0.70),
+                    transform: Transform::from_xyz(0.00, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(125.0),
+                ColliderDensity(188.0),
             ));
 
             // ── Fuselage aft (tail boom) ─────────────────────────────────────
             // Tapered boom from rear cabin to empennage. Skin friction only.
+            // Tiled with fwd: aft covers [−3.70, −1.00].
             parent.spawn((
                 AeroZoneBundle {
                     zone: AeroZone {
@@ -329,15 +345,16 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         ..default()
                     },
                     zone_force: ZoneForce::default(),
-                    collider: Collider::cuboid(2.90, 0.40, 0.35),
-                    transform: Transform::from_xyz(-2.25, 0.0, 0.0),
+                    collider: Collider::cuboid(2.70, 0.40, 0.35),
+                    transform: Transform::from_xyz(-2.35, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(110.0),
+                ColliderDensity(119.0),
             ));
 
             // ── Cabin / windshield ───────────────────────────────────────────
             // Form drag from the cabin profile sitting above the fuselage.
+            // Raised to z=−0.60 so it sits on top of fuse_fwd without Z overlap.
             parent.spawn((
                 AeroZoneBundle {
                     zone: AeroZone {
@@ -347,7 +364,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     },
                     zone_force: ZoneForce::default(),
                     collider: Collider::cuboid(1.20, 0.68, 0.50),
-                    transform: Transform::from_xyz(0.40, 0.0, -0.35),
+                    transform: Transform::from_xyz(0.40, 0.0, -0.60),
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(130.0),
@@ -520,12 +537,15 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
 
 // ── Zone builder functions (pub for testing / custom assemblies) ──────────────
 
-/// One wing panel zone at `y_m` lateral offset.
+/// One wing panel zone at position (`x_m`, `y_m`, `WING_Z`).
 ///
 /// `fraction` is this panel's share of the whole-aircraft CL and CD tables
-/// (e.g. 0.175 for a 17.5 % panel).
+/// (e.g. 0.175 for a 17.5 % panel). `x_m` is the chordwise centre; for
+/// full-chord panels use [`WING_AC_X`], for partial-chord panels (e.g. the
+/// tip front strip) offset accordingly.
 pub fn wing_zone(
     _name: &str,
+    x_m: f64,
     y_m: f64,
     fraction: f64,
     collider: Collider,
@@ -541,7 +561,7 @@ pub fn wing_zone(
             zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(
-                WING_AC_X as f32,
+                x_m as f32,
                 y_m as f32,
                 WING_Z as f32,
             ),
@@ -555,6 +575,9 @@ pub fn wing_zone(
 ///
 /// `CL_ail = Cl_da × b / (2 × y_arm) = 0.464` derived from JSBSim
 /// `Roll_aileron` derivative (`Cl_da = 0.3498/rad`).
+///
+/// Placed at the trailing edge of the wing (aft of the main wing panels)
+/// so there is no collider overlap with the tip panel.
 pub fn aileron_zone(
     _name: &str,
     y_m: f64,
@@ -562,6 +585,9 @@ pub fn aileron_zone(
     collider: Collider,
     density: ColliderDensity,
 ) -> impl Bundle {
+    // Wing TE is at WING_AC_X - chord/2 = -0.10 - 0.40 = -0.50.
+    // Aileron chord = 0.35, center = -0.50 + 0.175 = -0.325.
+    let aileron_x = (WING_AC_X - 0.40 + 0.175) as f32; // -0.325
     (
         AeroZoneBundle {
             zone: AeroZone {
@@ -574,7 +600,7 @@ pub fn aileron_zone(
             zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(
-                WING_AC_X as f32,
+                aileron_x,
                 y_m as f32,
                 WING_Z as f32,
             ),
@@ -653,10 +679,12 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
 /// `CL_elev = −|CM_de| × c̄ / l_t = −1.2004 × 1.6 / 3.96 ≈ −0.485`
 ///
 /// Negative CL means: positive elevator (nose-up stick input) → downward force
-/// at the tail → nose-up pitch moment. Placed slightly further aft than the
-/// h-stab AC at the elevator hinge line.
+/// at the tail → nose-up pitch moment. Tiled aft of the h-stab: elevator LE
+/// touches h-stab TE at x = −4.26 m, so elevator center is at x = −4.435 m.
 pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
-    let x = -(H_TAIL_ARM_M + 0.34) as f32; // elevator hinge ≈ 0.34 m aft of stab AC
+    // Elevator LE = h-stab TE = -(H_TAIL_ARM + hstab_chord/2) = -(3.96 + 0.30) = -4.26
+    // Elevator center = -4.26 - elevator_chord/2 = -4.26 - 0.175 = -4.435
+    let x = -4.435_f32;
     (
         AeroZoneBundle {
             zone: AeroZone {
