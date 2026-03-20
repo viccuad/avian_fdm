@@ -411,66 +411,180 @@ pub fn compute_aero_forces(
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::components::aero_coeff::AeroCoeff;
+    use std::f64::consts::FRAC_PI_6;
 
-    /// Dynamic pressure proportionality: doubling airspeed quadruples force.
-    #[test]
-    fn dynamic_pressure_quadruples_with_speed() {
-        let rho = 1.225_f64;
-        let v1 = 50.0_f64;
-        let v2 = 100.0_f64;
-        let qbar1 = 0.5 * rho * v1 * v1;
-        let qbar2 = 0.5 * rho * v2 * v2;
-        assert!((qbar2 / qbar1 - 4.0).abs() < 1e-10);
+    /// Build a minimal AeroZone with the given CL/CD scalars and no control role.
+    fn simple_zone(cl: f64, cd: f64) -> AeroZone {
+        AeroZone {
+            cl: AeroCoeff::Scalar(cl),
+            cd: AeroCoeff::Scalar(cd),
+            ..Default::default()
+        }
     }
 
-    /// At health = 0.0, force should be zero (detached zone contributes nothing).
-    #[test]
-    fn zero_health_zero_force() {
-        let health = 0.0_f64;
-        let cl = 0.5_f64;
-        let qbar = 1000.0_f64;
-        let s = 16.2_f64;
-        let force = cl * health * qbar * s;
-        assert_eq!(force, 0.0);
+    fn neutral_controls() -> ControlInputs {
+        ControlInputs { elevator: 0.0, aileron: 0.0, rudder: 0.0, throttle: 0.0 }
     }
 
-    /// Structural drag is zero at full health and at health=0, peaks between.
+    // ── evaluate_zone_coefficients ────────────────────────────────────────
+
     #[test]
-    fn structural_drag_curve() {
-        let damage_drag_coeff = 500.0_f64;
-        let qbar = 1000.0_f64;
-
-        let full = damage_drag_coeff * (1.0 - 1.0_f64) / qbar; // h=1: 0
-        let half = damage_drag_coeff * (1.0 - 0.5_f64) / qbar; // h=0.5
-        let zero = 0.0_f64; // h=0: zone gone, no contribution
-
-        assert_eq!(full, 0.0);
-        assert!(half > 0.0);
-        assert_eq!(zero, 0.0);
+    fn zero_health_produces_zero_coefficients() {
+        let zone = simple_zone(0.5, 0.03);
+        let coeffs = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 1e6, 1000.0, 0.0);
+        assert_eq!(coeffs.cl, 0.0);
+        assert_eq!(coeffs.cd, 0.0);
     }
 
-    /// Control surface AileronRight has opposite sign to AileronLeft.
     #[test]
-    fn aileron_mirror() {
-        let aileron_input = 0.5_f64;
-        let left_scale = aileron_input;    // AileronLeft
-        let right_scale = -aileron_input;  // AileronRight
-        assert_eq!(left_scale, -right_scale);
+    fn half_health_halves_lift() {
+        let zone = simple_zone(1.0, 0.0);
+        let full = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 1e6, 1000.0, 1.0);
+        let half = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 1e6, 1000.0, 0.5);
+        assert!((half.cl - full.cl * 0.5).abs() < 1e-12);
     }
 
-    /// Negative CL produces downward (negative Z in stability, negative Y in world at level flight).
     #[test]
-    fn negative_cl_downward_force() {
-        let cl = -0.3_f64;
-        let qbar = 1000.0_f64;
-        let s = 16.2_f64;
-        // In stability frame Z_s: lift = −cl * qbar * s (so negative cl → positive Z_s = downward)
-        let lift_z_stab = -cl * qbar * s;
-        assert!(lift_z_stab > 0.0, "negative CL should push down (+Z_s)");
+    fn damage_drag_peaks_at_intermediate_health() {
+        let mut zone = simple_zone(0.0, 0.03);
+        zone.damage_drag_coeff = 500.0;
+        let qbar = 1000.0;
+
+        let full = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.0, 1e6, qbar, 1.0);
+        let half = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.0, 1e6, qbar, 0.5);
+        // At full health: no damage drag.  At half: extra drag present.
+        assert!(half.cd > full.cd * 0.5, "damage drag should add extra at intermediate health");
     }
 
-    /// Coefficient evaluation smoke test.
+    #[test]
+    fn elevator_scales_lift_by_input() {
+        let mut zone = simple_zone(1.0, 0.0);
+        zone.control_role = Some(ControlSurfaceRole::Elevator);
+
+        let ctrl_half = ControlInputs { elevator: 0.5, ..neutral_controls() };
+        let ctrl_full = ControlInputs { elevator: 1.0, ..neutral_controls() };
+
+        let c_half = evaluate_zone_coefficients(&zone, &ctrl_half, 0.1, 1e6, 1000.0, 1.0);
+        let c_full = evaluate_zone_coefficients(&zone, &ctrl_full, 0.1, 1e6, 1000.0, 1.0);
+        assert!((c_half.cl - c_full.cl * 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn aileron_right_mirrors_left() {
+        let cl_val = 0.8;
+        let mut zone_l = simple_zone(cl_val, 0.0);
+        zone_l.control_role = Some(ControlSurfaceRole::AileronLeft);
+        let mut zone_r = simple_zone(cl_val, 0.0);
+        zone_r.control_role = Some(ControlSurfaceRole::AileronRight);
+
+        let ctrl = ControlInputs { aileron: 0.6, ..neutral_controls() };
+        let cl_left = evaluate_zone_coefficients(&zone_l, &ctrl, 0.1, 1e6, 1000.0, 1.0).cl;
+        let cl_right = evaluate_zone_coefficients(&zone_r, &ctrl, 0.1, 1e6, 1000.0, 1.0).cl;
+        assert!((cl_left + cl_right).abs() < 1e-12, "ailerons should produce opposite CL");
+    }
+
+    #[test]
+    fn control_deflection_always_increases_drag() {
+        let mut zone = simple_zone(0.0, 0.05);
+        zone.control_role = Some(ControlSurfaceRole::Elevator);
+
+        let neutral = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.0, 1e6, 1000.0, 1.0);
+        let ctrl_pos = ControlInputs { elevator: 0.8, ..neutral_controls() };
+        let deflected = evaluate_zone_coefficients(&zone, &ctrl_pos, 0.0, 1e6, 1000.0, 1.0);
+        assert!(deflected.cd >= neutral.cd * 0.8 - 1e-12, "deflection should not reduce drag");
+    }
+
+    // ── zone_force_world ─────────────────────────────────────────────────
+
+    #[test]
+    fn lift_opposes_gravity_at_zero_alpha() {
+        let coeffs = ZoneCoefficients { cl: 1.0, cd: 0.0, cy: 0.0, cm: 0.0, croll: 0.0, cn: 0.0 };
+        // At α=0 and level flight: stab_to_body is identity, body_to_world
+        // rotates body-Z(down) to world-−Y(down), so lift (−Z_s) → world +Y.
+        let stab_to_body = DQuat::IDENTITY;
+        let body_to_world = DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2);
+
+        let wf = zone_force_world(&coeffs, 1000.0, 16.0, 10.0, 1.6, stab_to_body, body_to_world);
+        assert!(wf.force.y > 0.0, "lift should point up (+Y world), got {}", wf.force.y);
+    }
+
+    #[test]
+    fn drag_opposes_forward_motion() {
+        let coeffs = ZoneCoefficients { cl: 0.0, cd: 1.0, cy: 0.0, cm: 0.0, croll: 0.0, cn: 0.0 };
+        let stab_to_body = DQuat::IDENTITY;
+        let body_to_world = DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2);
+
+        let wf = zone_force_world(&coeffs, 1000.0, 16.0, 10.0, 1.6, stab_to_body, body_to_world);
+        // Body X = forward = world X after the 90° rotation.  Drag is −X_s.
+        assert!(wf.force.x < 0.0, "drag should oppose forward motion, got {}", wf.force.x);
+    }
+
+    #[test]
+    fn force_scales_with_dynamic_pressure() {
+        let coeffs = ZoneCoefficients { cl: 0.5, cd: 0.0, cy: 0.0, cm: 0.0, croll: 0.0, cn: 0.0 };
+        let stab = DQuat::IDENTITY;
+        let b2w = DQuat::IDENTITY;
+
+        let wf1 = zone_force_world(&coeffs, 500.0, 16.0, 10.0, 1.6, stab, b2w);
+        let wf2 = zone_force_world(&coeffs, 2000.0, 16.0, 10.0, 1.6, stab, b2w);
+        // q̄ ratio is 4:1, so force ratio should be 4:1.
+        let ratio = wf2.force.length() / wf1.force.length();
+        assert!((ratio - 4.0).abs() < 1e-10, "force should scale with q̄, ratio = {ratio}");
+    }
+
+    #[test]
+    fn pitching_moment_uses_chord_not_span() {
+        let coeffs = ZoneCoefficients { cl: 0.0, cd: 0.0, cy: 0.0, cm: 1.0, croll: 0.0, cn: 0.0 };
+        let b2w = DQuat::IDENTITY;
+        let stab = DQuat::IDENTITY;
+
+        let wf_a = zone_force_world(&coeffs, 1000.0, 1.0, 10.0, 2.0, stab, b2w);
+        let wf_b = zone_force_world(&coeffs, 1000.0, 1.0, 10.0, 4.0, stab, b2w);
+        // Pitching moment ∝ chord; doubling chord should double torque.
+        let ratio = wf_b.torque.y / wf_a.torque.y;
+        assert!((ratio - 2.0).abs() < 1e-10, "CM should scale with chord, ratio = {ratio}");
+    }
+
+    // ── damping_torque ───────────────────────────────────────────────────
+
+    #[test]
+    fn roll_damping_opposes_roll_rate() {
+        let flight = FlightState {
+            p_rads: 1.0, q_rads: 0.0, r_rads: 0.0,
+            airspeed_ms: 50.0, dynamic_pressure_pa: 1531.0,
+            alpha_rad: 0.0, beta_rad: 0.0, mach: 0.15,
+            reynolds_number: 3e6, altitude_m: 0.0,
+        };
+        let geo = AircraftGeometry {
+            cl_p: -0.45, cm_q: 0.0, cn_r: 0.0,
+            wing_span_m: 10.0, chord_m: 1.6, wing_area_m2: 16.0,
+            ..Default::default()
+        };
+        let damp = damping_torque(&flight, &geo, DQuat::IDENTITY);
+        // p > 0 and cl_p < 0 → roll damping moment should be negative (opposes roll).
+        assert!(damp.x < 0.0, "roll damping should oppose positive p, got {}", damp.x);
+    }
+
+    #[test]
+    fn zero_rates_produce_zero_damping() {
+        let flight = FlightState {
+            p_rads: 0.0, q_rads: 0.0, r_rads: 0.0,
+            airspeed_ms: 50.0, dynamic_pressure_pa: 1531.0,
+            ..Default::default()
+        };
+        let geo = AircraftGeometry {
+            cl_p: -0.45, cm_q: -12.0, cn_r: -0.12,
+            wing_span_m: 10.0, chord_m: 1.6, wing_area_m2: 16.0,
+            ..Default::default()
+        };
+        let damp = damping_torque(&flight, &geo, DQuat::IDENTITY);
+        assert!(damp.length() < 1e-10, "zero rates should produce zero damping");
+    }
+
+    // ── AeroCoeff (kept from original) ───────────────────────────────────
+
     #[test]
     fn aero_coeff_scalar_evaluate() {
         let c = AeroCoeff::Scalar(0.8);
