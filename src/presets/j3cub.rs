@@ -72,11 +72,17 @@
 //! | Wing root/mid| 4 × (0.80 × 1.88 × 0.155) | 30        | 4×0.233  | 28          |
 //! | Wing tip     | 2 × (0.80 × 1.61 × 0.155) | 30        | 2×0.200  | 12          |
 //! | Aileron      | 2 × (0.35 × 0.75 × 0.15)  | 50        | 2×0.039  | 4           |
+//! | Fuse forward | (3.00 × 0.60 × 0.70)       | 125       | 1.260    | 158         |
+//! | Fuse aft     | (2.90 × 0.40 × 0.35)       | 110       | 0.406    | 45          |
+//! | Cabin        | (1.20 × 0.68 × 0.50)       | 130       | 0.408    | 53          |
+//! | Wing struts  | 2 × (2.60 × 0.04 × 0.04)  | 2700      | 2×0.004  | 22          |
+//! | Gear legs    | 2 × (0.65 × 0.04 × 0.04)  | 7800      | 2×0.001  | 16          |
+//! | Wheels       | 2 × (0.30 × 0.10 × 0.30)  | 1200      | 2×0.009  | 22          |
+//! | Tailwheel    | (0.12 × 0.06 × 0.12)       | 1200      | 0.001    | 1           |
 //! | H-stab       | (0.60 × 1.00 × 0.08)       | 100       | 0.048    | 5           |
 //! | Elevator     | (0.35 × 1.00 × 0.07)       | 80        | 0.025    | 2           |
 //! | V-tail       | (0.50 × 0.10 × 0.60)       | 100       | 0.030    | 3           |
 //! | Rudder       | (0.35 × 0.07 × 0.55)       | 80        | 0.013    | 1           |
-//! | Fuselage     | (6.50 × 0.65 × 0.75)       | 100       | 3.169    | 317         |
 //! | Engine       | (0.50 × 0.40 × 0.40)       | 860       | 0.080    | 69          |
 //! |              |                            |           | **Total**| **~441 kg** |
 
@@ -224,94 +230,252 @@ fn cd_zone(fraction: f64) -> AeroCoeff {
 /// }
 /// ```
 pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
+    use crate::components::GizmoShape;
+
     let root = commands
         .spawn((
             j3cub_core_bundle(transform),
         ))
         .with_children(|parent| {
             // ── Left wing ────────────────────────────────────────────────────
-            parent.spawn(wing_zone(
+            parent.spawn((wing_zone(
                 "L-root", -0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.155),
                 ColliderDensity(30.0),
-            ));
-            parent.spawn(wing_zone(
+            ), GizmoShape::Box { x: 1.60, y: 3.76, z: 0.04 }));
+            parent.spawn((wing_zone(
                 "L-mid", -2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.155),
                 ColliderDensity(30.0),
-            ));
-            parent.spawn(wing_zone(
+            ), GizmoShape::Box { x: 1.60, y: 3.76, z: 0.04 }));
+            parent.spawn((wing_zone(
                 "L-tip", -4.57, 0.150,
                 Collider::cuboid(0.80, 1.61, 0.155),
                 ColliderDensity(30.0),
-            ));
+            ), GizmoShape::Box { x: 1.60, y: 3.22, z: 0.04 }));
 
             // ── Right wing ───────────────────────────────────────────────────
-            parent.spawn(wing_zone(
+            parent.spawn((wing_zone(
                 "R-root", 0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.155),
                 ColliderDensity(30.0),
-            ));
-            parent.spawn(wing_zone(
+            ), GizmoShape::Box { x: 1.60, y: 3.76, z: 0.04 }));
+            parent.spawn((wing_zone(
                 "R-mid", 2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.155),
                 ColliderDensity(30.0),
-            ));
-            parent.spawn(wing_zone(
+            ), GizmoShape::Box { x: 1.60, y: 3.76, z: 0.04 }));
+            parent.spawn((wing_zone(
                 "R-tip", 4.57, 0.150,
                 Collider::cuboid(0.80, 1.61, 0.155),
                 ColliderDensity(30.0),
-            ));
+            ), GizmoShape::Box { x: 1.60, y: 3.22, z: 0.04 }));
 
             // ── Ailerons ─────────────────────────────────────────────────────
-            parent.spawn(aileron_zone(
+            parent.spawn((aileron_zone(
                 "L-aileron", -4.05,
                 ControlSurfaceRole::AileronLeft,
                 Collider::cuboid(0.35, 0.75, 0.15),
                 ColliderDensity(50.0),
-            ));
-            parent.spawn(aileron_zone(
+            ), GizmoShape::Box { x: 0.70, y: 1.50, z: 0.04 }));
+            parent.spawn((aileron_zone(
                 "R-aileron", 4.05,
                 ControlSurfaceRole::AileronRight,
                 Collider::cuboid(0.35, 0.75, 0.15),
                 ColliderDensity(50.0),
+            ), GizmoShape::Box { x: 0.70, y: 1.50, z: 0.04 }));
+
+            // ── Fuselage forward (firewall to rear seat) ─────────────────────
+            // Main structural mass — includes pilot, fuel tank, instruments.
+            // Skin friction drag only; gear drag is on the gear zones below.
+            parent.spawn((
+                AeroZoneBundle {
+                    zone: AeroZone {
+                        cl: AeroCoeff::Scalar(0.0),
+                        cd: AeroCoeff::Scalar(0.003),
+                        ..default()
+                    },
+                    zone_force: ZoneForce::default(),
+                    collider: Collider::cuboid(3.00, 0.60, 0.70),
+                    transform: Transform::from_xyz(-0.50, 0.0, 0.0),
+                    global_transform: GlobalTransform::default(),
+                },
+                ColliderDensity(125.0),
+                GizmoShape::Box { x: 3.00, y: 0.60, z: 0.70 },
             ));
 
-            // ── Fuselage (gear drag) ──────────────────────────────────────────
-            parent.spawn(fuselage_zone(
-                Collider::cuboid(6.50, 0.65, 0.75),
-                ColliderDensity(100.0),
+            // ── Fuselage aft (tail boom) ─────────────────────────────────────
+            // Tapered boom from rear cabin to empennage. Skin friction only.
+            parent.spawn((
+                AeroZoneBundle {
+                    zone: AeroZone {
+                        cl: AeroCoeff::Scalar(0.0),
+                        cd: AeroCoeff::Scalar(0.002),
+                        ..default()
+                    },
+                    zone_force: ZoneForce::default(),
+                    collider: Collider::cuboid(2.90, 0.40, 0.35),
+                    transform: Transform::from_xyz(-2.25, 0.0, 0.0),
+                    global_transform: GlobalTransform::default(),
+                },
+                ColliderDensity(110.0),
+                GizmoShape::Box { x: 2.90, y: 0.40, z: 0.35 },
+            ));
+
+            // ── Cabin / windshield ───────────────────────────────────────────
+            // Form drag from the cabin profile sitting above the fuselage.
+            parent.spawn((
+                AeroZoneBundle {
+                    zone: AeroZone {
+                        cl: AeroCoeff::Scalar(0.0),
+                        cd: AeroCoeff::Scalar(0.002),
+                        ..default()
+                    },
+                    zone_force: ZoneForce::default(),
+                    collider: Collider::cuboid(1.20, 0.68, 0.50),
+                    transform: Transform::from_xyz(0.40, 0.0, -0.35),
+                    global_transform: GlobalTransform::default(),
+                },
+                ColliderDensity(130.0),
+                GizmoShape::Box { x: 1.20, y: 0.68, z: 0.50 },
+            ));
+
+            // ── Wing struts ──────────────────────────────────────────────────
+            // Parasitic drag from the V-struts connecting fuselage to wings.
+            for (sign, _name) in [(-1.0_f32, "L-strut"), (1.0, "R-strut")] {
+                let fuse_attach = Vec3::new(0.20, 0.25 * sign, 0.30);
+                let wing_attach = Vec3::new(-0.10 + 0.35, 2.5 * sign, -0.58);
+                let mid = (fuse_attach + wing_attach) * 0.5;
+                parent.spawn((
+                    AeroZoneBundle {
+                        zone: AeroZone {
+                            cl: AeroCoeff::Scalar(0.0),
+                            cd: AeroCoeff::Scalar(0.001),
+                            ..default()
+                        },
+                        zone_force: ZoneForce::default(),
+                        collider: Collider::cuboid(2.60, 0.04, 0.04),
+                        transform: Transform::from_translation(mid),
+                        global_transform: GlobalTransform::default(),
+                    },
+                    ColliderDensity(2700.0),
+                    GizmoShape::Strut {
+                        start: fuse_attach - mid,
+                        end: wing_attach - mid,
+                    },
+                ));
+            }
+
+            // ── Landing gear legs ────────────────────────────────────────────
+            for (sign, _name) in [(-1.0_f32, "L-gear"), (1.0, "R-gear")] {
+                let top = Vec3::new(0.50, 0.15 * sign, 0.35);
+                let bottom = Vec3::new(0.50, 0.55 * sign, 0.90);
+                let mid = (top + bottom) * 0.5;
+                parent.spawn((
+                    AeroZoneBundle {
+                        zone: AeroZone {
+                            cl: AeroCoeff::Scalar(0.0),
+                            cd: AeroCoeff::Scalar(0.001),
+                            ..default()
+                        },
+                        zone_force: ZoneForce::default(),
+                        collider: Collider::cuboid(0.65, 0.04, 0.04),
+                        transform: Transform::from_translation(mid),
+                        global_transform: GlobalTransform::default(),
+                    },
+                    ColliderDensity(7800.0),
+                    GizmoShape::Strut {
+                        start: top - mid,
+                        end: bottom - mid,
+                    },
+                ));
+            }
+
+            // ── Main wheels ──────────────────────────────────────────────────
+            for (sign, _name) in [(-1.0_f32, "L-wheel"), (1.0, "R-wheel")] {
+                parent.spawn((
+                    AeroZoneBundle {
+                        zone: AeroZone {
+                            cl: AeroCoeff::Scalar(0.0),
+                            cd: AeroCoeff::Scalar(0.001),
+                            ..default()
+                        },
+                        zone_force: ZoneForce::default(),
+                        collider: Collider::cuboid(0.30, 0.10, 0.30),
+                        transform: Transform::from_xyz(0.50, 0.55 * sign, 0.90),
+                        global_transform: GlobalTransform::default(),
+                    },
+                    ColliderDensity(1200.0),
+                    GizmoShape::Sphere { radius: 0.15 },
+                ));
+            }
+
+            // ── Tailwheel ────────────────────────────────────────────────────
+            parent.spawn((
+                AeroZoneBundle {
+                    zone: AeroZone {
+                        cl: AeroCoeff::Scalar(0.0),
+                        cd: AeroCoeff::Scalar(0.0005),
+                        ..default()
+                    },
+                    zone_force: ZoneForce::default(),
+                    collider: Collider::cuboid(0.12, 0.06, 0.12),
+                    transform: Transform::from_xyz(-3.60, 0.0, 0.15),
+                    global_transform: GlobalTransform::default(),
+                },
+                ColliderDensity(1200.0),
+                GizmoShape::Sphere { radius: 0.06 },
             ));
 
             // ── Horizontal stabiliser ─────────────────────────────────────────
-            parent.spawn(hstab_zone(
+            parent.spawn((hstab_zone(
                 Collider::cuboid(0.60, 1.00, 0.08),
                 ColliderDensity(100.0),
-            ));
+            ), GizmoShape::Box { x: 1.20, y: 2.00, z: 0.04 }));
 
             // ── Elevator ──────────────────────────────────────────────────────
-            parent.spawn(elevator_zone(
+            parent.spawn((elevator_zone(
                 Collider::cuboid(0.35, 1.00, 0.07),
                 ColliderDensity(80.0),
-            ));
+            ), GizmoShape::Box { x: 0.70, y: 2.00, z: 0.04 }));
 
             // ── Vertical fin ──────────────────────────────────────────────────
-            parent.spawn(vtail_zone(
-                Collider::cuboid(0.50, 0.10, 0.60),
-                ColliderDensity(100.0),
+            parent.spawn((
+                vtail_zone(
+                    Collider::cuboid(0.50, 0.10, 0.60),
+                    ColliderDensity(100.0),
+                ),
+                GizmoShape::Quad {
+                    corners: [
+                        Vec3::new(0.30, 0.0, -0.30),    // root LE
+                        Vec3::new(0.50, 0.0, -0.70),    // tip LE
+                        Vec3::new(-0.30, 0.0, -0.90),   // tip TE
+                        Vec3::new(-0.40, 0.0, -0.00),   // root TE
+                    ],
+                },
             ));
 
             // ── Rudder ────────────────────────────────────────────────────────
-            parent.spawn(rudder_zone(
+            parent.spawn((rudder_zone(
                 Collider::cuboid(0.35, 0.07, 0.55),
                 ColliderDensity(80.0),
-            ));
+            ), GizmoShape::Quad {
+                corners: [
+                    Vec3::new(0.25, 0.0, -0.25),   // root LE
+                    Vec3::new(0.40, 0.0, -0.55),   // tip LE
+                    Vec3::new(-0.35, 0.0, -0.55),  // tip TE
+                    Vec3::new(-0.35, 0.0, 0.0),    // root TE
+                ],
+            }));
 
             // ── Engine ────────────────────────────────────────────────────────
             #[cfg(feature = "propulsion")]
-            parent.spawn(engine_zone(
-                Collider::cuboid(0.50, 0.40, 0.40),
-                ColliderDensity(860.0),
+            parent.spawn((
+                engine_zone(
+                    Collider::cuboid(0.50, 0.40, 0.40),
+                    ColliderDensity(860.0),
+                ),
+                GizmoShape::Cylinder { radius: 0.20, length: 0.50 },
             ));
         })
         .id();

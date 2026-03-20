@@ -19,14 +19,15 @@ impl Plugin for AircraftFdmPlugin {
     fn build(&self, app: &mut App) {
         use crate::components::{
             AeroZone, AircraftGeometry, AtmosphereState, ControlInputs,
-            Damageable, FlightState, ZoneForce,
+            Damageable, FlightState, GizmoShape, ZoneForce,
         };
 
         app.register_type::<AircraftGeometry>()
            .register_type::<ControlInputs>()
            .register_type::<FlightState>()
            .register_type::<AtmosphereState>()
-           .register_type::<AeroZone>();
+           .register_type::<AeroZone>()
+           .register_type::<GizmoShape>();
 
         #[cfg(feature = "damage")]
         app.register_type::<Damageable>();

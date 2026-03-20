@@ -219,70 +219,123 @@ fn orbit_camera(
 // comparable to the aircraft fuselage length, so it's easy to read.
 const FORCE_SCALE: f32 = 1.0 / 600.0;
 
-/// Draws a simplified structural outline of the aircraft using gizmo cuboids.
+/// Draws all zone entities using their [`GizmoShape`] component (if present)
+/// or their collider extents as a fallback cuboid.  Zones are color-coded:
+///
+/// | Colour | Meaning |
+/// |--------|---------|
+/// | Cyan   | AeroZone (aerodynamic surface) |
+/// | Green  | Control surface (aileron/elevator/rudder) |
+/// | Grey   | Engine zone |
+/// | Orange | Structural (drag-only, no lift) |
+///
+/// Damaged zones fade toward red; fully destroyed zones disappear.
 fn draw_aircraft_outline(
     mut gizmos: Gizmos,
-    query: Query<&Transform, With<AircraftGeometry>>,
+    root_query: Query<&Transform, With<AircraftGeometry>>,
+    zone_query: Query<(
+        &Transform,
+        Option<&AeroZone>,
+        Option<&GizmoShape>,
+        Option<&Damageable>,
+        Option<&EngineZone>,
+    ), Or<(With<AeroZone>, With<EngineZone>)>>,
 ) {
-    let Ok(ac) = query.single() else { return };
+    let Ok(ac) = root_query.single() else { return };
     let t = ac.translation;
     let r = ac.rotation;
 
-    // Helper: world Isometry3d for a body-frame offset.
-    let iso_at = |body_offset: Vec3| {
-        Isometry3d::new(t + r * body_offset, Quat::from_array(r.to_array()))
+    let to_world = |body: Vec3| t + r * body;
+    let iso_at = |body_offset: Vec3, extra_rot: Quat| {
+        Isometry3d::new(
+            t + r * body_offset,
+            Quat::from_array(r.to_array()) * extra_rot,
+        )
     };
 
-    // Engine / cowl block (Continental A-65: 0.5 × 0.4 × 0.4 m).
-    // Front face at x = 1.90 m — sets the nose limit for the fuselage.
-    gizmos.primitive_3d(
-        &Cuboid::new(0.50, 0.40, 0.40),
-        iso_at(Vec3::new(1.65, 0.0, 0.04)),
-        Color::srgba(0.6, 0.6, 0.6, 0.9),
-    );
+    for (zone_tf, aero, shape, dmg, engine) in &zone_query {
+        let health = dmg.map(|d| d.health as f32).unwrap_or(1.0);
+        if health <= 0.0 { continue; }
 
-    // Cabin section: firewall (x = 1.40) back to start of tail boom (x = −0.80).
-    // Length = 2.20 m, centred at x = +0.30.  Full cabin width / height.
-    gizmos.primitive_3d(
-        &Cuboid::new(2.20, 0.68, 0.72),
-        iso_at(Vec3::new(0.30, 0.0, 0.0)),
-        Color::srgba(0.95, 0.85, 0.3, 0.75),
-    );
+        // Pick base colour by zone type.
+        let base = if engine.is_some() {
+            Color::srgba(0.6, 0.6, 0.6, 0.9)
+        } else if aero.is_some_and(|a| a.control_role.is_some()) {
+            Color::srgba(0.3, 1.0, 0.5, 0.7)
+        } else if aero.is_some_and(|a| a.cl.evaluate(0.1, 2e6).abs() > 0.01) {
+            Color::srgba(0.4, 0.85, 1.0, 0.7) // lifting surface
+        } else {
+            Color::srgba(0.9, 0.75, 0.2, 0.7) // drag-only structural
+        };
 
-    // Tail boom: x = −0.80 back to tail end (x = −3.70).
-    // Length = 2.90 m, centred at x = −2.25.  Narrow cross-section.
-    gizmos.primitive_3d(
-        &Cuboid::new(2.90, 0.44, 0.38),
-        iso_at(Vec3::new(-2.25, 0.0, 0.0)),
-        Color::srgba(0.95, 0.85, 0.3, 0.65),
-    );
+        // Fade toward red with damage.
+        let color = if health < 1.0 {
+            let r_c = base.to_srgba().red * health + 1.0 * (1.0 - health);
+            let g_c = base.to_srgba().green * health;
+            let b_c = base.to_srgba().blue * health;
+            let a_c = base.to_srgba().alpha;
+            Color::srgba(r_c, g_c, b_c, a_c)
+        } else {
+            base
+        };
 
-    // Left wing (spans y = 0 → −5.37 m in body frame, centred at −2.685 m).
-    gizmos.primitive_3d(
-        &Cuboid::new(0.80, 5.37, 0.155),
-        iso_at(Vec3::new(-0.10, -2.685, -0.58)),
-        Color::srgba(0.4, 0.8, 1.0, 0.6),
-    );
-    // Right wing (mirror).
-    gizmos.primitive_3d(
-        &Cuboid::new(0.80, 5.37, 0.155),
-        iso_at(Vec3::new(-0.10, 2.685, -0.58)),
-        Color::srgba(0.4, 0.8, 1.0, 0.6),
-    );
+        let pos = zone_tf.translation;
 
-    // Horizontal stabiliser (tail arm ≈ 3.96 m aft).
-    gizmos.primitive_3d(
-        &Cuboid::new(0.60, 2.20, 0.08),
-        iso_at(Vec3::new(-3.96, 0.0, -0.10)),
-        Color::srgba(0.95, 0.85, 0.3, 0.6),
-    );
-
-    // Vertical fin.
-    gizmos.primitive_3d(
-        &Cuboid::new(0.50, 0.10, 0.60),
-        iso_at(Vec3::new(-4.16, 0.0, -0.50)),
-        Color::srgba(0.95, 0.85, 0.3, 0.6),
-    );
+        match shape {
+            Some(GizmoShape::Box { x, y, z }) => {
+                gizmos.primitive_3d(
+                    &Cuboid::new(*x, *y, *z),
+                    iso_at(pos, Quat::IDENTITY),
+                    color,
+                );
+            }
+            Some(GizmoShape::Cylinder { radius, length }) => {
+                gizmos.primitive_3d(
+                    &Cylinder::new(*radius, *length),
+                    iso_at(pos, Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
+                    color,
+                );
+            }
+            Some(GizmoShape::Cone { radius, length }) => {
+                gizmos.primitive_3d(
+                    &Cone { radius: *radius, height: *length },
+                    iso_at(pos, Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)),
+                    color,
+                );
+            }
+            Some(GizmoShape::Sphere { radius }) => {
+                gizmos.primitive_3d(
+                    &bevy::math::primitives::Sphere::new(*radius),
+                    iso_at(pos, Quat::IDENTITY),
+                    color,
+                );
+            }
+            Some(GizmoShape::Quad { corners }) => {
+                let pts: Vec<Vec3> = corners.iter()
+                    .chain(std::iter::once(&corners[0]))
+                    .map(|c| to_world(pos + *c))
+                    .collect();
+                gizmos.linestrip(pts, color);
+            }
+            Some(GizmoShape::Strut { start, end }) => {
+                gizmos.line(
+                    to_world(pos + *start),
+                    to_world(pos + *end),
+                    color,
+                );
+            }
+            None => {
+                // Fallback: draw as a cuboid matching common collider size.
+                // We don't have direct access to collider extents here, so
+                // use a small default marker.
+                gizmos.primitive_3d(
+                    &Cuboid::new(0.3, 0.3, 0.3),
+                    iso_at(pos, Quat::IDENTITY),
+                    color,
+                );
+            }
+        }
+    }
 }
 
 /// Draws per-zone forces (cyan/green) plus total-force, weight and net-force arrows.

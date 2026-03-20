@@ -9,12 +9,15 @@ pub mod engine_zone;
 pub mod flight_state;
 pub mod zone_force;
 
+pub mod gizmo_shape;
+
 pub use aero_coeff::AeroCoeff;
 pub use aero_zone::{AeroZone, AeroZoneBundle, ControlSurfaceRole, materials};
 pub use aircraft::{AircraftGeometry, AircraftCoreBundle};
 pub use controls::ControlInputs;
 pub use damageable::Damageable;
 pub use flight_state::{FlightState, AtmosphereState, WindResource};
+pub use gizmo_shape::GizmoShape;
 pub use zone_force::ZoneForce;
 
 #[cfg(feature = "propulsion")]
