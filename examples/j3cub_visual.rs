@@ -233,18 +233,28 @@ fn draw_aircraft_outline(
         Isometry3d::new(t + r * body_offset, Quat::from_array(r.to_array()))
     };
 
-    // Fuselage (6.5 m × 0.75 m × 0.65 m) — centroid 0.45 m aft of entity root.
-    gizmos.primitive_3d(
-        &Cuboid::new(6.5, 0.75, 0.65),
-        iso_at(Vec3::new(-0.45, 0.0, 0.0)),
-        Color::srgba(0.95, 0.85, 0.3, 0.7),
-    );
-
-    // Engine / cowl block (Continental A-65: 0.5 m × 0.4 m × 0.4 m).
+    // Engine / cowl block (Continental A-65: 0.5 × 0.4 × 0.4 m).
+    // Front face at x = 1.90 m — sets the nose limit for the fuselage.
     gizmos.primitive_3d(
         &Cuboid::new(0.50, 0.40, 0.40),
         iso_at(Vec3::new(1.65, 0.0, 0.04)),
         Color::srgba(0.6, 0.6, 0.6, 0.9),
+    );
+
+    // Cabin section: firewall (x = 1.40) back to start of tail boom (x = −0.80).
+    // Length = 2.20 m, centred at x = +0.30.  Full cabin width / height.
+    gizmos.primitive_3d(
+        &Cuboid::new(2.20, 0.68, 0.72),
+        iso_at(Vec3::new(0.30, 0.0, 0.0)),
+        Color::srgba(0.95, 0.85, 0.3, 0.75),
+    );
+
+    // Tail boom: x = −0.80 back to tail end (x = −3.70).
+    // Length = 2.90 m, centred at x = −2.25.  Narrow cross-section.
+    gizmos.primitive_3d(
+        &Cuboid::new(2.90, 0.44, 0.38),
+        iso_at(Vec3::new(-2.25, 0.0, 0.0)),
+        Color::srgba(0.95, 0.85, 0.3, 0.65),
     );
 
     // Left wing (spans y = 0 → −5.37 m in body frame, centred at −2.685 m).
