@@ -30,6 +30,18 @@ pub struct EngineZone {
     pub prop_diameter_m: f64,
     /// Thrust direction in body frame (unit vector). Usually `DVec3::X` (forward).
     pub thrust_axis_body: DVec3,
+
+    /// Airspeed at which the propeller produces zero net thrust (m/s).
+    ///
+    /// Models the speed dependence of a fixed-pitch propeller. The thrust
+    /// multiplier is `max(0, 1 − (V / V_zero)²)`:
+    ///
+    /// - At V = 0: factor = 1.0 (full static thrust)
+    /// - At V = V_zero: factor = 0.0 (propeller windmilling)
+    ///
+    /// Set to `0.0` to disable speed dependence (legacy constant-thrust model).
+    /// Typical values: 70–90 m/s for light GA (J3 Cub ≈ 80 m/s).
+    pub zero_thrust_speed_ms: f64,
 }
 
 impl Default for EngineZone {
@@ -39,6 +51,7 @@ impl Default for EngineZone {
             throttle_curve: vec![[0.0, 0.0], [1.0, 1.0]],
             prop_diameter_m: 1.0,
             thrust_axis_body: DVec3::X,
+            zero_thrust_speed_ms: 0.0,
         }
     }
 }

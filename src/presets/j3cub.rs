@@ -317,13 +317,13 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
 
             // ── Fuselage forward (firewall to rear seat) ─────────────────────
             // Main structural mass — includes pilot, fuel tank, instruments.
-            // Skin friction drag only; gear drag is on the gear zones below.
+            // Profile drag is already in the wing CD_basic table (Drag_basic).
             // Tiled in X with fuse_aft: fwd covers [−1.00, 1.00].
             parent.spawn((
                 AeroZoneBundle {
                     zone: AeroZone {
                         cl: AeroCoeff::Scalar(0.0),
-                        cd: AeroCoeff::Scalar(0.003),
+                        cd: AeroCoeff::Scalar(0.0),
                         ..default()
                     },
                     zone_force: ZoneForce::default(),
@@ -336,13 +336,14 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             ));
 
             // ── Fuselage aft (tail boom) ─────────────────────────────────────
-            // Tapered boom from rear cabin to empennage. Skin friction only.
+            // Tapered boom from rear cabin to empennage.
+            // Profile drag included in wing CD_basic table.
             // Tiled with fwd: aft covers [−3.70, −1.00].
             parent.spawn((
                 AeroZoneBundle {
                     zone: AeroZone {
                         cl: AeroCoeff::Scalar(0.0),
-                        cd: AeroCoeff::Scalar(0.002),
+                        cd: AeroCoeff::Scalar(0.0),
                         ..default()
                     },
                     zone_force: ZoneForce::default(),
@@ -355,13 +356,13 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             ));
 
             // ── Cabin / windshield ───────────────────────────────────────────
-            // Form drag from the cabin profile sitting above the fuselage.
+            // Mass contribution only; drag included in wing CD_basic table.
             // Raised to z=−0.60 so it sits on top of fuse_fwd without Z overlap.
             parent.spawn((
                 AeroZoneBundle {
                     zone: AeroZone {
                         cl: AeroCoeff::Scalar(0.0),
-                        cd: AeroCoeff::Scalar(0.002),
+                        cd: AeroCoeff::Scalar(0.0),
                         ..default()
                     },
                     zone_force: ZoneForce::default(),
@@ -374,7 +375,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             ));
 
             // ── Wing struts ──────────────────────────────────────────────────
-            // Parasitic drag from the V-struts connecting fuselage to wings.
+            // Mass/structural contribution; drag included in wing CD_basic.
             // Colliders are rotated to align with the strut direction.
             for (sign, _name) in [(-1.0_f32, "L-strut"), (1.0, "R-strut")] {
                 let fuse_attach = Vec3::new(0.20, 0.25 * sign, 0.30);
@@ -388,7 +389,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     AeroZoneBundle {
                         zone: AeroZone {
                             cl: AeroCoeff::Scalar(0.0),
-                            cd: AeroCoeff::Scalar(0.001),
+                            cd: AeroCoeff::Scalar(0.0),
                             ..default()
                         },
                         zone_force: ZoneForce::default(),
@@ -457,7 +458,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                 AeroZoneBundle {
                     zone: AeroZone {
                         cl: AeroCoeff::Scalar(0.0),
-                        cd: AeroCoeff::Scalar(0.0005),
+                        cd: AeroCoeff::Scalar(0.0),
                         ..default()
                     },
                     zone_force: ZoneForce::default(),
@@ -551,6 +552,9 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
                 cl_p: -0.45,
                 cm_q: -12.0,
                 cn_r: -0.12,
+                // JSBSim J3Cub: CD_i = CL² × 0.0485 → e = 1/(π × 0.0485 × AR)
+                // AR = 10.742² / 16.584 = 6.956 → e ≈ 0.94
+                oswald_factor: 0.94,
             },
             rigid_body: RigidBody::Dynamic,
             transform,
@@ -617,7 +621,7 @@ pub fn aileron_zone(
             zone: AeroZone {
                 // CL_ail = 0.3498 × 10.742 / (2 × 4.05) ≈ 0.464
                 cl: AeroCoeff::Scalar(0.464),
-                cd: AeroCoeff::Scalar(0.005), // small profile drag at deflection
+                cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 control_role: Some(role),
                 ..default()
             },
@@ -646,7 +650,7 @@ pub fn fuselage_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
         AeroZoneBundle {
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
-                cd: AeroCoeff::Scalar(0.006),
+                cd: AeroCoeff::Scalar(0.0),
                 ..default()
             },
             zone_force: ZoneForce::default(),
@@ -680,7 +684,7 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                     cols: RE_BP.to_vec(),
                     data: HTAIL_CL_DATA.to_vec(),
                 },
-                cd: AeroCoeff::Scalar(0.008), // tail profile drag fraction
+                cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 ..default()
             },
             zone_force: ZoneForce::default(),
@@ -714,7 +718,7 @@ pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
             zone: AeroZone {
                 // Negative: positive elevator (nose-up) → downward tail force.
                 cl: AeroCoeff::Scalar(-0.485),
-                cd: AeroCoeff::Scalar(0.005),
+                cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 control_role: Some(ControlSurfaceRole::Elevator),
                 ..default()
             },
@@ -736,7 +740,7 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
         AeroZoneBundle {
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
-                cd: AeroCoeff::Scalar(0.003),
+                cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 cy: AeroCoeff::Scalar(0.0), // TODO v2: beta-dependent CY_beta
                 ..default()
             },
@@ -767,7 +771,7 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
         AeroZoneBundle {
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
-                cd: AeroCoeff::Scalar(0.004),
+                cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 // Negative CY: positive rudder (nose-right) → −Y force at tail → +Z torque.
                 cy: AeroCoeff::Scalar(-0.152),
                 control_role: Some(ControlSurfaceRole::Rudder),
@@ -799,10 +803,13 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
 pub fn engine_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
     (
         EngineZone {
-            max_thrust_n:    1_200.0,
-            throttle_curve:  vec![[0.0, 0.0], [0.1, 0.07], [0.5, 0.45], [1.0, 1.0]],
+            max_thrust_n:    990.0,
+            throttle_curve:  vec![[0.0, 0.0], [0.5, 0.42], [0.75, 0.64], [1.0, 1.0]],
             prop_diameter_m: 1.905,
             thrust_axis_body: DVec3::X, // +X = forward
+            // McCauley CM7445, fixed-pitch 22°. At ~2800 RPM the zero-thrust
+            // advance ratio J≈0.95 → V_zero = J × n × D ≈ 80 m/s (155 kts).
+            zero_thrust_speed_ms: 80.0,
         },
         PropwashState::default(),
         ZoneForce::default(),

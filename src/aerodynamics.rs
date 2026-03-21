@@ -356,6 +356,8 @@ pub fn compute_aero_forces(
         let com_world: Vec3 = pos.0 + rot.0 * com.0;
 
         // ── Per-zone accumulation ────────────────────────────────────────
+        let mut total_cl = 0.0_f64; // sum of zone CL contributions (for induced drag)
+
         for child in children.iter() {
             if let Ok((zone, zone_gt, mut zone_force, dmg)) = zone_query.get_mut(child) {
                 *zone_force = ZoneForce::default();
@@ -367,6 +369,7 @@ pub fn compute_aero_forces(
 
                 // Step 1: evaluate coefficients.
                 let coeffs = evaluate_zone_coefficients(zone, ctrl, alpha, re, qbar, health);
+                total_cl += coeffs.cl;
 
                 // Step 2: convert to world-space force and torque.
                 let wf = zone_force_world(&coeffs, qbar, s, b, c, stab_to_body, body_to_world);
@@ -400,7 +403,23 @@ pub fn compute_aero_forces(
             }
         }
 
-        // Step 4: whole-aircraft dynamic damping.
+        // Step 4: induced drag — CD_i = CL² / (π · e · AR).
+        //
+        // Applied as a whole-aircraft drag force opposing the velocity vector.
+        // This models the vortex-induced drag from finite-span lifting surfaces
+        // that isn't captured in the zone profile-drag tables.
+        if geo.oswald_factor > 0.0 {
+            let ar = b * b / s;
+            let cd_i = total_cl * total_cl / (std::f64::consts::PI * geo.oswald_factor * ar);
+            let drag_i = cd_i * qbar * s;
+            // Induced drag acts in −X stability frame (opposing motion),
+            // same as profile drag.
+            let drag_stab = DVec3::new(-drag_i, 0.0, 0.0);
+            let drag_world = body_to_world * (stab_to_body * drag_stab);
+            cf.0 += dvec3_to_vec3(drag_world);
+        }
+
+        // Step 5: whole-aircraft dynamic damping.
         let damp = damping_torque(flight, geo, body_to_world);
         if damp.is_finite() {
             ct.0 += dvec3_to_vec3(damp);

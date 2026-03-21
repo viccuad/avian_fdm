@@ -56,7 +56,7 @@ pub fn compute_engine_zone_forces(
             continue;
         }
 
-        let Ok((ctrl, atmos, _flight, root_gt)) =
+        let Ok((ctrl, atmos, flight, root_gt)) =
             root_query.get_mut(col_of.body) else { continue };
 
         // 1. Throttle → thrust fraction.
@@ -66,7 +66,18 @@ pub fn compute_engine_zone_forces(
         // 2. Gagg–Ferrar altitude correction.
         let rho = atmos.density_kgm3;
         let density_ratio = (rho / RHO_0).max(0.0);
-        let thrust_n = engine.max_thrust_n * health * thrust_fraction * density_ratio.powf(0.7);
+
+        // 3. Speed-dependent thrust decay for fixed-pitch propellers.
+        let speed_factor = if engine.zero_thrust_speed_ms > 0.0 {
+            let ratio = flight.airspeed_ms / engine.zero_thrust_speed_ms;
+            (1.0 - ratio * ratio).max(0.0)
+        } else {
+            1.0
+        };
+
+        let thrust_n = engine.max_thrust_n * health * thrust_fraction
+            * density_ratio.powf(0.7)
+            * speed_factor;
 
         // 3. Actuator disk induced velocity.
         let radius = engine.prop_diameter_m * 0.5;

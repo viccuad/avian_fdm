@@ -72,7 +72,7 @@ def main():
     fdm.run_ic()
 
     # Start engine.
-    fdm["propulsion/engine/set-running"] = 1
+    fdm["propulsion/set-running"] = -1  # starts all engines
     fdm["fcs/throttle-cmd-norm"] = 0.5
     fdm["fcs/mixture-cmd-norm"] = 1.0
 

@@ -31,6 +31,19 @@ pub struct AircraftGeometry {
     /// Yaw damping derivative ∂Cn/∂r̂, where r̂ = r·b/(2V).
     /// Typical range: −0.1 to −0.15 for light aircraft. (Nelson Table B1)
     pub cn_r: f64,
+
+    // ── Induced drag ─────────────────────────────────────────────────────
+
+    /// Oswald span-efficiency factor *e*. Used to compute induced drag:
+    ///
+    /// ```text
+    /// CD_i = CL² / (π · e · AR)
+    /// ```
+    ///
+    /// where AR = b² / S. Typical values: 0.75–0.85 for low-wing monoplanes,
+    /// 0.85–0.95 for high-wing (like J3 Cub). Set to 0.0 to disable induced
+    /// drag (legacy behaviour).
+    pub oswald_factor: f64,
 }
 
 /// Core bundle. Spawn on the aircraft root entity.
