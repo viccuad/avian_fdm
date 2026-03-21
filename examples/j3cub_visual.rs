@@ -220,17 +220,15 @@ fn orbit_camera(
 const FORCE_SCALE: f32 = 1.0 / 600.0;
 
 /// Draws all zone entities using their [`Collider`] shape directly, with
-/// optional [`GizmoShape`] overrides for non-standard visuals.  Zones are
-/// color-coded by type:
+/// optional [`GizmoShape`] overrides for non-standard visuals.
 ///
-/// | Colour | Meaning |
-/// |--------|---------|
-/// | Cyan   | Lifting surface (wing, h-stab) |
-/// | Green  | Control surface (aileron/elevator/rudder) |
-/// | Grey   | Engine zone |
-/// | Orange | Structural / drag-only (fuselage, struts) |
-///
-/// Damaged zones fade toward red; fully destroyed zones disappear.
+/// | Colour      | Meaning                                      |
+/// |-------------|----------------------------------------------|
+/// | Cyan        | Lifting surface (wing, h-stab)               |
+/// | Green       | Control surface (aileron/elevator/rudder)     |
+/// | Orange      | Engine zone                                  |
+/// | Grey        | Non-lifting / structural (fuselage, struts)  |
+/// | Dark grey   | Contour detail lines                         |
 fn draw_aircraft_outline(
     mut gizmos: Gizmos,
     root_query: Query<&Transform, With<AircraftGeometry>>,
@@ -239,7 +237,7 @@ fn draw_aircraft_outline(
         Option<&AeroZone>,
         Option<&Collider>,
         Option<&GizmoShape>,
-        Option<&Damageable>,
+        Option<&GizmoContours>,
         Option<&EngineZone>,
     ), Or<(With<AeroZone>, With<EngineZone>)>>,
 ) {
@@ -257,30 +255,18 @@ fn draw_aircraft_outline(
         )
     };
 
-    for (zone_tf, aero, collider, shape, dmg, engine) in &zone_query {
-        let health = dmg.map(|d| d.health as f32).unwrap_or(1.0);
-        if health <= 0.0 { continue; }
+    let contour_color = Color::srgba(0.45, 0.45, 0.45, 0.7);
 
-        // Pick base colour by zone type.
-        let base = if engine.is_some() {
-            Color::srgba(0.6, 0.6, 0.6, 0.9)
+    for (zone_tf, aero, collider, shape, contours, engine) in &zone_query {
+        // Pick colour by zone type.
+        let color = if engine.is_some() {
+            Color::srgba(0.95, 0.65, 0.15, 0.9) // orange
         } else if aero.is_some_and(|a| a.control_role.is_some()) {
-            Color::srgba(0.3, 1.0, 0.5, 0.7)
+            Color::srgba(0.3, 1.0, 0.5, 0.7)    // green
         } else if aero.is_some_and(|a| a.cl.evaluate(0.1, 2e6).abs() > 0.01) {
-            Color::srgba(0.4, 0.85, 1.0, 0.7) // lifting surface
+            Color::srgba(0.4, 0.85, 1.0, 0.7)   // cyan — lifting surface
         } else {
-            Color::srgba(0.9, 0.75, 0.2, 0.7) // drag-only structural
-        };
-
-        // Fade toward red with damage.
-        let color = if health < 1.0 {
-            let r_c = base.to_srgba().red * health + 1.0 * (1.0 - health);
-            let g_c = base.to_srgba().green * health;
-            let b_c = base.to_srgba().blue * health;
-            let a_c = base.to_srgba().alpha;
-            Color::srgba(r_c, g_c, b_c, a_c)
-        } else {
-            base
+            Color::srgba(0.6, 0.6, 0.6, 0.6)    // grey — structural / drag-only
         };
 
         let pos = zone_tf.translation;
@@ -365,13 +351,23 @@ fn draw_aircraft_outline(
                     );
                 }
                 _ => {
-                    // Unsupported collider shape — draw a small marker.
                     gizmos.primitive_3d(
                         &Cuboid::new(0.1, 0.1, 0.1),
                         iso_at(pos, Quat::IDENTITY),
                         color,
                     );
                 }
+            }
+        }
+
+        // Draw contour linestrips in dark grey.
+        if let Some(contour_data) = contours {
+            for line in &contour_data.lines {
+                if line.len() < 2 { continue; }
+                let world_pts: Vec<Vec3> = line.iter()
+                    .map(|p| to_world(pos + *p))
+                    .collect();
+                gizmos.linestrip(world_pts, contour_color);
             }
         }
     }

@@ -17,7 +17,7 @@ pub use aircraft::{AircraftGeometry, AircraftCoreBundle};
 pub use controls::ControlInputs;
 pub use damageable::Damageable;
 pub use flight_state::{FlightState, AtmosphereState, WindResource};
-pub use gizmo_shape::GizmoShape;
+pub use gizmo_shape::{GizmoShape, GizmoContours};
 pub use zone_force::ZoneForce;
 
 #[cfg(feature = "propulsion")]

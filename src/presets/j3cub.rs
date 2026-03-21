@@ -111,7 +111,7 @@ use bevy::math::DVec3;
 
 use crate::components::{
     AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
-    ControlSurfaceRole, ZoneForce,
+    ControlSurfaceRole, GizmoContours, ZoneForce,
 };
 #[cfg(feature = "propulsion")]
 use crate::components::{EngineZone, PropwashState};
@@ -332,6 +332,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(188.0),
+                fuse_fwd_contours(),
             ));
 
             // ── Fuselage aft (tail boom) ─────────────────────────────────────
@@ -350,6 +351,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(119.0),
+                fuse_aft_contours(),
             ));
 
             // ── Cabin / windshield ───────────────────────────────────────────
@@ -368,6 +370,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(130.0),
+                cabin_contours(),
             ));
 
             // ── Wing struts ──────────────────────────────────────────────────
@@ -506,6 +509,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     ColliderDensity(860.0),
                 ),
                 GizmoShape::Cylinder { radius: 0.20, length: 0.50 },
+                engine_contours(),
             ));
         })
         .id();
@@ -784,6 +788,150 @@ pub fn engine_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
         Transform::from_xyz(1.65, 0.0, 0.04),
         GlobalTransform::default(),
     )
+}
+
+// ── Contour generators (detailed J-3 Cub outline) ────────────────────────────
+//
+// These functions return `GizmoContours` with linestrips that trace the real
+// aircraft profile. Coordinates are in zone-local frame (relative to the
+// zone's Transform). All dimensions come from J-3 Cub three-view drawings
+// and reference photos.
+
+/// Elliptical cross-section ring at local x, with given half-width and
+/// half-height. 12 segments for a smooth-ish ellipse.
+fn ellipse_ring(x: f32, hw: f32, hh: f32) -> Vec<Vec3> {
+    (0..=12)
+        .map(|i| {
+            let a = i as f32 * std::f32::consts::TAU / 12.0;
+            Vec3::new(x, hw * a.cos(), hh * a.sin())
+        })
+        .collect()
+}
+
+/// Forward fuselage contours: side profiles (top/bottom) and cross-section
+/// rings at key stations.
+///
+/// Zone center is at aircraft x=0.00, covers x=[−1.00, 1.00].
+/// Profile points are in zone-local x (so x=1.00 = firewall, x=−1.00 = rear seat).
+fn fuse_fwd_contours() -> GizmoContours {
+    // Side profiles (one per side, y = ±half_width at that station).
+    let top_profile: Vec<Vec3> = vec![
+        Vec3::new(1.00, 0.0, -0.30),   // firewall top
+        Vec3::new(0.60, 0.0, -0.34),   // cowl/windshield transition
+        Vec3::new(0.20, 0.0, -0.38),   // windshield base
+        Vec3::new(-0.20, 0.0, -0.40),  // cabin peak
+        Vec3::new(-0.60, 0.0, -0.38),  // rear cabin
+        Vec3::new(-1.00, 0.0, -0.34),  // rear seat
+    ];
+    let bot_profile: Vec<Vec3> = vec![
+        Vec3::new(1.00, 0.0, 0.35),    // firewall bottom
+        Vec3::new(0.60, 0.0, 0.34),    // lower cowl
+        Vec3::new(0.20, 0.0, 0.32),    // belly
+        Vec3::new(-0.20, 0.0, 0.28),   // belly taper
+        Vec3::new(-0.60, 0.0, 0.24),   // rear belly
+        Vec3::new(-1.00, 0.0, 0.20),   // rear seat
+    ];
+
+    // Cross-section rings at key stations.
+    let rings = vec![
+        ellipse_ring(1.00, 0.28, 0.32),   // firewall
+        ellipse_ring(0.20, 0.30, 0.35),    // cabin front
+        ellipse_ring(-0.60, 0.28, 0.31),   // rear cabin
+        ellipse_ring(-1.00, 0.24, 0.27),   // rear seat (fwd/aft boundary)
+    ];
+
+    let mut lines = vec![top_profile, bot_profile];
+    lines.extend(rings);
+    GizmoContours { lines }
+}
+
+/// Aft fuselage (tail boom) contours — tapered profile from rear seat to tail.
+///
+/// Zone center is at aircraft x=−2.35, covers x=[−3.70, −1.00].
+/// Local x: +1.35 = fwd end (−1.00 aircraft), −1.35 = aft end (−3.70 aircraft).
+fn fuse_aft_contours() -> GizmoContours {
+    let top_profile: Vec<Vec3> = vec![
+        Vec3::new(1.35, 0.0, -0.27),   // fwd end (matches fuse_fwd rear)
+        Vec3::new(0.65, 0.0, -0.22),
+        Vec3::new(0.00, 0.0, -0.18),
+        Vec3::new(-0.65, 0.0, -0.14),
+        Vec3::new(-1.10, 0.0, -0.10),
+        Vec3::new(-1.35, 0.0, -0.08),  // tail end
+    ];
+    let bot_profile: Vec<Vec3> = vec![
+        Vec3::new(1.35, 0.0, 0.20),
+        Vec3::new(0.65, 0.0, 0.16),
+        Vec3::new(0.00, 0.0, 0.12),
+        Vec3::new(-0.65, 0.0, 0.08),
+        Vec3::new(-1.10, 0.0, 0.06),
+        Vec3::new(-1.35, 0.0, 0.04),
+    ];
+
+    let rings = vec![
+        ellipse_ring(1.35, 0.20, 0.24),   // fwd end
+        ellipse_ring(0.00, 0.14, 0.15),    // mid boom
+        ellipse_ring(-1.00, 0.08, 0.08),   // near tail
+        ellipse_ring(-1.35, 0.06, 0.06),   // tail tip
+    ];
+
+    let mut lines = vec![top_profile, bot_profile];
+    lines.extend(rings);
+    GizmoContours { lines }
+}
+
+/// Cabin / windshield contours — the greenhouse profile above the fuselage.
+///
+/// Zone center at aircraft (0.40, 0, −0.60). Local coordinates relative to that.
+fn cabin_contours() -> GizmoContours {
+    // Windshield outline (side view, both sides).
+    let windshield_l: Vec<Vec3> = vec![
+        Vec3::new(0.50, -0.30, 0.25),   // windshield base (lower front)
+        Vec3::new(0.30, -0.30, -0.10),  // windshield top front
+        Vec3::new(-0.10, -0.30, -0.20), // roof peak
+        Vec3::new(-0.50, -0.30, -0.15), // rear window top
+        Vec3::new(-0.60, -0.30, 0.10),  // rear window base
+    ];
+    let windshield_r: Vec<Vec3> = windshield_l.iter()
+        .map(|p| Vec3::new(p.x, -p.y, p.z))
+        .collect();
+
+    // Roof spine (centerline).
+    let roof: Vec<Vec3> = vec![
+        Vec3::new(0.30, 0.0, -0.22),   // front
+        Vec3::new(-0.10, 0.0, -0.25),  // peak
+        Vec3::new(-0.50, 0.0, -0.18),  // rear
+    ];
+
+    GizmoContours {
+        lines: vec![windshield_l, windshield_r, roof],
+    }
+}
+
+/// Engine contours — spinner cone and propeller disc.
+///
+/// Zone center at aircraft (1.65, 0, 0.04). Engine GizmoShape is a cylinder;
+/// contours add the spinner and prop disc on top.
+#[cfg(feature = "propulsion")]
+fn engine_contours() -> GizmoContours {
+    // Spinner cone (linestrip profile, one side).
+    let spinner: Vec<Vec3> = vec![
+        Vec3::new(0.25, 0.0, 0.12),   // cylinder front bottom
+        Vec3::new(0.50, 0.0, 0.00),   // spinner tip
+        Vec3::new(0.25, 0.0, -0.12),  // cylinder front top
+    ];
+
+    // Propeller disc (circle at spinner tip, in YZ plane).
+    let prop_radius = 0.953_f32;
+    let prop_disc: Vec<Vec3> = (0..=24)
+        .map(|i| {
+            let a = i as f32 * std::f32::consts::TAU / 24.0;
+            Vec3::new(0.50, prop_radius * a.cos(), prop_radius * a.sin())
+        })
+        .collect();
+
+    GizmoContours {
+        lines: vec![spinner, prop_disc],
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

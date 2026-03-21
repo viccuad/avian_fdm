@@ -691,7 +691,7 @@ pub mod prelude {
         AircraftCoreBundle, AircraftGeometry,
         ControlInputs, FlightState, AtmosphereState,
         aero_coeff::AeroCoeff,
-        GizmoShape,
+        GizmoShape, GizmoContours,
         ZoneForce,
     };
     pub use crate::plugin::AircraftFdmPlugin;

@@ -19,6 +19,14 @@
 //! Aerodynamic surfaces (wings, h-stab, ailerons, elevator) use thin colliders
 //! (≈ 2 cm) whose cuboid outline naturally looks like a flat panel — they need
 //! no `GizmoShape` at all.
+//!
+//! ## Contour detail
+//!
+//! [`GizmoContours`] adds arbitrary linestrips to a zone for visual detail
+//! beyond what the collider shape shows — curved fuselage profiles, airfoil
+//! cross-sections, rounded wingtips. These are purely decorative but are
+//! zone-aware: they inherit damage colouring and disappear when the zone is
+//! destroyed.
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -72,4 +80,32 @@ pub enum GizmoShape {
         /// End point in local coordinates.
         end: Vec3,
     },
+}
+
+/// Additional linestrip contours for detailed aircraft outline rendering.
+///
+/// Each entry is a polyline (sequence of points in zone-local coordinates)
+/// drawn as a connected linestrip. Use this to add curved profiles,
+/// cross-section rings, airfoil sections, or any detail that the collider
+/// shape doesn't capture.
+///
+/// Contours inherit the zone's damage colour — they fade toward red as
+/// health decreases and vanish when the zone is destroyed.
+///
+/// # Example
+/// ```rust
+/// # use avian_fdm::components::gizmo_shape::GizmoContours;
+/// # use bevy::prelude::*;
+/// // Elliptical fuselage cross-section at x = 0
+/// let ring: Vec<Vec3> = (0..=12).map(|i| {
+///     let angle = i as f32 * std::f32::consts::TAU / 12.0;
+///     Vec3::new(0.0, 0.30 * angle.cos(), 0.35 * angle.sin())
+/// }).collect();
+/// let contours = GizmoContours { lines: vec![ring] };
+/// ```
+#[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
+#[reflect(Component, Serialize, Deserialize)]
+pub struct GizmoContours {
+    /// Each entry is a polyline drawn as a connected linestrip.
+    pub lines: Vec<Vec<Vec3>>,
 }
