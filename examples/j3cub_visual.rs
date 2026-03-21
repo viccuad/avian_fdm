@@ -45,6 +45,7 @@ fn main() {
         .add_plugins(PhysicsPlugins::default())
         .add_plugins(AircraftFdmPlugin)
         .init_resource::<OrbitCamera>()
+        .init_resource::<ShowColliders>()
         .add_systems(Startup, (spawn_aircraft, spawn_scene))
         .add_systems(
             Update,
@@ -219,8 +220,15 @@ fn orbit_camera(
 // comparable to the aircraft fuselage length, so it's easy to read.
 const FORCE_SCALE: f32 = 1.0 / 600.0;
 
+/// When true, draws raw collider shapes instead of contours / GizmoShape.
+/// Toggle with **C**.
+#[derive(Resource, Default)]
+struct ShowColliders(bool);
+
 /// Draws all zone entities using their [`Collider`] shape directly, with
 /// optional [`GizmoShape`] overrides for non-standard visuals.
+///
+/// Press **C** to toggle raw collider view.
 ///
 /// | Colour      | Meaning                                      |
 /// |-------------|----------------------------------------------|
@@ -228,7 +236,6 @@ const FORCE_SCALE: f32 = 1.0 / 600.0;
 /// | Green       | Control surface (aileron/elevator/rudder)     |
 /// | Orange      | Engine zone                                  |
 /// | Grey        | Non-lifting / structural (fuselage, struts)  |
-/// | Dark grey   | Contour detail lines                         |
 fn draw_aircraft_outline(
     mut gizmos: Gizmos,
     root_query: Query<&Transform, With<AircraftGeometry>>,
@@ -240,24 +247,75 @@ fn draw_aircraft_outline(
         Option<&GizmoContours>,
         Option<&EngineZone>,
     ), Or<(With<AeroZone>, With<EngineZone>)>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mut show_colliders: ResMut<ShowColliders>,
 ) {
     use parry3d::shape::TypedShape;
+
+    if keys.just_pressed(KeyCode::KeyC) {
+        show_colliders.0 = !show_colliders.0;
+    }
 
     let Ok(ac) = root_query.single() else { return };
     let t = ac.translation;
     let r = ac.rotation;
 
     let to_world = |body: Vec3| t + r * body;
-    let iso_at = |body_offset: Vec3, extra_rot: Quat| {
+    // Zone-local point → world, respecting zone rotation.
+    let zone_to_world = |zone_tf: &Transform, local: Vec3| {
+        to_world(zone_tf.translation + zone_tf.rotation * local)
+    };
+    let iso_at = |zone_tf: &Transform, extra_rot: Quat| {
         Isometry3d::new(
-            t + r * body_offset,
-            Quat::from_array(r.to_array()) * extra_rot,
+            t + r * zone_tf.translation,
+            Quat::from_array(r.to_array()) * Quat::from_array(zone_tf.rotation.to_array()) * extra_rot,
         )
     };
 
-    let contour_color = Color::srgba(0.45, 0.45, 0.45, 0.7);
+    let collider_color = Color::srgba(0.8, 0.5, 0.2, 0.5);
 
     for (zone_tf, aero, collider, shape, contours, engine) in &zone_query {
+
+        // ── Collider-only mode (toggle with C) ──────────────────────────
+        if show_colliders.0 {
+            if let Some(col) = collider {
+                match col.shape_scaled().as_typed_shape() {
+                    TypedShape::Cuboid(c) => {
+                        let he = c.half_extents;
+                        gizmos.primitive_3d(
+                            &Cuboid::new(he.x as f32 * 2.0, he.y as f32 * 2.0, he.z as f32 * 2.0),
+                            iso_at(zone_tf, Quat::IDENTITY),
+                            collider_color,
+                        );
+                    }
+                    TypedShape::Ball(b) => {
+                        gizmos.primitive_3d(
+                            &bevy::math::primitives::Sphere::new(b.radius as f32),
+                            iso_at(zone_tf, Quat::IDENTITY),
+                            collider_color,
+                        );
+                    }
+                    TypedShape::Cylinder(c) => {
+                        gizmos.primitive_3d(
+                            &Cylinder::new(c.radius as f32, c.half_height as f32 * 2.0),
+                            iso_at(zone_tf, Quat::IDENTITY),
+                            collider_color,
+                        );
+                    }
+                    TypedShape::Capsule(c) => {
+                        gizmos.primitive_3d(
+                            &Capsule3d::new(c.radius as f32, c.half_height() as f32 * 2.0),
+                            iso_at(zone_tf, Quat::IDENTITY),
+                            collider_color,
+                        );
+                    }
+                    _ => {}
+                }
+            }
+            continue;
+        }
+
+        // ── Normal mode: contours / GizmoShape / collider fallback ──────
         // Pick colour by zone type.
         let color = if engine.is_some() {
             Color::srgba(0.95, 0.65, 0.15, 0.9) // orange
@@ -269,14 +327,13 @@ fn draw_aircraft_outline(
             Color::srgba(0.6, 0.6, 0.6, 0.6)    // grey — structural / drag-only
         };
 
-        let pos = zone_tf.translation;
 
         // Draw contour linestrips when present.
         if let Some(contour_data) = contours {
             for line in &contour_data.lines {
                 if line.len() < 2 { continue; }
                 let world_pts: Vec<Vec3> = line.iter()
-                    .map(|p| to_world(pos + *p))
+                    .map(|p| zone_to_world(zone_tf, *p))
                     .collect();
                 gizmos.linestrip(world_pts, color);
             }
@@ -291,42 +348,42 @@ fn draw_aircraft_outline(
                 GizmoShape::Box { x, y, z } => {
                     gizmos.primitive_3d(
                         &Cuboid::new(*x, *y, *z),
-                        iso_at(pos, Quat::IDENTITY),
+                        iso_at(zone_tf, Quat::IDENTITY),
                         color,
                     );
                 }
                 GizmoShape::Cylinder { radius, length } => {
                     gizmos.primitive_3d(
                         &Cylinder::new(*radius, *length),
-                        iso_at(pos, Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
+                        iso_at(zone_tf, Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
                         color,
                     );
                 }
                 GizmoShape::Cone { radius, length } => {
                     gizmos.primitive_3d(
                         &Cone { radius: *radius, height: *length },
-                        iso_at(pos, Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)),
+                        iso_at(zone_tf, Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)),
                         color,
                     );
                 }
                 GizmoShape::Sphere { radius } => {
                     gizmos.primitive_3d(
                         &bevy::math::primitives::Sphere::new(*radius),
-                        iso_at(pos, Quat::IDENTITY),
+                        iso_at(zone_tf, Quat::IDENTITY),
                         color,
                     );
                 }
                 GizmoShape::Quad { corners } => {
                     let pts: Vec<Vec3> = corners.iter()
                         .chain(std::iter::once(&corners[0]))
-                        .map(|c| to_world(pos + *c))
+                        .map(|c| zone_to_world(zone_tf, *c))
                         .collect();
                     gizmos.linestrip(pts, color);
                 }
                 GizmoShape::Strut { start, end } => {
                     gizmos.line(
-                        to_world(pos + *start),
-                        to_world(pos + *end),
+                        zone_to_world(zone_tf, *start),
+                        zone_to_world(zone_tf, *end),
                         color,
                     );
                 }
@@ -339,35 +396,35 @@ fn draw_aircraft_outline(
                     let he = c.half_extents;
                     gizmos.primitive_3d(
                         &Cuboid::new(he.x as f32 * 2.0, he.y as f32 * 2.0, he.z as f32 * 2.0),
-                        iso_at(pos, Quat::IDENTITY),
+                        iso_at(zone_tf, Quat::IDENTITY),
                         color,
                     );
                 }
                 TypedShape::Ball(b) => {
                     gizmos.primitive_3d(
                         &bevy::math::primitives::Sphere::new(b.radius as f32),
-                        iso_at(pos, Quat::IDENTITY),
+                        iso_at(zone_tf, Quat::IDENTITY),
                         color,
                     );
                 }
                 TypedShape::Cylinder(c) => {
                     gizmos.primitive_3d(
                         &Cylinder::new(c.radius as f32, c.half_height as f32 * 2.0),
-                        iso_at(pos, Quat::IDENTITY),
+                        iso_at(zone_tf, Quat::IDENTITY),
                         color,
                     );
                 }
                 TypedShape::Capsule(c) => {
                     gizmos.primitive_3d(
                         &Capsule3d::new(c.radius as f32, c.half_height() as f32 * 2.0),
-                        iso_at(pos, Quat::IDENTITY),
+                        iso_at(zone_tf, Quat::IDENTITY),
                         color,
                     );
                 }
                 _ => {
                     gizmos.primitive_3d(
                         &Cuboid::new(0.1, 0.1, 0.1),
-                        iso_at(pos, Quat::IDENTITY),
+                        iso_at(zone_tf, Quat::IDENTITY),
                         color,
                     );
                 }

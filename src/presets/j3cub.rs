@@ -375,10 +375,15 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
 
             // ── Wing struts ──────────────────────────────────────────────────
             // Parasitic drag from the V-struts connecting fuselage to wings.
+            // Colliders are rotated to align with the strut direction.
             for (sign, _name) in [(-1.0_f32, "L-strut"), (1.0, "R-strut")] {
                 let fuse_attach = Vec3::new(0.20, 0.25 * sign, 0.30);
                 let wing_attach = Vec3::new(-0.10 + 0.35, 2.5 * sign, -0.58);
                 let mid = (fuse_attach + wing_attach) * 0.5;
+                let dir = wing_attach - fuse_attach;
+                let length = dir.length();
+                let rot = Quat::from_rotation_arc(Vec3::X, dir.normalize());
+                let half = length * 0.5;
                 parent.spawn((
                     AeroZoneBundle {
                         zone: AeroZone {
@@ -387,14 +392,14 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                             ..default()
                         },
                         zone_force: ZoneForce::default(),
-                        collider: Collider::cuboid(2.60, 0.04, 0.04),
-                        transform: Transform::from_translation(mid),
+                        collider: Collider::cuboid(length, 0.04, 0.04),
+                        transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
                     },
                     ColliderDensity(2700.0),
                     GizmoShape::Strut {
-                        start: fuse_attach - mid,
-                        end: wing_attach - mid,
+                        start: Vec3::new(-half, 0.0, 0.0),
+                        end: Vec3::new(half, 0.0, 0.0),
                     },
                 ));
             }
@@ -404,6 +409,10 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                 let top = Vec3::new(0.50, 0.15 * sign, 0.35);
                 let bottom = Vec3::new(0.50, 0.55 * sign, 0.90);
                 let mid = (top + bottom) * 0.5;
+                let dir = bottom - top;
+                let length = dir.length();
+                let rot = Quat::from_rotation_arc(Vec3::X, dir.normalize());
+                let half = length * 0.5;
                 parent.spawn((
                     AeroZoneBundle {
                         zone: AeroZone {
@@ -412,14 +421,14 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                             ..default()
                         },
                         zone_force: ZoneForce::default(),
-                        collider: Collider::cuboid(0.65, 0.04, 0.04),
-                        transform: Transform::from_translation(mid),
+                        collider: Collider::cuboid(length, 0.04, 0.04),
+                        transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
                     },
                     ColliderDensity(7800.0),
                     GizmoShape::Strut {
-                        start: top - mid,
-                        end: bottom - mid,
+                        start: Vec3::new(-half, 0.0, 0.0),
+                        end: Vec3::new(half, 0.0, 0.0),
                     },
                 ));
             }
