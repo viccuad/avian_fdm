@@ -271,7 +271,21 @@ fn draw_aircraft_outline(
 
         let pos = zone_tf.translation;
 
-        // Priority: GizmoShape override > Collider shape > nothing.
+        // Draw contour linestrips when present.
+        if let Some(contour_data) = contours {
+            for line in &contour_data.lines {
+                if line.len() < 2 { continue; }
+                let world_pts: Vec<Vec3> = line.iter()
+                    .map(|p| to_world(pos + *p))
+                    .collect();
+                gizmos.linestrip(world_pts, color);
+            }
+            // If there's no GizmoShape, contours are the only visual — skip
+            // the collider fallback below.
+            if shape.is_none() { continue; }
+        }
+
+        // Draw GizmoShape override, or fall back to Collider shape.
         if let Some(gs) = shape {
             match gs {
                 GizmoShape::Box { x, y, z } => {
@@ -360,16 +374,7 @@ fn draw_aircraft_outline(
             }
         }
 
-        // Draw contour linestrips in dark grey.
-        if let Some(contour_data) = contours {
-            for line in &contour_data.lines {
-                if line.len() < 2 { continue; }
-                let world_pts: Vec<Vec3> = line.iter()
-                    .map(|p| to_world(pos + *p))
-                    .collect();
-                gizmos.linestrip(world_pts, contour_color);
-            }
-        }
+        // (contour zones handled above with `continue`)
     }
 }
 

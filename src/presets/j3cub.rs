@@ -366,7 +366,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     },
                     zone_force: ZoneForce::default(),
                     collider: Collider::cuboid(1.20, 0.68, 0.50),
-                    transform: Transform::from_xyz(0.40, 0.0, -0.60),
+                    transform: Transform::from_xyz(0.20, 0.0, -0.60),
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(130.0),
@@ -461,43 +461,54 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             ));
 
             // ── Horizontal stabiliser ─────────────────────────────────────────
-            parent.spawn(hstab_zone(
-                Collider::cuboid(0.60, 1.00, 0.02),
-                ColliderDensity(400.0),
+            parent.spawn((
+                hstab_zone(
+                    Collider::cuboid(0.60, 1.00, 0.02),
+                    ColliderDensity(400.0),
+                ),
+                hstab_contours(),
             ));
 
             // ── Elevator ──────────────────────────────────────────────────────
-            parent.spawn(elevator_zone(
-                Collider::cuboid(0.35, 1.00, 0.02),
-                ColliderDensity(280.0),
+            parent.spawn((
+                elevator_zone(
+                    Collider::cuboid(0.35, 1.00, 0.02),
+                    ColliderDensity(280.0),
+                ),
+                elevator_contours(),
             ));
 
             // ── Vertical fin ──────────────────────────────────────────────────
+            // Root touches fuselage top (z=−0.175). LE sweeps aft from root
+            // to tip. TE is the straight hinge line shared with the rudder.
+            // Real J3 Cub: root chord ~0.65m, tip ~0.35m, height ~0.85m.
             parent.spawn((
                 vtail_zone(
-                    Collider::cuboid(0.50, 0.10, 0.60),
-                    ColliderDensity(100.0),
+                    Collider::cuboid(0.65, 0.10, 0.85),
+                    ColliderDensity(54.0),
                 ),
                 GizmoShape::Quad {
                     corners: [
-                        Vec3::new(0.30, 0.0, -0.30),    // root LE
-                        Vec3::new(0.50, 0.0, -0.70),    // tip LE
-                        Vec3::new(-0.30, 0.0, -0.90),   // tip TE
-                        Vec3::new(-0.40, 0.0, -0.00),   // root TE
+                        Vec3::new( 0.325, 0.0,  0.425),  // root LE (fwd, bottom)
+                        Vec3::new(-0.325, 0.0,  0.425),  // root TE (aft, bottom = hinge)
+                        Vec3::new(-0.325, 0.0, -0.425),  // tip TE  (aft, top = hinge)
+                        Vec3::new( 0.175, 0.0, -0.425),  // tip LE  (swept aft, top)
                     ],
                 },
             ));
 
             // ── Rudder ────────────────────────────────────────────────────────
+            // LE is the hinge line (matches vtail TE at x = −3.825 body).
+            // Real J3 Cub: root chord ~0.45m, tip ~0.30m, height ~0.95m.
             parent.spawn((rudder_zone(
-                Collider::cuboid(0.35, 0.07, 0.55),
-                ColliderDensity(80.0),
+                Collider::cuboid(0.45, 0.07, 0.95),
+                ColliderDensity(33.0),
             ), GizmoShape::Quad {
                 corners: [
-                    Vec3::new(0.25, 0.0, -0.25),   // root LE
-                    Vec3::new(0.40, 0.0, -0.55),   // tip LE
-                    Vec3::new(-0.35, 0.0, -0.55),  // tip TE
-                    Vec3::new(-0.35, 0.0, 0.0),    // root TE
+                    Vec3::new( 0.225, 0.0,  0.475),  // root LE (hinge, bottom)
+                    Vec3::new(-0.225, 0.0,  0.475),  // root TE (aft, bottom)
+                    Vec3::new(-0.075, 0.0, -0.475),  // tip TE  (aft, top, tapered)
+                    Vec3::new( 0.225, 0.0, -0.475),  // tip LE  (hinge, top)
                 ],
             }));
 
@@ -722,11 +733,12 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
             },
             zone_force: ZoneForce::default(),
             collider,
-            // z = −0.80 m: V-tail AC is ~0.80 m above fuselage datum (upward = −Z).
+            // z = −0.60 m: midpoint — root at fuselage top (z=−0.175),
+            // tip extends ~0.85 m above.
             transform: Transform::from_xyz(
                 -(H_TAIL_ARM_M as f32 - 0.46),
                 0.0,
-                -0.80,
+                -0.60,
             ),
             global_transform: GlobalTransform::default(),
         },
@@ -754,10 +766,12 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
             },
             zone_force: ZoneForce::default(),
             collider,
+            // Rudder center sits just aft of vtail, same height range.
+            // x = −3.95 so LE (+0.20) lands at x = −3.75 = vtail TE.
             transform: Transform::from_xyz(
-                -(H_TAIL_ARM_M as f32 + 0.04),
+                -3.95,
                 0.0,
-                -1.10,
+                -0.45,
             ),
             global_transform: GlobalTransform::default(),
         },
@@ -931,6 +945,38 @@ fn engine_contours() -> GizmoContours {
 
     GizmoContours {
         lines: vec![spinner, prop_disc],
+    }
+}
+
+/// H-stab planform — simple rectangle.
+/// Zone-local coords: collider cuboid(0.60, 1.00, 0.02).
+fn hstab_contours() -> GizmoContours {
+    let hc = 0.30_f32;
+    let hs = 0.50_f32;
+    GizmoContours {
+        lines: vec![vec![
+            Vec3::new(-hc, -hs, 0.0),
+            Vec3::new(-hc,  hs, 0.0),
+            Vec3::new( hc,  hs, 0.0),
+            Vec3::new( hc, -hs, 0.0),
+            Vec3::new(-hc, -hs, 0.0),
+        ]],
+    }
+}
+
+/// Elevator planform — simple rectangle.
+/// Zone-local coords: collider cuboid(0.35, 1.00, 0.02).
+fn elevator_contours() -> GizmoContours {
+    let hc = 0.175_f32;
+    let hs = 0.50_f32;
+    GizmoContours {
+        lines: vec![vec![
+            Vec3::new(-hc, -hs, 0.0),
+            Vec3::new(-hc,  hs, 0.0),
+            Vec3::new( hc,  hs, 0.0),
+            Vec3::new( hc, -hs, 0.0),
+            Vec3::new(-hc, -hs, 0.0),
+        ]],
     }
 }
 
