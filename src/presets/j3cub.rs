@@ -548,13 +548,9 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
                 wing_area_m2: WING_AREA_M2,
                 wing_span_m:  WING_SPAN_M,
                 chord_m:      CHORD_M,
-                // Damping derivatives set to zero: roll/pitch/yaw damping now
-                // emerge from per-zone local α/β (E½.1).  The physical wing,
-                // h-stab, and v-tail zones produce the correct damping forces
-                // from their geometry without explicit derivative tuning.
-                cl_p: 0.0,
-                cm_q: 0.0,
-                cn_r: 0.0,
+                // lod_damping: None (default) — roll/pitch/yaw damping emerges
+                // from per-zone local α/β physics (E½.1).
+                lod_damping: None,
                 // JSBSim J3Cub: CD_i = CL² × 0.0485 → e = 1/(π × 0.0485 × AR)
                 // AR = 10.742² / 16.584 = 6.956 → e ≈ 0.94
                 oswald_factor: 0.94,

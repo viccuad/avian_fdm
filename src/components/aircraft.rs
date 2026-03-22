@@ -4,8 +4,43 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 
+/// Whole-aircraft angular-rate damping derivatives, used as an **LOD fallback**.
+///
+/// At full fidelity, roll/pitch/yaw damping emerge naturally from per-zone local
+/// α/β corrections (see `zone_local_angles`): the wing tips resist roll, the
+/// h-stab resists pitch, the v-tail resists yaw — all from geometry alone.
+///
+/// Set `AircraftGeometry::lod_damping` to `Some(LodDamping { … })` only when
+/// the aircraft has too few zones to produce realistic physical damping (e.g.
+/// a single-zone missile body, or a low-fidelity background AI aircraft).
+///
+/// # Non-dimensional form
+///
+/// ```text
+/// ΔL = Cl_p · (p·b / 2V) · q̄ · S · b     roll  damping → body X
+/// ΔM = Cm_q · (q·c̄ / 2V) · q̄ · S · c̄    pitch damping → body Y
+/// ΔN = Cn_r · (r·b / 2V) · q̄ · S · b     yaw   damping → body Z
+/// ```
+///
+/// All derivatives should be negative (damping opposes motion).
+/// Typical light GA values (Nelson 1998, Table B1):
+/// `Cl_p ≈ −0.45`, `Cm_q ≈ −12.0`, `Cn_r ≈ −0.12`.
+#[derive(Reflect, Serialize, Deserialize, Clone, Debug)]
+#[reflect(Serialize, Deserialize)]
+pub struct LodDamping {
+    /// Roll damping derivative ∂Cl/∂p̂, where p̂ = p·b/(2V).
+    /// Typical range: −0.4 to −0.5 for light aircraft.
+    pub cl_p: f64,
+    /// Pitch damping derivative ∂Cm/∂q̂, where q̂ = q·c̄/(2V).
+    /// Typical range: −10 to −20 for light aircraft.
+    pub cm_q: f64,
+    /// Yaw damping derivative ∂Cn/∂r̂, where r̂ = r·b/(2V).
+    /// Typical range: −0.1 to −0.15 for light aircraft.
+    pub cn_r: f64,
+}
+
 /// Wing and tail geometry constants used for aerodynamic non-dimensionalisation
-/// (q̄·S, q̄·S·b, q̄·S·c̄), plus whole-aircraft dynamic damping derivatives.
+/// (q̄·S, q̄·S·b, q̄·S·c̄).
 ///
 /// Lives on the **aircraft root entity**.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
@@ -18,19 +53,17 @@ pub struct AircraftGeometry {
     /// Mean aerodynamic chord c̄ (m). Used to non-dimensionalise pitching moment.
     pub chord_m: f64,
 
-    // ── Dynamic damping derivatives ────────────────────────────────────────
-    // Non-dimensional; applied as ΔC × (rate · ref_length / 2V) × q̄ × S × ref_length.
-    // Negative values produce stabilising (restoring) moments.
+    // ── LOD damping (optional) ─────────────────────────────────────────────
 
-    /// Roll damping derivative ∂Cl/∂p̂, where p̂ = p·b/(2V).
-    /// Typical range: −0.4 to −0.5 for light aircraft. (Nelson Table B1)
-    pub cl_p: f64,
-    /// Pitch damping derivative ∂Cm/∂q̂, where q̂ = q·c̄/(2V).
-    /// Typical range: −10 to −20 for light aircraft. (Nelson Table B1)
-    pub cm_q: f64,
-    /// Yaw damping derivative ∂Cn/∂r̂, where r̂ = r·b/(2V).
-    /// Typical range: −0.1 to −0.15 for light aircraft. (Nelson Table B1)
-    pub cn_r: f64,
+    /// Whole-aircraft damping derivatives, applied as an LOD fallback.
+    ///
+    /// `None` (default) — damping comes entirely from per-zone local α/β
+    /// physics.  Use this for any aircraft with a realistic zone layout.
+    ///
+    /// `Some(LodDamping { … })` — global derivatives are added on top of
+    /// zone physics.  Use only for sparse-zone aircraft (single-zone bodies,
+    /// low-fidelity AI) that cannot produce adequate damping from geometry.
+    pub lod_damping: Option<LodDamping>,
 
     // ── Induced drag ─────────────────────────────────────────────────────
 

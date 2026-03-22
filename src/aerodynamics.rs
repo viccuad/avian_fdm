@@ -18,18 +18,22 @@
 //!                                      system) and its moment-arm torque
 //!   Once per aircraft:
 //!     4. induced_drag                — whole-aircraft CD_i = CL²/(π·e·AR)
-//!     5. damping_torque (LOD fallback) — global cl_p/cm_q/cn_r; skipped when
-//!                                        all three are zero (zone physics used)
+//!     5. damping_torque (LOD fallback) — only when `lod_damping` is `Some`;
+//!                                        skipped for full-fidelity zone layouts
 //! ```
 //!
 //! ## Why per-zone local angles matter
 //!
 //! With per-zone local α/β (step 0), asymmetric stall, snap rolls, spins,
 //! adverse yaw, Dutch roll, and pitch-rate tail authority limits **emerge
-//! naturally** from zone geometry — no special-case logic needed.  The global
-//! damping derivatives (`cl_p`, `cm_q`, `cn_r` in [`AircraftGeometry`]) become
-//! optional LOD fallbacks for aircraft that have too few zones to produce
-//! realistic damping.  Set them to `0.0` to rely entirely on zone physics.
+//! naturally** from zone geometry — no special-case logic needed.
+//!
+//! The two modes are **mutually exclusive**:
+//!
+//! | `lod_damping` | Step 0 | Step 5 | Best for |
+//! |---|---|---|---|
+//! | `None` (default) | per-zone local α/β | skipped | full-zone aircraft |
+//! | `Some(LodDamping)` | global α/β only | derivatives applied | sparse-zone bodies |
 //!
 //! Each function's doc comment explains the physics behind that step, so reading
 //! them top-to-bottom gives a self-contained introduction to how the FDM
@@ -322,11 +326,21 @@ fn accumulate_engine_force(
 
 /// Compute whole-aircraft angular-rate damping torque in world coordinates.
 ///
-/// # Why damping matters
+/// This is an **LOD fallback** for aircraft with too few zones to produce
+/// realistic physical damping from geometry alone.  At full fidelity, call
+/// [`zone_local_angles`] per zone instead — the differential forces from wing
+/// and tail zones naturally oppose body rates without any explicit derivatives.
 ///
-/// Without rate-dependent restoring moments, any angular perturbation would
-/// grow without bound — the aircraft would tumble after the slightest gust.
-/// Real aircraft are damped by the aerodynamic surfaces that resist rotation:
+/// # When to use
+///
+/// Supply a [`LodDamping`](crate::components::LodDamping) value only for:
+/// - Single-zone bodies (missiles, pylons)
+/// - Low-fidelity AI aircraft with minimal zone layouts
+///
+/// For any aircraft with realistic wing, h-stab, and v-tail zones, leave
+/// `lod_damping = None` and let zone physics do the work.
+///
+/// # How it works
 ///
 /// - **Roll damping (Cl_p):** When the aircraft rolls right (p > 0), the
 ///   descending right wing sees increased angle of attack, producing more lift,
@@ -343,16 +357,13 @@ fn accumulate_engine_force(
 ///
 /// # Non-dimensional form
 ///
-/// Each derivative is expressed in non-dimensional rate:
-///
 /// ```text
 /// ΔL = Cl_p · (p·b / 2V) · q̄ · S · b     roll  damping → body X
 /// ΔM = Cm_q · (q·c̄ / 2V) · q̄ · S · c̄    pitch damping → body Y
 /// ΔN = Cn_r · (r·b / 2V) · q̄ · S · b     yaw   damping → body Z
 /// ```
 ///
-/// The `(rate × length / 2V)` term is the non-dimensional rate — the ratio
-/// of the tip speed (from rotation) to the freestream velocity.  Multiplying
+/// The `(rate × length / 2V)` term is the non-dimensional rate.  Multiplying
 /// by `q̄ · S · length` recovers a dimensional moment in N·m.
 ///
 /// Typical values for a light GA aircraft (Nelson 1998, Table B1):
@@ -360,6 +371,7 @@ fn accumulate_engine_force(
 /// because damping opposes motion.
 pub fn damping_torque(
     flight: &FlightState,
+    lod: &crate::components::LodDamping,
     geo: &AircraftGeometry,
     body_to_world: DQuat,
 ) -> DVec3 {
@@ -374,9 +386,9 @@ pub fn damping_torque(
     let rb_2v = flight.r_rads * b / (2.0 * v);
 
     let damp_body = DVec3::new(
-        geo.cl_p * pb_2v * qbar * s * b,
-        geo.cm_q * qc_2v * qbar * s * c,
-        geo.cn_r * rb_2v * qbar * s * b,
+        lod.cl_p * pb_2v * qbar * s * b,
+        lod.cm_q * qc_2v * qbar * s * c,
+        lod.cn_r * rb_2v * qbar * s * b,
     );
 
     body_to_world * damp_body
@@ -391,24 +403,24 @@ fn dvec3_to_vec3(v: DVec3) -> Vec3 {
 
 /// Bevy system that orchestrates the aerodynamic pipeline each physics step.
 ///
-/// For each aircraft root entity, this system:
+/// The two fidelity modes are **mutually exclusive**, selected by whether
+/// [`AircraftGeometry::lod_damping`] is `Some`:
 ///
-/// 0. Computes per-zone local α/β via [`zone_local_angles`] — correcting
-///    the whole-aircraft angles for the zone's position in the angular-rate
-///    velocity field.
-/// 1. Iterates every [`AeroZone`] child and calls
-///    [`evaluate_zone_coefficients`] → [`zone_force_world`] to get
-///    world-space forces and torques.
-/// 2. Accumulates each zone's force, moment-arm torque `(r_zone − r_CG) × F`,
-///    and pure aerodynamic torque into the root's
-///    [`ConstantForce`] / [`ConstantTorque`].
-/// 3. Rolls up pre-computed engine thrust via [`accumulate_engine_force`].
-/// 4. Adds whole-aircraft induced drag.
-/// 5. Optionally applies global [`damping_torque`] as an LOD fallback when
-///    `cl_p`, `cm_q`, or `cn_r` are non-zero.  Set all three to `0.0` to rely
-///    entirely on zone-level damping from step 0.
+/// **Full-fidelity mode** (`lod_damping = None`):
+/// - Step 0 applies per-zone local α/β corrections from body rates.
+/// - Roll/pitch/yaw damping emerges from differential zone forces.
+/// - Step 5 is skipped.
 ///
-/// The results are consumed by Avian's solver in the next phase.
+/// **LOD mode** (`lod_damping = Some(…)`):
+/// - Step 0 is skipped; all zones evaluate at the global α/β.
+/// - Step 5 applies explicit `Cl_p`/`Cm_q`/`Cn_r` derivatives as the sole
+///   source of damping.
+///
+/// Steps common to both modes:
+/// 1. [`evaluate_zone_coefficients`] → [`zone_force_world`] per zone.
+/// 2. Moment-arm torques `(r_zone − r_CG) × F` accumulated.
+/// 3. Pre-computed engine thrust via [`accumulate_engine_force`].
+/// 4. Whole-aircraft induced drag CD_i = CL²/(π·e·AR).
 pub fn compute_aero_forces(
     mut root_query: Query<(
         &mut ConstantForce,
@@ -453,11 +465,17 @@ pub fn compute_aero_forces(
         let c = geo.chord_m;
 
         let body_to_world = DQuat::from_array(rot.0.to_array().map(|x| x as f64));
-        // Global stab_to_body (at whole-aircraft α) — used for induced drag.
+        // Global stab_to_body (at whole-aircraft α) — used for induced drag and LOD mode.
         let stab_to_body_global = DQuat::from_rotation_y(-alpha);
         let com_world: Vec3 = pos.0 + rot.0 * com.0;
         // CG in world space as DVec3, used to measure zone moment arms.
         let cg_world = DVec3::new(com_world.x as f64, com_world.y as f64, com_world.z as f64);
+
+        // LOD mode: when `lod_damping` is provided, zones evaluate at the global
+        // α/β (no per-zone corrections) and `damping_torque` owns all damping.
+        // When `lod_damping` is None, per-zone local angles (step 0) are applied
+        // and damping emerges from differential zone forces — no derivatives needed.
+        let use_lod = geo.lod_damping.is_some();
 
         // ── Per-zone accumulation ────────────────────────────────────────
         let mut total_cl = 0.0_f64; // sum of zone CL contributions (for induced drag)
@@ -471,21 +489,23 @@ pub fn compute_aero_forces(
                     continue;
                 }
 
-                // Step 0: per-zone local α/β.
-                // Measure the zone's position relative to CG in body frame.
-                let zone_world_pos = zone_gt.translation();
-                let zone_rel_world = DVec3::new(
-                    zone_world_pos.x as f64 - cg_world.x,
-                    zone_world_pos.y as f64 - cg_world.y,
-                    zone_world_pos.z as f64 - cg_world.z,
-                );
-                let zone_body = body_to_world.inverse() * zone_rel_world;
-                let (alpha_local, beta_local) =
-                    zone_local_angles(alpha, beta, p, q, r, zone_body.x, zone_body.y, v);
-
-                // Per-zone stab_to_body uses the local angle of attack so that
-                // the stability-frame force direction is correct for this zone.
-                let stab_to_body_local = DQuat::from_rotation_y(-alpha_local);
+                // Step 0: per-zone local α/β — skipped in LOD mode.
+                // In full-fidelity mode, measure the zone's body-frame position
+                // relative to the CG and apply roll/pitch/yaw-rate corrections.
+                let (alpha_local, beta_local, stab_to_body_local) = if use_lod {
+                    (alpha, beta, stab_to_body_global)
+                } else {
+                    let zone_world_pos = zone_gt.translation();
+                    let zone_rel_world = DVec3::new(
+                        zone_world_pos.x as f64 - cg_world.x,
+                        zone_world_pos.y as f64 - cg_world.y,
+                        zone_world_pos.z as f64 - cg_world.z,
+                    );
+                    let zone_body = body_to_world.inverse() * zone_rel_world;
+                    let (al, bl) =
+                        zone_local_angles(alpha, beta, p, q, r, zone_body.x, zone_body.y, v);
+                    (al, bl, DQuat::from_rotation_y(-al))
+                };
 
                 // Step 1: evaluate coefficients at local α/β.
                 let coeffs = evaluate_zone_coefficients(
@@ -541,11 +561,12 @@ pub fn compute_aero_forces(
             cf.0 += dvec3_to_vec3(drag_world);
         }
 
-        // Step 5: global damping torque — LOD fallback.
-        // Skipped when all derivatives are zero; zone physics (step 0) then
-        // provides damping emergently from per-zone local α/β.
-        if geo.cl_p != 0.0 || geo.cm_q != 0.0 || geo.cn_r != 0.0 {
-            let damp = damping_torque(flight, geo, body_to_world);
+        // Step 5: global damping torque — LOD mode only.
+        // Mutually exclusive with per-zone local angles (step 0): when
+        // `lod_damping` is Some, zones evaluated at global α/β produce no
+        // emergent damping, so the derivatives here are the sole source.
+        if let Some(lod) = &geo.lod_damping {
+            let damp = damping_torque(flight, lod, geo, body_to_world);
             if damp.is_finite() {
                 ct.0 += dvec3_to_vec3(damp);
             }
@@ -702,12 +723,12 @@ mod tests {
             alpha_rad: 0.0, beta_rad: 0.0, mach: 0.15,
             reynolds_number: 3e6, altitude_m: 0.0,
         };
+        let lod = crate::components::LodDamping { cl_p: -0.45, cm_q: 0.0, cn_r: 0.0 };
         let geo = AircraftGeometry {
-            cl_p: -0.45, cm_q: 0.0, cn_r: 0.0,
             wing_span_m: 10.0, chord_m: 1.6, wing_area_m2: 16.0,
             ..Default::default()
         };
-        let damp = damping_torque(&flight, &geo, DQuat::IDENTITY);
+        let damp = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
         // p > 0 and cl_p < 0 → roll damping moment should be negative (opposes roll).
         assert!(damp.x < 0.0, "roll damping should oppose positive p, got {}", damp.x);
     }
@@ -719,12 +740,12 @@ mod tests {
             airspeed_ms: 50.0, dynamic_pressure_pa: 1531.0,
             ..Default::default()
         };
+        let lod = crate::components::LodDamping { cl_p: -0.45, cm_q: -12.0, cn_r: -0.12 };
         let geo = AircraftGeometry {
-            cl_p: -0.45, cm_q: -12.0, cn_r: -0.12,
             wing_span_m: 10.0, chord_m: 1.6, wing_area_m2: 16.0,
             ..Default::default()
         };
-        let damp = damping_torque(&flight, &geo, DQuat::IDENTITY);
+        let damp = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
         assert!(damp.length() < 1e-10, "zero rates should produce zero damping");
     }
 
