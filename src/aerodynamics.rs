@@ -47,7 +47,7 @@ use avian3d::prelude::{
 
 use crate::components::{
     AeroZone, AircraftGeometry, ControlInputs, ControlSurfaceRole,
-    Damageable, FlightState, ZoneForce,
+    Damageable, FlightState, InducedDrag, LodDamping, ZoneForce,
 };
 #[cfg(feature = "propulsion")]
 use crate::components::EngineZone;
@@ -432,6 +432,8 @@ pub fn compute_aero_forces(
         &AircraftGeometry,
         &ControlInputs,
         &Children,
+        Option<&LodDamping>,
+        Option<&InducedDrag>,
     )>,
     mut zone_query: Query<(
         &AeroZone,
@@ -442,7 +444,7 @@ pub fn compute_aero_forces(
     #[cfg(feature = "propulsion")]
     engine_zone_query: Query<&ZoneForce, (With<EngineZone>, Without<AeroZone>)>,
 ) {
-    for (mut cf, mut ct, pos, rot, com, flight, geo, ctrl, children)
+    for (mut cf, mut ct, pos, rot, com, flight, geo, ctrl, children, lod_damping, induced_drag)
         in root_query.iter_mut()
     {
         cf.0 = Vec3::ZERO;
@@ -471,11 +473,11 @@ pub fn compute_aero_forces(
         // CG in world space as DVec3, used to measure zone moment arms.
         let cg_world = DVec3::new(com_world.x as f64, com_world.y as f64, com_world.z as f64);
 
-        // LOD mode: when `lod_damping` is provided, zones evaluate at the global
-        // α/β (no per-zone corrections) and `damping_torque` owns all damping.
-        // When `lod_damping` is None, per-zone local angles (step 0) are applied
-        // and damping emerges from differential zone forces — no derivatives needed.
-        let use_lod = geo.lod_damping.is_some();
+        // LOD mode: when the `LodDamping` component is present, zones evaluate
+        // at the global α/β (no per-zone corrections) and `damping_torque` owns
+        // all damping.  When absent, per-zone local angles run and damping
+        // emerges from differential zone forces.
+        let use_lod = lod_damping.is_some();
 
         // ── Per-zone accumulation ────────────────────────────────────────
         let mut total_cl = 0.0_f64; // sum of zone CL contributions (for induced drag)
@@ -549,12 +551,12 @@ pub fn compute_aero_forces(
 
         // Step 4: induced drag — CD_i = CL² / (π · e · AR).
         //
-        // Applied as a whole-aircraft drag force opposing the velocity vector.
-        // This models the vortex-induced drag from finite-span lifting surfaces
-        // that isn't captured in the zone profile-drag tables.
-        if geo.oswald_factor > 0.0 {
+        // Only applied when the `InducedDrag` component is present.
+        // Absent for gliders (CD already in polar), missiles, or aircraft
+        // whose zone CDs already include induced drag.
+        if let Some(id) = induced_drag {
             let ar = b * b / s;
-            let cd_i = total_cl * total_cl / (std::f64::consts::PI * geo.oswald_factor * ar);
+            let cd_i = total_cl * total_cl / (std::f64::consts::PI * id.oswald_factor * ar);
             let drag_i = cd_i * qbar * s;
             let drag_stab = DVec3::new(-drag_i, 0.0, 0.0);
             let drag_world = body_to_world * (stab_to_body_global * drag_stab);
@@ -562,10 +564,10 @@ pub fn compute_aero_forces(
         }
 
         // Step 5: global damping torque — LOD mode only.
-        // Mutually exclusive with per-zone local angles (step 0): when
-        // `lod_damping` is Some, zones evaluated at global α/β produce no
-        // emergent damping, so the derivatives here are the sole source.
-        if let Some(lod) = &geo.lod_damping {
+        // Mutually exclusive with per-zone local angles (step 0): when the
+        // `LodDamping` component is present, zones evaluated at global α/β
+        // produce no emergent damping, so the derivatives here are the sole source.
+        if let Some(lod) = lod_damping {
             let damp = damping_torque(flight, lod, geo, body_to_world);
             if damp.is_finite() {
                 ct.0 += dvec3_to_vec3(damp);

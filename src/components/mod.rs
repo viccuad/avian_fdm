@@ -13,7 +13,7 @@ pub mod gizmo_shape;
 
 pub use aero_coeff::AeroCoeff;
 pub use aero_zone::{AeroZone, AeroZoneBundle, ControlSurfaceRole, materials};
-pub use aircraft::{AircraftGeometry, AircraftCoreBundle, LodDamping};
+pub use aircraft::{AircraftGeometry, AircraftCoreBundle, LodDamping, InducedDrag};
 pub use controls::ControlInputs;
 pub use damageable::Damageable;
 pub use flight_state::{FlightState, AtmosphereState, WindResource};

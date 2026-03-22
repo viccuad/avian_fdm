@@ -75,18 +75,22 @@ pub enum AeroCoeff {
 }
 
 impl AeroCoeff {
-    /// Evaluate the coefficient at the given angle of attack (rad) and Reynolds number.
+    /// Evaluate the coefficient at the given primary angle (rad) and Reynolds number.
+    ///
+    /// The primary angle is the first table axis:
+    /// - For CL, CD, CM, Croll, Cn: pass the local angle of attack `α_local`.
+    /// - For CY (side force): pass the local sideslip angle `β_local`.
     ///
     /// - [`AeroCoeff::Scalar`]: returns the constant; ignores both inputs.
-    /// - [`AeroCoeff::Table1D`]: linearly interpolates on `alpha`; `re` is ignored.
+    /// - [`AeroCoeff::Table1D`]: linearly interpolates on `angle_rad`; `re` is ignored.
     ///   Clamps to the first/last breakpoint with a [`bevy::log::warn_once`] if
     ///   out of range.
-    /// - [`AeroCoeff::Table2D`]: bilinearly interpolates on `(alpha, re)`.
+    /// - [`AeroCoeff::Table2D`]: bilinearly interpolates on `(angle_rad, re)`.
     ///   Clamps both axes independently with a `warn_once!` if out of range.
     ///
     /// Never panics in release builds. Returns `0.0` on a degenerate table
     /// (empty breakpoints) after a [`bevy::log::warn`].
-    pub fn evaluate(&self, alpha: f64, re: f64) -> f64 {
+    pub fn evaluate(&self, angle_rad: f64, re: f64) -> f64 {
         match self {
             AeroCoeff::Scalar(v) => *v,
             AeroCoeff::Table1D { breakpoints, values } => {
@@ -94,20 +98,20 @@ impl AeroCoeff {
                     warn!("AeroCoeff::Table1D has empty breakpoints; returning 0.0");
                     return 0.0;
                 }
-                let alpha = clamp_with_warn(alpha, breakpoints[0], *breakpoints.last().unwrap(),
-                    "Table1D alpha");
-                lerp_1d(alpha, breakpoints, values)
+                let angle_rad = clamp_with_warn(angle_rad, breakpoints[0], *breakpoints.last().unwrap(),
+                    "Table1D angle_rad");
+                lerp_1d(angle_rad, breakpoints, values)
             }
             AeroCoeff::Table2D { rows, cols, data } => {
                 if rows.is_empty() || cols.is_empty() {
                     warn!("AeroCoeff::Table2D has empty rows or cols; returning 0.0");
                     return 0.0;
                 }
-                let alpha = clamp_with_warn(alpha, rows[0], *rows.last().unwrap(),
-                    "Table2D alpha");
+                let angle_rad = clamp_with_warn(angle_rad, rows[0], *rows.last().unwrap(),
+                    "Table2D angle_rad");
                 let re = clamp_with_warn(re, cols[0], *cols.last().unwrap(),
                     "Table2D re");
-                bilerp(alpha, re, rows, cols, data)
+                bilerp(angle_rad, re, rows, cols, data)
             }
         }
     }
@@ -137,12 +141,12 @@ fn lerp_1d(x: f64, bp: &[f64], vals: &[f64]) -> f64 {
 }
 
 /// Bilinear interpolation in a 2-D flat row-major table.
-/// `alpha` and `re` must already be clamped to their respective ranges.
-fn bilerp(alpha: f64, re: f64, rows: &[f64], cols: &[f64], data: &[f64]) -> f64 {
+/// `angle_rad` and `re` must already be clamped to their respective ranges.
+fn bilerp(angle_rad: f64, re: f64, rows: &[f64], cols: &[f64], data: &[f64]) -> f64 {
     let nc = cols.len();
 
     // saturating_sub(2) handles the single-row / single-col degenerate case.
-    let ri = rows.partition_point(|&r| r <= alpha).saturating_sub(1)
+    let ri = rows.partition_point(|&r| r <= angle_rad).saturating_sub(1)
                  .min(rows.len().saturating_sub(2));
     let ci = cols.partition_point(|&c| c <= re).saturating_sub(1)
                  .min(cols.len().saturating_sub(2));
@@ -151,17 +155,17 @@ fn bilerp(alpha: f64, re: f64, rows: &[f64], cols: &[f64], data: &[f64]) -> f64 
     let ri1 = (ri + 1).min(rows.len() - 1);
     let ci1 = (ci + 1).min(cols.len() - 1);
 
-    let ta = if rows[ri1] != rows[ri] { (alpha - rows[ri]) / (rows[ri1] - rows[ri]) } else { 0.0 };
-    let tr = if cols[ci1] != cols[ci] { (re    - cols[ci]) / (cols[ci1] - cols[ci]) } else { 0.0 };
+    let ta = if rows[ri1] != rows[ri] { (angle_rad - rows[ri]) / (rows[ri1] - rows[ri]) } else { 0.0 };
+    let tr = if cols[ci1] != cols[ci] { (re        - cols[ci]) / (cols[ci1] - cols[ci]) } else { 0.0 };
 
     let v00 = data[ri  * nc + ci ];
     let v01 = data[ri  * nc + ci1];
     let v10 = data[ri1 * nc + ci ];
     let v11 = data[ri1 * nc + ci1];
 
-    let v0 = v00 + tr * (v01 - v00); // interpolate along Re at lower alpha row
-    let v1 = v10 + tr * (v11 - v10); // interpolate along Re at upper alpha row
-    v0 + ta * (v1 - v0)              // interpolate along alpha
+    let v0 = v00 + tr * (v01 - v00); // interpolate along Re at lower angle row
+    let v1 = v10 + tr * (v11 - v10); // interpolate along Re at upper angle row
+    v0 + ta * (v1 - v0)              // interpolate along angle
 }
 
 #[cfg(test)]

@@ -111,7 +111,7 @@ use bevy::math::DVec3;
 
 use crate::components::{
     AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
-    ControlSurfaceRole, GizmoContours, ZoneForce,
+    ControlSurfaceRole, GizmoContours, InducedDrag, ZoneForce,
 };
 #[cfg(feature = "propulsion")]
 use crate::components::{EngineZone, PropwashState};
@@ -252,6 +252,10 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
     let root = commands
         .spawn((
             j3cub_core_bundle(transform),
+            // Lift-induced drag: J3Cub has a high-wing strut-braced layout.
+            // e = 0.94 from JSBSim: CD_i = CL² × 0.0485 → e = 1/(π × 0.0485 × AR=6.956)
+            InducedDrag { oswald_factor: 0.94 },
+            // No LodDamping — roll/pitch/yaw damping emerges from zone geometry.
         ))
         .with_children(|parent| {
             // ── Left wing ────────────────────────────────────────────────────
@@ -541,6 +545,10 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
 /// Core [`AircraftCoreBundle`] for the J-3 Cub root entity.
 ///
 /// Mass, CoG, and inertia are computed by Avian from child zone colliders.
+///
+/// Pair with [`InducedDrag`] (already included by [`spawn`]) for lift-induced
+/// drag.  No [`LodDamping`](crate::components::LodDamping) — roll/pitch/yaw
+/// damping emerges from per-zone local α/β physics.
 pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
     (
         AircraftCoreBundle {
@@ -548,12 +556,6 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
                 wing_area_m2: WING_AREA_M2,
                 wing_span_m:  WING_SPAN_M,
                 chord_m:      CHORD_M,
-                // lod_damping: None (default) — roll/pitch/yaw damping emerges
-                // from per-zone local α/β physics (E½.1).
-                lod_damping: None,
-                // JSBSim J3Cub: CD_i = CL² × 0.0485 → e = 1/(π × 0.0485 × AR)
-                // AR = 10.742² / 16.584 = 6.956 → e ≈ 0.94
-                oswald_factor: 0.94,
             },
             rigid_body: RigidBody::Dynamic,
             transform,

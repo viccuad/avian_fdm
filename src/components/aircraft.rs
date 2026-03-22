@@ -6,13 +6,15 @@ use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 
 /// Whole-aircraft angular-rate damping derivatives, used as an **LOD fallback**.
 ///
-/// At full fidelity, roll/pitch/yaw damping emerge naturally from per-zone local
-/// α/β corrections (see `zone_local_angles`): the wing tips resist roll, the
-/// h-stab resists pitch, the v-tail resists yaw — all from geometry alone.
+/// Add this component to the aircraft root entity when the zone layout is too
+/// sparse to produce realistic physical damping from geometry alone (e.g. a
+/// single-zone missile body, or a low-fidelity AI aircraft).
 ///
-/// Set `AircraftGeometry::lod_damping` to `Some(LodDamping { … })` only when
-/// the aircraft has too few zones to produce realistic physical damping (e.g.
-/// a single-zone missile body, or a low-fidelity background AI aircraft).
+/// **Mutually exclusive with per-zone local α/β** — when this component is
+/// present, [`compute_aero_forces`](crate::aerodynamics::compute_aero_forces)
+/// evaluates all zones at the global α/β (no rate corrections) and uses these
+/// derivatives as the sole source of angular damping.  When absent, per-zone
+/// local angles run and damping emerges naturally from zone geometry.
 ///
 /// # Non-dimensional form
 ///
@@ -25,8 +27,8 @@ use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 /// All derivatives should be negative (damping opposes motion).
 /// Typical light GA values (Nelson 1998, Table B1):
 /// `Cl_p ≈ −0.45`, `Cm_q ≈ −12.0`, `Cn_r ≈ −0.12`.
-#[derive(Reflect, Serialize, Deserialize, Clone, Debug)]
-#[reflect(Serialize, Deserialize)]
+#[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
+#[reflect(Component, Serialize, Deserialize)]
 pub struct LodDamping {
     /// Roll damping derivative ∂Cl/∂p̂, where p̂ = p·b/(2V).
     /// Typical range: −0.4 to −0.5 for light aircraft.
@@ -39,10 +41,52 @@ pub struct LodDamping {
     pub cn_r: f64,
 }
 
+/// Lift-induced drag model.
+///
+/// Add this component to the aircraft root entity to enable whole-aircraft
+/// induced drag:
+///
+/// ```text
+/// CD_i = CL² / (π · e · AR),   AR = b² / S
+/// ```
+///
+/// **Omit this component** for:
+/// - **Gliders** — induced drag is typically already embedded in the wing zone
+///   CD tables from measured polar data.
+/// - **Missiles and projectiles** — no significant spanwise lift distribution;
+///   the bluff-body drag dominates.
+/// - **Aircraft whose zone CD tables already include induced drag** — adding
+///   this component would double-count.
+///
+/// **Include this component** for:
+/// - Any conventional lifting aircraft whose zone CD comes from a 2-D profile
+///   drag polar (JSBSim-style) that separates parasite and induced drag.
+///
+/// | Aircraft type | Typical *e* |
+/// |---|---|
+/// | High-wing light aircraft (J3 Cub) | 0.85–0.95 |
+/// | Low-wing monoplane | 0.75–0.85 |
+/// | Elliptical wing (theoretical ideal) | 1.0 |
+/// | Delta / swept wing | 0.6–0.75 |
+#[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
+#[reflect(Component, Serialize, Deserialize)]
+pub struct InducedDrag {
+    /// Oswald span-efficiency factor *e* ∈ (0, 1].
+    ///
+    /// Accounts for non-elliptical span loading, wingtip vortex losses, and
+    /// fuselage interference.  Higher is better; 1.0 is the theoretical
+    /// elliptical ideal.
+    pub oswald_factor: f64,
+}
+
 /// Wing and tail geometry constants used for aerodynamic non-dimensionalisation
 /// (q̄·S, q̄·S·b, q̄·S·c̄).
 ///
-/// Lives on the **aircraft root entity**.
+/// Lives on the **aircraft root entity** as part of [`AircraftCoreBundle`].
+///
+/// Optional components — add separately to the root entity as needed:
+/// - [`LodDamping`] — explicit damping derivatives for sparse-zone LOD aircraft.
+/// - [`InducedDrag`] — lift-induced drag for conventional lifting aircraft.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct AircraftGeometry {
@@ -52,31 +96,6 @@ pub struct AircraftGeometry {
     pub wing_span_m: f64,
     /// Mean aerodynamic chord c̄ (m). Used to non-dimensionalise pitching moment.
     pub chord_m: f64,
-
-    // ── LOD damping (optional) ─────────────────────────────────────────────
-
-    /// Whole-aircraft damping derivatives, applied as an LOD fallback.
-    ///
-    /// `None` (default) — damping comes entirely from per-zone local α/β
-    /// physics.  Use this for any aircraft with a realistic zone layout.
-    ///
-    /// `Some(LodDamping { … })` — global derivatives are added on top of
-    /// zone physics.  Use only for sparse-zone aircraft (single-zone bodies,
-    /// low-fidelity AI) that cannot produce adequate damping from geometry.
-    pub lod_damping: Option<LodDamping>,
-
-    // ── Induced drag ─────────────────────────────────────────────────────
-
-    /// Oswald span-efficiency factor *e*. Used to compute induced drag:
-    ///
-    /// ```text
-    /// CD_i = CL² / (π · e · AR)
-    /// ```
-    ///
-    /// where AR = b² / S. Typical values: 0.75–0.85 for low-wing monoplanes,
-    /// 0.85–0.95 for high-wing (like J3 Cub). Set to 0.0 to disable induced
-    /// drag (legacy behaviour).
-    pub oswald_factor: f64,
 }
 
 /// Core bundle. Spawn on the aircraft root entity.
@@ -88,11 +107,22 @@ pub struct AircraftGeometry {
 /// [`ConstantForce`] and [`ConstantTorque`] components, which Avian then
 /// applies natively via `ForceSystems::ApplyConstantForces`.
 ///
+/// # Optional components (add to the same entity after spawning)
+///
+/// - [`InducedDrag`] — add for conventional lifting aircraft (most fixed-wing).
+///   Omit for gliders with polar-based CDs, missiles, or LOD AI.
+/// - [`LodDamping`] — add only for sparse-zone aircraft where zone geometry
+///   cannot produce realistic roll/pitch/yaw damping.
+///
 /// # Example
 /// ```rust,no_run
 /// # use avian_fdm::components::*;
 /// # use bevy::prelude::*;
-/// // commands.spawn(AircraftCoreBundle { geometry: AircraftGeometry { wing_area_m2: 16.2, wing_span_m: 10.6, chord_m: 1.53 }, ..default() });
+/// // Full-fidelity aircraft with induced drag, zone-based damping:
+/// // commands.spawn((
+/// //     AircraftCoreBundle { geometry: AircraftGeometry { wing_area_m2: 16.2, wing_span_m: 10.6, chord_m: 1.53 }, ..default() },
+/// //     InducedDrag { oswald_factor: 0.85 },
+/// // ));
 /// ```
 #[derive(Bundle, Default)]
 pub struct AircraftCoreBundle {
