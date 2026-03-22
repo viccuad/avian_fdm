@@ -10,8 +10,8 @@
 //!
 //! Mass, centre of gravity, and the full inertia tensor are computed
 //! automatically by Avian from the [`avian3d::prelude::ColliderDensity`] on
-//! each child collider. Damaging or destroying a zone (setting
-//! [`components::Damageable::health`] to 0) instantly updates the physics
+//! each child collider. Failing or destroying a zone (setting
+//! [`components::Failure::remaining`] to 0) instantly updates the physics
 //! without any bookkeeping on the game's part.
 //!
 //! ---
@@ -96,7 +96,7 @@
 //! | Lift, drag, side-force per zone | Structural elasticity / aeroelasticity |
 //! | Pitch/roll/yaw damping derivatives | Compressibility (transonic/supersonic) |
 //! | Piston engine + fixed-pitch propeller | Turbine / jet engine cycles |
-//! | Damage degradation and detachment | Fuel burn / weight change over time |
+//! | Failure degradation and detachment | Fuel burn / weight change over time |
 //! | 6-DoF integration (via Avian) | Autopilot / stability augmentation |
 //!
 //! ### Stability-derivative approach
@@ -329,7 +329,7 @@
 //! 1. Read α, q̄, Re from [`components::FlightState`] on the root entity.
 //! 2. Evaluate C_L(α, Re), C_D(α, Re), C_Y(α, Re) via bilinear interpolation.
 //! 3. Multiply by the zone's share of reference area (`fraction × S_ref`).
-//! 4. Scale by zone health ∈ [0, 1] — zero-health zones contribute nothing.
+//! 4. Scale by `Failure.remaining` ∈ [0, 1] — zones at zero remaining contribute nothing.
 //! 5. Construct the force vector in **stability axes**:
 //!    ```text
 //!    F_stab = (−C_D·q̄·S,  C_Y·q̄·S,  −C_L·q̄·S)
@@ -425,7 +425,7 @@
 //!   (via [`avian3d::prelude::ColliderDensity`])
 //! - A [`avian3d::prelude::Transform`] that places it in body-frame coordinates
 //! - An [`components::AeroZone`] that describes its aerodynamic contribution
-//! - Optionally a [`components::Damageable`] for health tracking
+//! - Optionally a [`components::Failure`] for degraded-performance tracking
 //!
 //! Avian **automatically** computes total mass, CG, and inertia tensor from
 //! all child colliders. No explicit bookkeeping required.
@@ -445,31 +445,31 @@
 //!
 //! ### How zone contributions compose
 //!
-//! Total lift = Σ C_L_zone · q̄ · S_zone (summed over all non-zero-health zones)
+//! Total lift = Σ C_L_zone · q̄ · S_zone (summed over all zones with remaining > 0)
 //!
 //! Each zone's `fraction` field controls its share of the reference area S_ref.
 //! For the J3Cub wing, six panels each take 15–17.5% of total wing area; they
 //! sum to 100%. The fuselage and tail zones have their own `wing_area_m2` (via
 //! the root [`components::AircraftGeometry`]) so their coefficients scale correctly.
 //!
-//! ### Health degradation
+//! ### Failure degradation
 //!
-//! When [`components::Damageable::health`] is set to a value ∈ (0, 1):
+//! When [`components::Failure::remaining`] is set to a value ∈ (0, 1):
 //!
 //! ```text
-//! C_L_effective = C_L · health
-//! C_D_effective = C_D · health + C_D_damage · (1 − health) / q̄
+//! C_L_effective = C_L · remaining
+//! C_D_effective = C_D · remaining + C_D_damage · (1 − remaining) / q̄
 //! ```
 //!
-//! A damaged wing produces less lift AND more drag (deformation increases
-//! induced drag). At `health = 0`, the zone contributes zero force — it has
-//! effectively stalled/separated and produces no net aerodynamic effect.
+//! A failed zone produces less lift AND more drag (deformation increases
+//! induced drag). At `remaining = 0`, the zone contributes zero force — it has
+//! effectively separated from the airframe and produces no net aerodynamic effect.
 //!
 //! ### Physical detachment (`DetachPlugin`)
 //!
 //! *Only compiled with `features = ["damage"]`.* See [`detach`].
 //!
-//! When health reaches exactly 0.0, [`detach::DetachPlugin`] (if registered)
+//! When `remaining` reaches exactly 0.0, [`detach::DetachPlugin`] (if registered)
 //! removes the zone from the aircraft hierarchy and inserts
 //! [`avian3d::prelude::RigidBody::Dynamic`] onto it, giving it independent
 //! physics. The piece inherits the aircraft's current linear and angular
@@ -479,9 +479,9 @@
 //! tensor after detachment — a wing detaching shifts the CG and changes roll/
 //! yaw inertia without any manual update.
 //!
-//! Games that want debris-free damage (zones simply stop contributing without
-//! flying away) can omit `DetachPlugin`; zero-health zones already produce no
-//! force by default.
+//! Games that want debris-free failure (zones simply stop contributing without
+//! flying away) can omit `DetachPlugin`; zones at `remaining = 0` already
+//! produce no force by default.
 //!
 //! ---
 //!
@@ -550,7 +550,7 @@
 //! │                                                                           │
 //! │  4. compute_aero_forces                                                  │
 //! │                          reads: FlightState, AircraftGeometry,           │
-//! │                                 ControlInputs, AeroZone, Damageable,    │
+//! │                                 ControlInputs, AeroZone, Failure,        │
 //! │                                 GlobalTransform(zone), Children,        │
 //! │                                 Position(root), Rotation(root),          │
 //! │                                 ComputedCenterOfMass(root)               │
@@ -594,14 +594,14 @@
 //!
 //! | Feature      | Default | Description |
 //! |--------------|---------|-------------|
-//! | `damage`     | **on**  | [`components::Damageable`] component and [`detach::DetachPlugin`] |
+//! | `damage`     | **on**  | [`components::Failure`] component and [`detach::DetachPlugin`] |
 //! | `propulsion` | **on**  | Piston engine ([`components::EngineZone`]) and propwash model |
 //! | `debug-viz`  | off     | Bevy Gizmo overlays + egui HUD via [`debug`] |
 //! | `presets`    | off     | Reference aircraft presets ([`presets`], e.g. J-3 Cub) |
 //!
 //! The `damage` and `propulsion` features are on by default because most
 //! flight simulators need both. Disable with `default-features = false` if your
-//! aircraft is immortal and un-powered (e.g. a glider with fixed health).
+//! aircraft is immortal and un-powered (e.g. a glider with no failure model).
 //!
 //! ---
 //!
@@ -734,7 +734,7 @@ pub mod prelude {
     pub use crate::plugin::AircraftFdmPlugin;
 
     #[cfg(feature = "damage")]
-    pub use crate::components::Damageable;
+    pub use crate::components::Failure;
 
     #[cfg(feature = "propulsion")]
     pub use crate::components::{EngineZone, PropwashState};

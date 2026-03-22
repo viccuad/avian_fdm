@@ -5,7 +5,7 @@
 //! Gagg–Ferrar altitude correction:
 //!
 //! ```text
-//! T = T_max · health · throttle_fraction · (ρ / ρ₀)^0.7
+//! T = T_max · remaining · throttle_fraction · (ρ / ρ₀)^0.7
 //! ```
 //!
 //! Propeller induced velocity (actuator disk):
@@ -25,7 +25,7 @@ use bevy::math::DQuat;
 use avian3d::prelude::ColliderOf;
 
 use crate::components::{
-    AtmosphereState, ControlInputs, Damageable, EngineZone, FlightState, PropwashState, ZoneForce,
+    AtmosphereState, ControlInputs, Failure, EngineZone, FlightState, PropwashState, ZoneForce,
 };
 
 /// Sea-level standard density (kg/m³).
@@ -39,7 +39,7 @@ pub fn compute_engine_zone_forces(
         &ColliderOf,
         &mut ZoneForce,
         &mut PropwashState,
-        Option<&Damageable>,
+        Option<&Failure>,
     )>,
     mut root_query: Query<(
         &ControlInputs,
@@ -51,8 +51,8 @@ pub fn compute_engine_zone_forces(
     for (engine, engine_gt, col_of, mut zone_force, mut propwash, dmg) in engine_query.iter_mut() {
         *zone_force = ZoneForce::default();
 
-        let health = dmg.map(|d| d.health).unwrap_or(1.0);
-        if health <= 0.0 {
+        let remaining = dmg.map(|d: &Failure| d.remaining).unwrap_or(1.0);
+        if remaining <= 0.0 {
             continue;
         }
 
@@ -75,7 +75,7 @@ pub fn compute_engine_zone_forces(
             1.0
         };
 
-        let thrust_n = engine.max_thrust_n * health * thrust_fraction
+        let thrust_n = engine.max_thrust_n * remaining * thrust_fraction
             * density_ratio.powf(0.7)
             * speed_factor;
 
@@ -174,10 +174,10 @@ mod tests {
     }
 
     #[test]
-    fn zero_health_zero_thrust() {
-        let health = 0.0_f64;
+    fn zero_remaining_zero_thrust() {
+        let remaining = 0.0_f64;
         let max_thrust = 500.0_f64;
-        let thrust = max_thrust * health;
+        let thrust = max_thrust * remaining;
         assert_eq!(thrust, 0.0);
     }
 }

@@ -31,7 +31,7 @@ use crate::components::zone_force::ZoneForce;
 /// The moment-coefficient data (CM, Croll, Cn) is assumed to be referenced
 /// to the aerodynamic centre.
 ///
-/// Damage is tracked separately via [`super::Damageable`]. When absent, the
+/// Failure state is tracked separately via [`super::Failure`]. When absent, the
 /// zone is treated as fully intact.
 ///
 /// Lives on each **AeroZone child entity** (child of the aircraft root).

@@ -11,7 +11,7 @@ use bevy::prelude::*;
 /// and by the debug visualisation.
 ///
 /// Zero-initialised at spawn. Set to `default()` (zeroed) when the zone is
-/// destroyed (`Damageable.health == 0.0`) or otherwise inactive.
+/// fully failed (`Failure.remaining == 0.0`) or otherwise inactive.
 ///
 /// **Do not read or write this component from game code.**
 #[derive(Component, Default, Clone, Copy, Debug)]

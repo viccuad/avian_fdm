@@ -47,7 +47,7 @@ use avian3d::prelude::{
 
 use crate::components::{
     AeroZone, AircraftGeometry, ControlInputs, ControlSurfaceRole,
-    Damageable, FlightState, InducedDrag, LodDamping, ZoneForce,
+    Failure, FlightState, InducedDrag, LodDamping, ZoneForce,
 };
 #[cfg(feature = "propulsion")]
 use crate::components::EngineZone;
@@ -168,16 +168,16 @@ pub struct ZoneCoefficients {
 ///    deflects the left aileron trailing-edge down (more lift) and the right
 ///    one trailing-edge up (less lift).
 ///
-/// 3. **Damage degradation** — All coefficients are multiplied by
-///    `health ∈ (0, 1]`.  A half-destroyed wing produces half the lift.
+/// 3. **Failure degradation** — All coefficients are multiplied by
+///    `remaining ∈ (0, 1]`.  A wing at 0.5 remaining produces half the lift.
 ///    Additionally, structural deformation adds parasitic drag that peaks at
-///    intermediate health:
+///    intermediate failure:
 ///
 ///    ```text
-///    CD_effective = (CD_base · |input| + damage_drag · (1 − health) / q̄) · health
+///    CD_effective = (CD_base · |input| + damage_drag · (1 − remaining) / q̄) · remaining
 ///    ```
 ///
-///    At health = 0 the zone is fully detached and produces no force at all
+///    At `remaining = 0` the zone is fully detached and produces no force at all
 ///    (handled by the caller, not this function).
 pub fn evaluate_zone_coefficients(
     zone: &AeroZone,
@@ -186,7 +186,7 @@ pub fn evaluate_zone_coefficients(
     beta_local: f64,
     re: f64,
     qbar: f64,
-    health: f64,
+    remaining: f64,
 ) -> ZoneCoefficients {
     // Raw table lookups at the current flight condition.
     // CL, CD, CM, Croll, Cn depend on local angle of attack.
@@ -207,16 +207,16 @@ pub fn evaluate_zone_coefficients(
         None => (1.0, 1.0),
     };
 
-    // Damage: structural deformation drag, scaled out at health = 0.
-    let extra_cd = zone.damage_drag_coeff * (1.0 - health) / qbar.max(1e-4);
+    // Failure degradation: structural deformation drag grows as remaining → 0.
+    let extra_cd = zone.damage_drag_coeff * (1.0 - remaining) / qbar.max(1e-4);
 
     ZoneCoefficients {
-        cl: cl_base * scale * health,
-        cd: (cd_base * cd_scale + extra_cd) * health,
-        cy: cy_base * scale * health,
-        cm: cm_base * scale * health,
-        croll: croll_base * scale * health,
-        cn: cn_base * scale * health,
+        cl: cl_base * scale * remaining,
+        cd: (cd_base * cd_scale + extra_cd) * remaining,
+        cy: cy_base * scale * remaining,
+        cm: cm_base * scale * remaining,
+        croll: croll_base * scale * remaining,
+        cn: cn_base * scale * remaining,
     }
 }
 
@@ -439,7 +439,7 @@ pub fn compute_aero_forces(
         &AeroZone,
         &GlobalTransform,
         &mut ZoneForce,
-        Option<&Damageable>,
+        Option<&Failure>,
     )>,
     #[cfg(feature = "propulsion")]
     engine_zone_query: Query<&ZoneForce, (With<EngineZone>, Without<AeroZone>)>,
@@ -486,8 +486,8 @@ pub fn compute_aero_forces(
             if let Ok((zone, zone_gt, mut zone_force, dmg)) = zone_query.get_mut(child) {
                 *zone_force = ZoneForce::default();
 
-                let health = dmg.map(|d| d.health).unwrap_or(1.0);
-                if health <= 0.0 {
+                let remaining = dmg.map(|d| d.remaining).unwrap_or(1.0);
+                if remaining <= 0.0 {
                     continue;
                 }
 
@@ -511,7 +511,7 @@ pub fn compute_aero_forces(
 
                 // Step 1: evaluate coefficients at local α/β.
                 let coeffs = evaluate_zone_coefficients(
-                    zone, ctrl, alpha_local, beta_local, re, qbar, health,
+                    zone, ctrl, alpha_local, beta_local, re, qbar, remaining,
                 );
                 total_cl += coeffs.cl;
 
@@ -599,7 +599,7 @@ mod tests {
     // ── evaluate_zone_coefficients ────────────────────────────────────────
 
     #[test]
-    fn zero_health_produces_zero_coefficients() {
+    fn zero_remaining_produces_zero_coefficients() {
         let zone = simple_zone(0.5, 0.03);
         let coeffs = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 0.0, 1e6, 1000.0, 0.0);
         assert_eq!(coeffs.cl, 0.0);
@@ -607,7 +607,7 @@ mod tests {
     }
 
     #[test]
-    fn half_health_halves_lift() {
+    fn half_remaining_halves_lift() {
         let zone = simple_zone(1.0, 0.0);
         let full = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 0.0, 1e6, 1000.0, 1.0);
         let half = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 0.0, 1e6, 1000.0, 0.5);
@@ -615,15 +615,15 @@ mod tests {
     }
 
     #[test]
-    fn damage_drag_peaks_at_intermediate_health() {
+    fn damage_drag_peaks_at_intermediate_remaining() {
         let mut zone = simple_zone(0.0, 0.03);
         zone.damage_drag_coeff = 500.0;
         let qbar = 1000.0;
 
         let full = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.0, 0.0, 1e6, qbar, 1.0);
         let half = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.0, 0.0, 1e6, qbar, 0.5);
-        // At full health: no damage drag.  At half: extra drag present.
-        assert!(half.cd > full.cd * 0.5, "damage drag should add extra at intermediate health");
+        // At remaining=1: no damage drag.  At remaining=0.5: extra drag present.
+        assert!(half.cd > full.cd * 0.5, "damage drag should add extra at intermediate remaining");
     }
 
     #[test]
