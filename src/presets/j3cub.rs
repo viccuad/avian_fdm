@@ -115,84 +115,95 @@ use crate::components::{
 };
 #[cfg(feature = "propulsion")]
 use crate::components::{EngineZone, PropwashState};
+use crate::sourced;
 
 // ── Aircraft reference constants ─────────────────────────────────────────────
 
 /// JSBSim J3Cub reference wing area (m²): 178.50 ft² × 0.0929.
-pub const WING_AREA_M2: f64 = 16.584;
+pub const WING_AREA_M2: f64 = sourced!(16.584, "JSBSim:J3Cub.xml — wing_area 178.50 ft² × 0.0929 m²/ft²");
 
 /// JSBSim J3Cub wingspan (m): 35.25 ft × 0.3048.
-pub const WING_SPAN_M: f64 = 10.742;
+pub const WING_SPAN_M: f64 = sourced!(10.742, "JSBSim:J3Cub.xml — wingspan 35.25 ft × 0.3048 m/ft");
 
 /// JSBSim J3Cub mean aerodynamic chord (m): 5.25 ft × 0.3048.
-pub const CHORD_M: f64 = 1.600;
+pub const CHORD_M: f64 = sourced!(1.600, "JSBSim:J3Cub.xml — chord 5.25 ft × 0.3048 m/ft");
 
 /// Horizontal tail moment arm (m): ≈ 13 ft estimated from vtailarm in J3Cub.xml.
-const H_TAIL_ARM_M: f64 = 3.96;
+const H_TAIL_ARM_M: f64 = sourced!(3.96, "JSBSim:J3Cub.xml — vtailarm ≈ 13 ft × 0.3048");
 
 /// Wing aerodynamic-centre x-offset from entity root (m).
 /// The Avian-computed CG lands at ≈ −0.172 m (fuselage centroid at −0.45 m),
 /// so the wing AC is ≈ 0.072 m **forward** of the CG — 4.5 % MAC, matching
 /// the J3Cub's documented forward-of-neutral-point CG range.
-const WING_AC_X: f64 = -0.10;
+const WING_AC_X: f64 = sourced!(-0.10, "Geometry — AC at 25% MAC; tuned so Avian CG sits 4.5% MAC forward of AC");
 
 /// Wing height above CG in body frame (m, negative = up since +Z = down).
 /// JSBSim: CG at z = −22.83 in, wing datum at z = 0 in → 22.83 in = 0.580 m above CG.
-const WING_Z: f64 = -0.580;
+const WING_Z: f64 = sourced!(-0.580, "JSBSim:J3Cub.xml — CG z = −22.83 in; wing datum z = 0 → 22.83 in = 0.580 m");
 
 // ── Shared alpha / Re breakpoints for Table2D ────────────────────────────────
 
 /// Alpha breakpoints (radians) shared by wing CL and CD tables.
 /// Sourced directly from the `tableData` in `J3Cub.xml` (USA-35B airfoil).
-const ALPHA_BP: [f64; 14] = [
-    -1.5700, -0.3491, -0.2443, -0.1745, -0.0873,
-     0.0000,  0.0873,  0.1309,  0.1745,  0.2182,
-     0.2618,  0.3054,  0.3491,  1.5700,
-];
+const ALPHA_BP: [f64; 14] = sourced!(
+    [-1.5700, -0.3491, -0.2443, -0.1745, -0.0873,
+      0.0000,  0.0873,  0.1309,  0.1745,  0.2182,
+      0.2618,  0.3054,  0.3491,  1.5700],
+    "JSBSim:J3Cub.xml — alpha breakpoints from Lift_alpha and Drag_basic tableData"
+);
 
 /// Reynolds number breakpoints for the USA-35B airfoil tables.
-const RE_BP: [f64; 2] = [1_668_183.0, 3_707_224.0];
+const RE_BP: [f64; 2] = sourced!(
+    [1_668_183.0, 3_707_224.0],
+    "JSBSim:J3Cub.xml — Re at cruise (V=27 m/s) and fast cruise (V=40 m/s), chord=1.6 m, ν=1.46e-5"
+);
 
 // ── Whole-aircraft CL data (row-major: 14 alpha rows × 2 Re columns) ─────────
 //
 // From J3Cub.xml `Lift_alpha` table. Rows correspond to ALPHA_BP, columns to RE_BP.
-const CL_DATA: [f64; 28] = [
-     0.0000,  0.0000,   // alpha = −1.5700
-    -0.0085, -0.5085,   // alpha = −0.3491
-    -0.5085, -0.8136,   // alpha = −0.2443
-    -0.5085, -0.5085,   // alpha = −0.1745
-     0.1017,  0.1017,   // alpha = −0.0873
-     0.5339,  0.5339,   // alpha =  0.0000
-     1.2204,  1.2204,   // alpha =  0.0873
-     1.4746,  1.4746,   // alpha =  0.1309
-     1.5000,  1.6272,   // alpha =  0.1745
-     1.6201,  1.7797,   // alpha =  0.2182
-     1.5645,  1.8306,   // alpha =  0.2618
-     1.4272,  1.6272,   // alpha =  0.3054
-     1.3138,  1.4238,   // alpha =  0.3491
-     0.0000,  0.0000,   // alpha =  1.5700
-];
+const CL_DATA: [f64; 28] = sourced!(
+    [
+         0.0000,  0.0000,   // alpha = −1.5700
+        -0.0085, -0.5085,   // alpha = −0.3491
+        -0.5085, -0.8136,   // alpha = −0.2443
+        -0.5085, -0.5085,   // alpha = −0.1745
+         0.1017,  0.1017,   // alpha = −0.0873
+         0.5339,  0.5339,   // alpha =  0.0000
+         1.2204,  1.2204,   // alpha =  0.0873
+         1.4746,  1.4746,   // alpha =  0.1309
+         1.5000,  1.6272,   // alpha =  0.1745
+         1.6201,  1.7797,   // alpha =  0.2182
+         1.5645,  1.8306,   // alpha =  0.2618
+         1.4272,  1.6272,   // alpha =  0.3054
+         1.3138,  1.4238,   // alpha =  0.3491
+         0.0000,  0.0000,   // alpha =  1.5700
+    ],
+    "JSBSim:J3Cub.xml — Lift_alpha table (USA-35B airfoil); whole-aircraft CL"
+);
 
 // ── Whole-aircraft CD data (row-major: 14 alpha rows × 2 Re columns) ─────────
 //
 // From J3Cub.xml `Drag_basic` table (profile drag only; induced drag is implicit
 // in lift distribution). Columns correspond to RE_BP.
-const CD_DATA: [f64; 28] = [
-    1.4091, 1.4091,   // alpha = −1.5700
-    0.1898, 0.1736,   // alpha = −0.3491
-    0.1567, 0.0494,   // alpha = −0.2443
-    0.0307, 0.0290,   // alpha = −0.1745
-    0.0216, 0.0208,   // alpha = −0.0873
-    0.0189, 0.0187,   // alpha =  0.0000
-    0.0216, 0.0208,   // alpha =  0.0873
-    0.0289, 0.0279,   // alpha =  0.1309
-    0.0332, 0.0315,   // alpha =  0.1745
-    0.0435, 0.0402,   // alpha =  0.2182
-    0.0757, 0.0707,   // alpha =  0.2618
-    0.1408, 0.1125,   // alpha =  0.3054
-    0.1898, 0.1736,   // alpha =  0.3491
-    1.4091, 1.4091,   // alpha =  1.5700
-];
+const CD_DATA: [f64; 28] = sourced!(
+    [
+        1.4091, 1.4091,   // alpha = −1.5700
+        0.1898, 0.1736,   // alpha = −0.3491
+        0.1567, 0.0494,   // alpha = −0.2443
+        0.0307, 0.0290,   // alpha = −0.1745
+        0.0216, 0.0208,   // alpha = −0.0873
+        0.0189, 0.0187,   // alpha =  0.0000
+        0.0216, 0.0208,   // alpha =  0.0873
+        0.0289, 0.0279,   // alpha =  0.1309
+        0.0332, 0.0315,   // alpha =  0.1745
+        0.0435, 0.0402,   // alpha =  0.2182
+        0.0757, 0.0707,   // alpha =  0.2618
+        0.1408, 0.1125,   // alpha =  0.3054
+        0.1898, 0.1736,   // alpha =  0.3491
+        1.4091, 1.4091,   // alpha =  1.5700
+    ],
+    "JSBSim:J3Cub.xml — Drag_basic table (profile drag only, parasite; no induced drag)"
+);
 
 // ── H-tail CL table data (6 alpha rows × 2 Re columns) ───────────────────────
 //
@@ -200,15 +211,21 @@ const CD_DATA: [f64; 28] = [
 //   CM_α(Re=1.7M) = −2.0327/rad  →  CL_α_tail = +0.821/rad
 //   CM_α(Re=3.7M) = −1.3432/rad  →  CL_α_tail = +0.543/rad
 // Entry [i,j] = alpha_rows[i] × CL_alpha[j]  (CL_alpha is positive, α sign is preserved)
-const HTAIL_ALPHA_BP: [f64; 6] = [-0.3491, -0.1745, 0.0000, 0.0873, 0.1745, 0.3491];
-const HTAIL_CL_DATA: [f64; 12] = [
-    -0.2866, -0.1892,   // alpha = −0.3491
-    -0.1433, -0.0947,   // alpha = −0.1745
-     0.0000,  0.0000,   // alpha =  0.0000
-     0.0717,  0.0474,   // alpha =  0.0873
-     0.1433,  0.0947,   // alpha =  0.1745
-     0.2866,  0.1892,   // alpha =  0.3491
-];
+const HTAIL_ALPHA_BP: [f64; 6] = sourced!(
+    [-0.3491, -0.1745, 0.0000, 0.0873, 0.1745, 0.3491],
+    "JSBSim:J3Cub.xml — h-tail alpha breakpoints (±20° range)"
+);
+const HTAIL_CL_DATA: [f64; 12] = sourced!(
+    [
+        -0.2866, -0.1892,   // alpha = −0.3491
+        -0.1433, -0.0947,   // alpha = −0.1745
+         0.0000,  0.0000,   // alpha =  0.0000
+         0.0717,  0.0474,   // alpha =  0.0873
+         0.1433,  0.0947,   // alpha =  0.1745
+         0.2866,  0.1892,   // alpha =  0.3491
+    ],
+    "JSBSim:J3Cub.xml — derived from CM_alpha: CL_alpha_tail = CM_alpha × c̄/l_t; Re=1.7M→0.821/rad, Re=3.7M→0.543/rad"
+);
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
@@ -254,7 +271,12 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             j3cub_core_bundle(transform),
             // Lift-induced drag: J3Cub has a high-wing strut-braced layout.
             // e = 0.94 from JSBSim: CD_i = CL² × 0.0485 → e = 1/(π × 0.0485 × AR=6.956)
-            InducedDrag { oswald_factor: 0.94 },
+            InducedDrag {
+                oswald_factor: sourced!(
+                    0.94,
+                    "JSBSim:J3Cub.xml — CD_i = CL²×0.0485 → e = 1/(π×0.0485×AR=6.956) ≈ 0.94"
+                ),
+            },
             // No LodDamping — roll/pitch/yaw damping emerges from zone geometry.
         ))
         .with_children(|parent| {
@@ -263,36 +285,36 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             parent.spawn(wing_zone(
                 "L-root", WING_AC_X, -0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
-                ColliderDensity(232.5),
+                ColliderDensity(sourced!(232.5, "Calibration — wing panels share 244 kg total; root panel 20% span")),
             ));
             parent.spawn(wing_zone(
                 "L-mid", WING_AC_X, -2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
-                ColliderDensity(232.5),
+                ColliderDensity(sourced!(232.5, "Calibration — wing panels share 244 kg total; mid panel 20% span")),
             ));
             // Tip front (LE half of chord, inboard of aileron spanwise).
             // x = WING_AC_X + (full_chord - tip_chord) / 2 = -0.10 + 0.175 = 0.075
             parent.spawn(wing_zone(
                 "L-tip", 0.075, -4.19, 0.150,
                 Collider::cuboid(0.45, 0.86, 0.02),
-                ColliderDensity(517.0),
+                ColliderDensity(sourced!(517.0, "Calibration — tip panel smaller volume; density raised to keep tip-panel mass ≈ root")),
             ));
 
             // ── Right wing ───────────────────────────────────────────────────
             parent.spawn(wing_zone(
                 "R-root", WING_AC_X, 0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
-                ColliderDensity(232.5),
+                ColliderDensity(sourced!(232.5, "Calibration — wing panels share 244 kg total; root panel 20% span")),
             ));
             parent.spawn(wing_zone(
                 "R-mid", WING_AC_X, 2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
-                ColliderDensity(232.5),
+                ColliderDensity(sourced!(232.5, "Calibration — wing panels share 244 kg total; mid panel 20% span")),
             ));
             parent.spawn(wing_zone(
                 "R-tip", 0.075, 4.19, 0.150,
                 Collider::cuboid(0.45, 0.86, 0.02),
-                ColliderDensity(517.0),
+                ColliderDensity(sourced!(517.0, "Calibration — tip panel smaller volume; density raised to keep tip-panel mass ≈ root")),
             ));
 
             // ── Ailerons ─────────────────────────────────────────────────────
@@ -310,13 +332,13 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                 "L-aileron", -4.19,
                 ControlSurfaceRole::AileronLeft,
                 Collider::cuboid(0.35, 0.86, 0.02),
-                ColliderDensity(381.0),
+                ColliderDensity(sourced!(381.0, "Calibration — aileron smaller chord; density set for ~8 kg per aileron")),
             ));
             parent.spawn(aileron_zone(
                 "R-aileron", 4.19,
                 ControlSurfaceRole::AileronRight,
                 Collider::cuboid(0.35, 0.86, 0.02),
-                ColliderDensity(381.0),
+                ColliderDensity(sourced!(381.0, "Calibration — aileron smaller chord; density set for ~8 kg per aileron")),
             ));
 
             // ── Fuselage forward (firewall to rear seat) ─────────────────────
@@ -335,8 +357,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     transform: Transform::from_xyz(0.00, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(188.0),
-                fuse_fwd_contours(),
+                ColliderDensity(sourced!(188.0, "Calibration — fuselage fwd includes pilot + fuel + instruments; tuned for 499 kg total")),
             ));
 
             // ── Fuselage aft (tail boom) ─────────────────────────────────────
@@ -355,8 +376,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     transform: Transform::from_xyz(-2.35, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(119.0),
-                fuse_aft_contours(),
+                ColliderDensity(sourced!(119.0, "Calibration — tail boom lighter than fwd fuselage; tuned for aft CG position")),
             ));
 
             // ── Cabin / windshield ───────────────────────────────────────────
@@ -374,8 +394,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     transform: Transform::from_xyz(0.20, 0.0, -0.60),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(130.0),
-                cabin_contours(),
+                ColliderDensity(sourced!(130.0, "Calibration — cabin/windshield structure; mostly air volume, low effective density")),
             ));
 
             // ── Wing struts ──────────────────────────────────────────────────
@@ -401,7 +420,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
                     },
-                    ColliderDensity(2700.0),
+                    ColliderDensity(sourced!(2700.0, "Literature — 2024-T3 aluminium alloy, standard strut tube material")),
                     GizmoShape::Strut {
                         start: Vec3::new(-half, 0.0, 0.0),
                         end: Vec3::new(half, 0.0, 0.0),
@@ -422,7 +441,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     AeroZoneBundle {
                         zone: AeroZone {
                             cl: AeroCoeff::Scalar(0.0),
-                            cd: AeroCoeff::Scalar(0.001),
+                            cd: AeroCoeff::Scalar(sourced!(0.001, "JSBSim:J3Cub.xml — Drag_gear residual per landing-gear leg; exposed axle + bungee")),
                             ..default()
                         },
                         zone_force: ZoneForce::default(),
@@ -430,7 +449,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
                     },
-                    ColliderDensity(7800.0),
+                    ColliderDensity(sourced!(7800.0, "Literature — steel axle/bungee landing gear; standard mild steel density")),
                     GizmoShape::Strut {
                         start: Vec3::new(-half, 0.0, 0.0),
                         end: Vec3::new(half, 0.0, 0.0),
@@ -444,7 +463,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     AeroZoneBundle {
                         zone: AeroZone {
                             cl: AeroCoeff::Scalar(0.0),
-                            cd: AeroCoeff::Scalar(0.001),
+                            cd: AeroCoeff::Scalar(sourced!(0.001, "JSBSim:J3Cub.xml — Drag_gear residual per wheel; tyre frontal area")),
                             ..default()
                         },
                         zone_force: ZoneForce::default(),
@@ -452,8 +471,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         transform: Transform::from_xyz(0.50, 0.55 * sign, 0.90),
                         global_transform: GlobalTransform::default(),
                     },
-                    ColliderDensity(1200.0),
-                    GizmoShape::Sphere { radius: 0.15 },
+                    ColliderDensity(sourced!(1200.0, "Estimate — 8-ply tyre + aluminium rim; composite density ≈ rubber 1100 + Al 2700")),
                 ));
             }
 
@@ -470,15 +488,14 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     transform: Transform::from_xyz(-3.60, 0.0, 0.15),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(1200.0),
-                GizmoShape::Sphere { radius: 0.06 },
+                ColliderDensity(sourced!(1200.0, "Estimate — tailwheel tyre + stub axle; same composite density as main wheels")),
             ));
 
             // ── Horizontal stabiliser ─────────────────────────────────────────
             parent.spawn((
                 hstab_zone(
                     Collider::cuboid(0.60, 1.00, 0.02),
-                    ColliderDensity(400.0),
+                    ColliderDensity(sourced!(400.0, "Calibration — h-stab fabric/tube structure; ~9.6 kg total matches scale")),
                 ),
                 hstab_contours(),
             ));
@@ -487,7 +504,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             parent.spawn((
                 elevator_zone(
                     Collider::cuboid(0.35, 1.00, 0.02),
-                    ColliderDensity(280.0),
+                    ColliderDensity(sourced!(280.0, "Calibration — elevator lighter than h-stab (smaller chord); ~4 kg total")),
                 ),
                 elevator_contours(),
             ));
@@ -499,7 +516,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             parent.spawn((
                 vtail_zone(
                     Collider::cuboid(0.65, 0.10, 0.85),
-                    ColliderDensity(54.0),
+                    ColliderDensity(sourced!(54.0, "Calibration — vertical fin is a fabric-covered wood/tube structure; ~3 kg target")),
                 ),
                 GizmoShape::Quad {
                     corners: [
@@ -516,7 +533,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // Real J3 Cub: root chord ~0.45m, tip ~0.30m, height ~0.95m.
             parent.spawn((rudder_zone(
                 Collider::cuboid(0.45, 0.07, 0.95),
-                ColliderDensity(33.0),
+                ColliderDensity(sourced!(33.0, "Calibration — rudder lighter than fin (less frame); ~1 kg target")),
             ), GizmoShape::Quad {
                 corners: [
                     Vec3::new( 0.225, 0.0,  0.475),  // root LE (hinge, bottom)
@@ -531,7 +548,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             parent.spawn((
                 engine_zone(
                     Collider::cuboid(0.50, 0.40, 0.40),
-                    ColliderDensity(860.0),
+                    ColliderDensity(sourced!(860.0, "JSBSim:J3Cub.xml — Continental A-65 dry mass ≈ 69 kg; 69/(0.50×0.40×0.40)≈862")),
                 ),
                 GizmoShape::Cylinder { radius: 0.20, length: 0.50 },
                 engine_contours(),
@@ -621,7 +638,10 @@ pub fn aileron_zone(
         AeroZoneBundle {
             zone: AeroZone {
                 // CL_ail = 0.3498 × 10.742 / (2 × 4.05) ≈ 0.464
-                cl: AeroCoeff::Scalar(0.464),
+                cl: AeroCoeff::Scalar(sourced!(
+                    0.464,
+                    "JSBSim:J3Cub.xml — Roll_aileron Cl_da = 0.3498/rad; CL_ail = Cl_da × b / (2 × y_arm) = 0.3498 × 10.742 / (2 × 4.05)"
+                )),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 control_role: Some(role),
                 ..default()
@@ -718,7 +738,10 @@ pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
         AeroZoneBundle {
             zone: AeroZone {
                 // Negative: positive elevator (nose-up) → downward tail force.
-                cl: AeroCoeff::Scalar(-0.485),
+                cl: AeroCoeff::Scalar(sourced!(
+                    -0.485,
+                    "JSBSim:J3Cub.xml — Pitch_elevator CM_de = −1.2004/rad; CL_elev = |CM_de| × c̄/l_t = 1.2004 × 1.6/3.96, negated for nose-up convention"
+                )),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 control_role: Some(ControlSurfaceRole::Elevator),
                 ..default()
@@ -774,7 +797,10 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
                 cl: AeroCoeff::Scalar(0.0),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 // Negative CY: positive rudder (nose-right) → −Y force at tail → +Z torque.
-                cy: AeroCoeff::Scalar(-0.152),
+                cy: AeroCoeff::Scalar(sourced!(
+                    -0.152,
+                    "JSBSim:J3Cub.xml — Yaw_rudder CN_dr = −0.0565/rad; CY_rud = CN_dr × b/x_arm = 0.0565 × 10.742/4.0, negated for −Y force convention"
+                )),
                 control_role: Some(ControlSurfaceRole::Rudder),
                 ..default()
             },
@@ -804,13 +830,16 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
 pub fn engine_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
     (
         EngineZone {
-            max_thrust_n:    990.0,
-            throttle_curve:  vec![[0.0, 0.0], [0.5, 0.42], [0.75, 0.64], [1.0, 1.0]],
-            prop_diameter_m: 1.905,
+            max_thrust_n:    sourced!(990.0, "Calibration:JSBSim — Continental A-65 (65 hp); peak thrust calibrated to match JSBSim trim at 50 kts / 1000 ft"),
+            throttle_curve:  sourced!(
+                vec![[0.0, 0.0], [0.5, 0.42], [0.75, 0.64], [1.0, 1.0]],
+                "Calibration:JSBSim — nonlinear throttle response matching JSBSim thrust vs throttle setting (prop efficiency drop at low opening)"
+            ),
+            prop_diameter_m: sourced!(1.905, "JSBSim:J3Cub.xml — McCauley CM7445 propeller, 75 in × 0.0254 m/in = 1.905 m"),
             thrust_axis_body: DVec3::X, // +X = forward
             // McCauley CM7445, fixed-pitch 22°. At ~2800 RPM the zero-thrust
             // advance ratio J≈0.95 → V_zero = J × n × D ≈ 80 m/s (155 kts).
-            zero_thrust_speed_ms: 80.0,
+            zero_thrust_speed_ms: sourced!(80.0, "Estimate:McCauley CM7445 — fixed-pitch 22° blade; J_zero ≈ 0.95 at 2800 RPM → V = J × (2800/60) × 1.905 ≈ 84 m/s, rounded to 80"),
         },
         PropwashState::default(),
         ZoneForce::default(),

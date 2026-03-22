@@ -665,6 +665,42 @@
 
 #![deny(missing_docs)]
 
+/// Annotates a value with its data provenance.
+///
+/// The source description is a string literal passed as the second argument.
+/// It is **discarded by the macro** — only the value expression is emitted.
+/// The string never becomes a `&str` static and adds nothing to the binary.
+///
+/// Use this in preset files to record where each number came from, so future
+/// maintainers can trace any value back to its origin without digging through
+/// commit history or external references.
+///
+/// # Source prefix conventions
+///
+/// | Prefix | Meaning |
+/// |---|---|
+/// | `"JSBSim:J3Cub.xml"` | Directly transcribed from a JSBSim aircraft XML |
+/// | `"Calibration:JSBSim"` | Tuned to match JSBSim behaviour experimentally |
+/// | `"Literature:…"` | Derived from a published paper or textbook |
+/// | `"Geometry"` | Computed analytically from aircraft dimensions |
+/// | `"Estimate"` | Engineering judgement; no primary source |
+/// | `"Guesswork"` | Placeholder; should be replaced with measured data |
+///
+/// # Example
+///
+/// ```rust
+/// # use avian_fdm::sourced;
+/// // Zero runtime cost — expands to exactly `0.94f64`:
+/// let e: f64 = sourced!(0.94, "JSBSim:J3Cub.xml — CD_i = CL²×0.0485 → e≈0.94");
+/// assert_eq!(e, 0.94);
+/// ```
+#[macro_export]
+macro_rules! sourced {
+    ($value:expr, $source:literal) => {
+        $value
+    };
+}
+
 pub mod components;
 pub mod math;
 pub mod atmosphere;
@@ -686,6 +722,7 @@ pub mod presets;
 
 /// Re-exports for convenient glob import: `use avian_fdm::prelude::*;`
 pub mod prelude {
+    pub use crate::sourced;
     pub use crate::components::{
         AeroZone, AeroZoneBundle, ControlSurfaceRole, materials,
         AircraftCoreBundle, AircraftGeometry,
