@@ -42,32 +42,45 @@ use serde::{Deserialize, Serialize};
 /// Call [`AeroCoeff::evaluate`] each frame to obtain a `f64` value at the
 /// current flight conditions.
 ///
-/// ## `Placeholder` and `Option<AeroCoeff>` — completeness system
+/// ## Completeness system — `Absent`, `Placeholder`, and data variants
 ///
-/// Two complementary mechanisms signal unmodelled coefficients:
+/// Every coefficient field in [`crate::components::AeroZone`] is an `AeroCoeff`.
+/// Three variants carry distinct meaning for unmodelled coefficients:
 ///
-/// | Value | Meaning | Runtime |
+/// | Variant | Meaning | Runtime |
 /// |---|---|---|
-/// | `None` (field absent) | Absent by design — symmetric section, no CY, etc. | Silent 0.0 |
-/// | `Some(Placeholder)` | Should exist but not yet modelled | `warn_once!` + 0.0 |
-/// | `Some(Scalar(0.0))` | Intentional zero (document with `sourced!`) | Silent 0.0 |
-/// | `Some(Table1D/2D)` | Fully modelled | Interpolated value |
+/// | `Absent` (default for secondary fields) | Not applicable by design — symmetric section, no CY, etc. | Silent 0.0 |
+/// | `Placeholder` (default for primary fields) | Should exist but not yet modelled | `warn_once!` + 0.0 |
+/// | `Scalar(0.0)` with [`crate::sourced!`] | Intentional explicit zero | Silent 0.0 |
+/// | `Table1D` / `Table2D` | Fully modelled | Interpolated value |
 ///
-/// `Placeholder` is the `Default` for `AeroCoeff`, so any zone field left
-/// unfilled (or a new field added to `AeroZone`) automatically warns at
-/// runtime rather than silently contributing zero force.
+/// `Placeholder` is the `Default` for `AeroCoeff`, so any primary field left
+/// unfilled automatically warns at runtime rather than silently producing zero.
 #[derive(Reflect, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[reflect(Serialize, Deserialize)]
 pub enum AeroCoeff {
+    /// Absent by design — this coefficient does not apply to this zone.
+    ///
+    /// Evaluates to `0.0` silently (no warning). Use for secondary
+    /// coefficients that structurally don't exist on a given zone:
+    /// e.g. `cy` on a symmetric main wing, or `croll` when roll is
+    /// handled entirely by emergent geometry.
+    ///
+    /// This is the default for secondary `AeroZone` fields (`cy`, `cm`,
+    /// `croll`, `cn`). Set a field to `Absent` explicitly when you want
+    /// to document that the absence is intentional.
+    Absent,
+
     /// Explicit "not yet modelled" sentinel.
     ///
     /// Evaluates to `0.0` (same as `Scalar(0.0)`) but emits a
     /// `warn_once!` on the first evaluation to notify the aircraft
     /// author that this coefficient still needs data.
     ///
-    /// This is the [`Default`] value for `AeroCoeff`. Any `AeroZone`
-    /// field that is not explicitly set will be `Placeholder`, ensuring
-    /// gaps are visible at runtime rather than silently contributing zero.
+    /// This is the [`Default`] value for `AeroCoeff` and the default for
+    /// primary fields (`cl`, `cd`). Any `AeroZone` field that is not
+    /// explicitly set will be `Placeholder`, ensuring gaps are visible at
+    /// runtime rather than silently contributing zero.
     ///
     /// Replace with [`AeroCoeff::Scalar`] (annotated with [`crate::sourced!`])
     /// or a lookup table once you have data.
@@ -112,6 +125,11 @@ impl Default for AeroCoeff {
 }
 
 impl AeroCoeff {
+    /// Returns `true` if this coefficient is `Absent` (not applicable by design).
+    pub fn is_absent(&self) -> bool {
+        matches!(self, AeroCoeff::Absent)
+    }
+
     /// Returns `true` if this coefficient is `Placeholder` (not yet modelled).
     ///
     /// Useful for validation and tooling; the hot path should just call
@@ -126,6 +144,7 @@ impl AeroCoeff {
     /// - For CL, CD, CM, Croll, Cn: pass the local angle of attack `α_local`.
     /// - For CY (side force): pass the local sideslip angle `β_local`.
     ///
+    /// - [`AeroCoeff::Absent`]: returns `0.0` silently (not applicable by design).
     /// - [`AeroCoeff::Placeholder`]: emits `warn_once!` and returns `0.0`.
     /// - [`AeroCoeff::Scalar`]: returns the constant; ignores both inputs.
     /// - [`AeroCoeff::Table1D`]: linearly interpolates on `angle_rad`; `re` is ignored.
@@ -138,6 +157,7 @@ impl AeroCoeff {
     /// (empty breakpoints) after a [`bevy::log::warn`].
     pub fn evaluate(&self, angle_rad: f64, re: f64) -> f64 {
         match self {
+            AeroCoeff::Absent => 0.0,
             AeroCoeff::Placeholder => {
                 warn_once!(
                     "AeroCoeff::Placeholder evaluated — this coefficient has no data yet. \
@@ -396,5 +416,28 @@ mod tests {
     #[test]
     fn default_aero_coeff_is_placeholder() {
         assert!(AeroCoeff::default().is_placeholder());
+    }
+
+    // ── Absent variant ────────────────────────────────────────────────────────
+
+    #[test]
+    fn absent_evaluates_to_zero_silently() {
+        assert_eq!(AeroCoeff::Absent.evaluate(0.3, 1e6), 0.0);
+        assert_eq!(AeroCoeff::Absent.evaluate(-1.0, 2e6), 0.0);
+    }
+
+    #[test]
+    fn absent_is_absent_true() {
+        assert!(AeroCoeff::Absent.is_absent());
+    }
+
+    #[test]
+    fn placeholder_is_absent_false() {
+        assert!(!AeroCoeff::Placeholder.is_absent());
+    }
+
+    #[test]
+    fn scalar_is_absent_false() {
+        assert!(!AeroCoeff::Scalar(0.0).is_absent());
     }
 }

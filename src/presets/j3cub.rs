@@ -767,7 +767,7 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
-                cy: None, // TODO v2: beta-dependent CY_beta
+                cy: AeroCoeff::Absent, // TODO v2: beta-dependent CY_beta
                 ..default()
             },
             zone_force: ZoneForce::default(),
@@ -799,10 +799,10 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
                 cl: AeroCoeff::Scalar(0.0),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 // Negative CY: positive rudder (nose-right) → −Y force at tail → +Z torque.
-                cy: Some(AeroCoeff::Scalar(sourced!(
+                cy: AeroCoeff::Scalar(sourced!(
                     -0.152,
                     "JSBSim:J3Cub.xml — Yaw_rudder CN_dr = −0.0565/rad; CY_rud = CN_dr × b/x_arm = 0.0565 × 10.742/4.0, negated for −Y force convention"
-                ))),
+                )),
                 control_role: Some(ControlSurfaceRole::Rudder),
                 ..default()
             },
