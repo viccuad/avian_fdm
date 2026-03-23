@@ -3,7 +3,7 @@ name = "avian_fdm"
 version = "0.1.0"
 edition = "2021"
 description = "6-DoF Flight Dynamics Model for Bevy + Avian 0.6"
-license = "MIT OR Apache-2.0"
+license = "LGPL-2.1-or-later"
 
 [features]
 default = ["propulsion"]
