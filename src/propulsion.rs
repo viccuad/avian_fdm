@@ -2,13 +2,19 @@
 //!
 //! # Overview
 //!
-//! Gagg–Ferrar altitude correction:
+//! Gagg–Ferrar altitude correction — **thrust = max thrust × health fraction ×
+//! throttle position × air density ratio raised to the 0.7 power. The 0.7
+//! exponent is empirical for naturally-aspirated piston engines: thrust falls
+//! with altitude as air thins. See: Gagg-Ferrar piston engine model.**
 //!
 //! ```text
 //! T = T_max · remaining · throttle_fraction · (ρ / ρ₀)^0.7
 //! ```
 //!
-//! Propeller induced velocity (actuator disk):
+//! Propeller induced velocity via **actuator disk theory** — **induced airspeed
+//! behind the propeller = square root of (thrust ÷ (2 × air density × disk area)).
+//! Disk area = π × propeller radius². See: actuator disk theory,
+//! momentum theory propeller.**
 //!
 //! ```text
 //! V_ind = √(T / (2 · ρ · A))    A = π · (d/2)²

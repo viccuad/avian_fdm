@@ -18,6 +18,11 @@ use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 ///
 /// # Non-dimensional form
 ///
+/// **Damping moment = damping derivative × normalised angular rate × dynamic
+/// pressure × wing area × reference length. The normalised rate (e.g. roll rate
+/// × wingspan ÷ 2 × airspeed) is dimensionless — it compares rotational tip
+/// speed to forward speed. Negative derivatives mean damping opposes motion.**
+///
 /// ```text
 /// ΔL = Cl_p · (p · b / 2V) · q̄ · S · b     roll  damping → body X
 /// ΔM = Cm_q · (q · c̄ / 2V) · q̄ · S · c̄    pitch damping → body Y
@@ -44,7 +49,9 @@ pub struct LodDamping {
 /// Lift-induced drag model.
 ///
 /// Add this component to the aircraft root entity to enable whole-aircraft
-/// induced drag:
+/// induced drag. **Induced drag coefficient = lift coefficient squared ÷ (π ×
+/// Oswald efficiency factor × aspect ratio). Aspect ratio = wingspan² ÷ wing
+/// area. See: induced drag, drag polar, Oswald efficiency.**
 ///
 /// ```text
 /// CD_i = CL² / (π · e · AR),   AR = b² / S

@@ -63,6 +63,8 @@ use crate::math::to_dvec3;
 ///
 /// A zone at spanwise station `y` (metres, positive starboard) sees a
 /// body-Z velocity increment `Δw = p · y` from roll rate `p` (rad/s).
+/// **Local angle-of-attack change from roll = roll rate (rad/s) × spanwise
+/// distance from roll axis (m) ÷ airspeed (m/s).**
 ///
 /// ```text
 /// Δα_roll = p · y / V
@@ -76,6 +78,9 @@ use crate::math::to_dvec3;
 ///
 /// A zone at longitudinal station `x` (metres, positive forward from CG) sees
 /// a body-Z velocity increment from pitch rate `q` (rad/s):
+/// **Local angle-of-attack change from pitch = pitch rate (rad/s) × longitudinal
+/// distance from CG (m) ÷ airspeed (m/s). Positive forward, so the tail
+/// (negative x) sees reduced AoA during a pull.**
 ///
 /// ```text
 /// Δα_pitch = q · x / V
@@ -89,6 +94,9 @@ use crate::math::to_dvec3;
 ///
 /// A zone at spanwise station `y` sees a body-Y velocity increment from yaw
 /// rate `r` (rad/s):
+/// **Local sideslip change from yaw = yaw rate (rad/s) × spanwise distance
+/// from yaw axis (m) ÷ airspeed (m/s). Produces asymmetric drag (adverse yaw)
+/// and drives Dutch-roll dynamics.**
 ///
 /// ```text
 /// Δβ_yaw = r · y / V
@@ -171,6 +179,9 @@ pub(crate) struct ZoneCoefficients {
 ///    `remaining ∈ (0, 1]`.  A wing at 0.5 remaining produces half the lift.
 ///    Additionally, structural deformation adds parasitic drag that peaks at
 ///    intermediate failure:
+///    **Effective drag = (base drag × control deflection + damage drag × fraction
+///    lost ÷ dynamic pressure) × remaining fraction. Structural deformation
+///    contributes drag even while the zone still produces lift.**
 ///
 ///    ```text
 ///    CD_effective = (CD_base · |input| + damage_drag · (1 − remaining) / q̄) · remaining
@@ -245,7 +256,10 @@ pub(crate) struct ZoneWorldForce {
 ///
 /// Aerodynamic coefficients are defined in the **stability frame**, which is
 /// the body frame rotated by −α about body-Y so that its X axis aligns with
-/// the velocity vector.  Forces are constructed there:
+/// the velocity vector.  Forces are constructed there.
+/// **Each force component = aerodynamic coefficient × dynamic pressure × wing
+/// area. Drag opposes motion (−X), side force is rightward (+Y), lift is
+/// perpendicular to velocity upward (−Z in stability frame):**
 ///
 /// ```text
 /// F_stability = ( −CD · q̄ · S,     drag opposes motion (−X_s)
@@ -253,7 +267,9 @@ pub(crate) struct ZoneWorldForce {
 ///                 −CL · q̄ · S )    lift perpendicular to velocity (−Z_s)
 /// ```
 ///
-/// The force is then rotated to body frame and then to world:
+/// The force is then rotated to body frame and then to world.
+/// **Undo the angle-of-attack rotation (stability → body), then apply the
+/// aircraft's orientation quaternion (body → world):**
 ///
 /// ```text
 /// F_body  = R_y(−α) · F_stability      (stab_to_body rotation)
@@ -264,7 +280,10 @@ pub(crate) struct ZoneWorldForce {
 ///
 /// Each zone also produces moment coefficients (CM, Croll, Cn) that represent
 /// pure couples — torques that exist even if the zone were at the CG.  These
-/// are expressed directly in body frame (not stability frame):
+/// are expressed directly in body frame (not stability frame).
+/// **Pure torque = moment coefficient × dynamic pressure × wing area × reference
+/// length. Roll and yaw use wingspan (lateral reference); pitch uses chord
+/// (longitudinal reference):**
 ///
 /// ```text
 /// τ_body = ( Croll · q̄ · S · b,   rolling moment  → body X
@@ -360,6 +379,12 @@ fn accumulate_engine_force(
 ///   moment.
 ///
 /// # Non-dimensional form
+///
+/// **Damping moment = damping derivative × normalised angular rate × dynamic
+/// pressure × wing area × reference length. The normalised rate (rate × length
+/// ÷ 2 × airspeed) is dimensionless — it compares rotational tip speed to
+/// forward speed. All derivatives are negative (oppose motion). See:
+/// aerodynamic damping derivatives, roll damping Clp, pitch damping Cmq.**
 ///
 /// ```text
 /// ΔL = Cl_p · (p · b / 2V) · q̄ · S · b     roll  damping → body X

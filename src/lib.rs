@@ -114,7 +114,7 @@
 //! (sometimes called the *linear aerodynamic model*). Aerodynamic coefficients
 //! — C_L, C_D, C_Y — are expressed as tabulated functions of angle of attack α
 //! and Reynolds number Re, then multiplied by dynamic pressure q̄ and
-//! reference area S:
+//! reference area S. **Aerodynamic force = coefficient × dynamic pressure × wing area:**
 //!
 //! ```text
 //! Lift  = C_L(α, Re) · q̄ · S
@@ -162,7 +162,8 @@
 //!
 //! The stability frame is the body frame rotated by −α about body Y, aligning
 //! its X axis with the velocity vector. Lift is defined as perpendicular to the
-//! velocity (−Z_stability), drag as opposing it (−X_stability):
+//! velocity (−Z_stability), drag as opposing it (−X_stability).
+//! **Force in stability axes, then rotated to body frame, then to world frame:**
 //!
 //! ```text
 //! force_stability = (−C_D · q̄ · S,  C_Y · q̄ · S,  −C_L · q̄ · S)
@@ -192,7 +193,7 @@
 //!
 //! ### Translational dynamics
 //!
-//! Newton's second law in vector form:
+//! Newton's second law in vector form — **net force equals mass times acceleration:**
 //!
 //! ```text
 //! F_net = m · (dV/dt)
@@ -211,7 +212,8 @@
 //! ### Rotational dynamics (Euler's equations)
 //!
 //! In **body frame**, with principal axes close to body X/Y/Z, Euler's
-//! equations of motion are:
+//! equations of motion are. **Rolling, pitching, and yawing moments equal
+//! inertia times angular acceleration plus gyroscopic cross-coupling terms:**
 //!
 //! ```text
 //! L = I_xx · ṗ + (I_zz − I_yy) · q · r   (roll  equation)
@@ -222,7 +224,8 @@
 //! where (p, q, r) are body-frame roll/pitch/yaw rates, and (L, M, N) are the
 //! roll/pitch/yaw moments. Avian evaluates this system internally; `avian_fdm`
 //! supplies (L, M, N) via [`avian3d::prelude::ConstantTorque`] by computing the
-//! cross product of each zone force with its moment arm:
+//! cross product of each zone force with its moment arm.
+//! **Torque = lever arm × force (cross product):**
 //!
 //! ```text
 //! τ_zone = (r_zone − r_CG) × F_zone
@@ -248,7 +251,8 @@
 //!
 //! ### Why density drives everything
 //!
-//! Every aerodynamic force scales with **dynamic pressure**:
+//! Every aerodynamic force scales with **dynamic pressure** — the kinetic energy
+//! of the airflow per unit volume. **Dynamic pressure q-bar = half × air density (kg/m³) × airspeed² (m/s):**
 //!
 //! ```text
 //! q̄ = ½ · ρ · V²
@@ -259,7 +263,9 @@
 //! reduction that directly cuts lift and drag by 20% at the same airspeed.
 //! An aircraft must fly faster at altitude to generate the same lift.
 //!
-//! Dynamic pressure also controls Reynolds number:
+//! Dynamic pressure also controls Reynolds number.
+//! **Reynolds number = (density × speed × chord) ÷ viscosity — a dimensionless ratio
+//! of inertial to viscous forces that determines whether airflow is smooth or turbulent:**
 //!
 //! ```text
 //! Re = ρ · V · c̄ / μ
@@ -274,14 +280,16 @@
 //!
 //! The [`atmosphere`] module implements ICAO Doc 7488 for 0–20 km:
 //!
-//! **Troposphere (h ≤ 11 000 m):**
+//! **Troposphere (h ≤ 11 000 m)** — temperature drops linearly with altitude (lapse rate),
+//! pressure follows a power law, density is derived from the ideal gas law:
 //! ```text
 //! T = 288.15 − 0.0065 · h          (K)
 //! p = 101 325 · (T / 288.15)^5.256 (Pa)
 //! ρ = p / (287.053 · T)             (kg/m³)
 //! ```
 //!
-//! **Stratosphere (11 000 m < h ≤ 20 000 m):**
+//! **Stratosphere (11 000 m < h ≤ 20 000 m)** — temperature is constant (isothermal layer),
+//! pressure decays exponentially with altitude (barometric formula):
 //! ```text
 //! T = 216.65                                     (K, isothermal)
 //! p = p₁₁ · exp(−g · (h − 11000) / (R · T₁₁))  (Pa)
@@ -290,7 +298,8 @@
 //!
 //! Dynamic viscosity μ uses **Sutherland's law** — the gas-kinetic model that
 //! correctly predicts viscosity *increasing* with temperature (opposite to
-//! liquids):
+//! liquids). **Viscosity scales as temperature to the 3/2 power, corrected by
+//! Sutherland's constant (110.4 K) for real-gas behaviour:**
 //!
 //! ```text
 //! μ = 1.716×10⁻⁵ · (T/273.15)^(3/2) · (273.15 + 110.4) / (T + 110.4)
@@ -310,7 +319,9 @@
 //!
 //! Aerodynamic coefficients are measured quantities, not derived from first
 //! principles in real-time. The stability-derivative method represents them as
-//! a **Taylor series** around a trim condition (small perturbations):
+//! a **Taylor series** around a trim condition (small perturbations).
+//! **Lift coefficient grows linearly with angle of attack up to stall; drag
+//! follows a parabolic polar (increases with lift squared):**
 //!
 //! ```text
 //! C_L(α) ≈ C_L₀ + C_Lα · α + C_Lα² · α² + …
@@ -339,7 +350,8 @@
 //! 2. Evaluate C_L(α, Re), C_D(α, Re), C_Y(α, Re) via bilinear interpolation.
 //! 3. Multiply by the zone's share of reference area (`fraction × S_ref`).
 //! 4. Scale by `Failure.remaining` ∈ [0, 1] — zones at zero remaining contribute nothing.
-//! 5. Construct the force vector in **stability axes**:
+//! 5. Construct the force vector in **stability axes**. **Force along each axis
+//!    = aerodynamic coefficient × dynamic pressure × wing area:**
 //!    ```text
 //!    F_stab = (−C_D · q̄ · S,  C_Y · q̄ · S,  −C_L · q̄ · S)
 //!    ```
@@ -355,7 +367,10 @@
 //!
 //! Angular-rate damping is applied once per root as whole-aircraft moment
 //! increments (not per zone). The three damping derivatives are from
-//! Nelson (1998), Table B1, for the J3Cub:
+//! Nelson (1998), Table B1, for the J3Cub.
+//! **Damping moment = damping derivative × normalised angular rate × dynamic pressure × area × length.
+//! The normalised rate (e.g. p·b/2V) is dimensionless — angular rate scaled by wingspan
+//! and divided by airspeed:**
 //!
 //! ```text
 //! ΔM = C_Mq · (q · c̄/2V) · q̄ · S · c̄   (pitch damping,  C_Mq = −12)
@@ -390,7 +405,9 @@
 //!
 //! ### Piston engine model
 //!
-//! Thrust at altitude follows the **Gagg-Ferrar correction**:
+//! Thrust at altitude follows the **Gagg-Ferrar correction** — **maximum thrust
+//! scaled by throttle position and air density ratio raised to the 0.7 power
+//! (empirical constant for naturally-aspirated piston engines):**
 //!
 //! ```text
 //! T = T_max · η_throttle · (ρ/ρ₀)^0.7
@@ -403,7 +420,8 @@
 //! ### Actuator disk — propwash velocity
 //!
 //! The induced velocity behind the propeller (used later for propwash coupling)
-//! is estimated with **actuator disk theory**:
+//! is estimated with **actuator disk theory** — **propeller-induced airspeed =
+//! square root of (thrust ÷ (2 × air density × disk area)), where disk area = π × radius²:**
 //!
 //! ```text
 //! V_ind = √(T / (2 · ρ · A_disk))    A_disk = π · (d/2)²

@@ -9,7 +9,9 @@
 //!
 //! Real aerodynamic coefficients are nonlinear functions of many variables.
 //! The *stability derivative method* approximates them as a Taylor expansion
-//! around a trim condition:
+//! around a trim condition. **Lift coefficient = baseline value + lift slope ×
+//! angle-of-attack + pitch-rate correction term. See: stability
+//! derivatives, aerodynamic Taylor series.**
 //!
 //! ```text
 //! CL(α, Re) ≈ CL₀ + CL_α · α + CL_q · (q · c̄/2V) + …

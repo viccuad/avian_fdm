@@ -95,7 +95,9 @@ pub struct AeroZone {
     /// (`remaining > 0`). Represents structural drag from deformation.
     ///
     /// `None` (the default) means this zone has no damage-drag model — the
-    /// common case for most zones. `Some(coeff)` enables the calculation:
+    /// common case for most zones. `Some(coeff)` enables the calculation.
+    /// **Extra drag = damage coefficient × fraction destroyed ÷ dynamic pressure.
+    /// Peaks at intermediate failure; zero when fully intact or fully detached.**
     ///
     /// ```text
     /// CD_extra = coeff × (1 − remaining) / q̄   when remaining > 0

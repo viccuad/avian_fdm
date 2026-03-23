@@ -14,14 +14,18 @@
 //!
 //! ## ISA derivation summary (ICAO Doc 7488)
 //!
-//! Troposphere (h ≤ 11 000 m):
+//! **Troposphere (h ≤ 11 000 m)** — temperature drops linearly with altitude
+//! (lapse rate 6.5 K/km); pressure follows a power law from that lapse rate;
+//! density is derived from the ideal gas law (pressure ÷ gas constant ÷ temperature):
 //! ```text
 //! T = T₀ − L · h          T₀ = 288.15 K,  L = 0.0065 K/m
 //! p = p₀ · (T/T₀)^n       n = g/(R · L) ≈ 5.2559,  g = 9.80665 m/s²,  R = 287.05287 J/(kg·K)
 //! ρ = p/(R·T)
 //! ```
 //!
-//! Stratosphere (11 000 m < h ≤ 20 000 m):
+//! **Stratosphere (11 000 m < h ≤ 20 000 m)** — temperature is constant
+//! (isothermal layer at −56.5 °C); pressure decays exponentially with altitude
+//! (barometric formula); density again from the ideal gas law:
 //! ```text
 //! T = 216.65 K  (isothermal)
 //! p = p₁₁ · exp(−g · (h−h₁₁)/(R · T₁₁))
@@ -32,6 +36,9 @@
 //!
 //! Gas viscosity *increases* with temperature (unlike liquids — gas molecules
 //! collide more at higher T, transferring more momentum across flow layers).
+//! **Dynamic viscosity = reference viscosity × (T/273)^(3/2) corrected by
+//! Sutherland's constant (110.4 K) for real-gas behaviour. See:
+//! Sutherland's law viscosity.**
 //!
 //! ```text
 //! μ = μ_ref · (T/T_ref)^(3/2) · (T_ref + S)/(T + S)
