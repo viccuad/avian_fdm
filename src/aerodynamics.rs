@@ -17,7 +17,7 @@
 //!     3. accumulate_engine_force     — add pre-computed thrust (from propulsion
 //!                                      system) and its moment-arm torque
 //!   Once per aircraft:
-//!     4. induced_drag                — whole-aircraft CD_i = CL²/(π·e·AR)
+//!     4. induced_drag                — whole-aircraft CD_i = CL²/(π · e · AR)
 //!     5. damping_torque (LOD fallback) — only when `lod_damping` is `Some`;
 //!                                        skipped for full-fidelity zone layouts
 //! ```
@@ -362,9 +362,9 @@ fn accumulate_engine_force(
 /// # Non-dimensional form
 ///
 /// ```text
-/// ΔL = Cl_p · (p·b / 2V) · q̄ · S · b     roll  damping → body X
-/// ΔM = Cm_q · (q·c̄ / 2V) · q̄ · S · c̄    pitch damping → body Y
-/// ΔN = Cn_r · (r·b / 2V) · q̄ · S · b     yaw   damping → body Z
+/// ΔL = Cl_p · (p · b / 2V) · q̄ · S · b     roll  damping → body X
+/// ΔM = Cm_q · (q · c̄ / 2V) · q̄ · S · c̄    pitch damping → body Y
+/// ΔN = Cn_r · (r · b / 2V) · q̄ · S · b     yaw   damping → body Z
 /// ```
 ///
 /// The `(rate × length / 2V)` term is the non-dimensional rate.  Multiplying
@@ -418,7 +418,7 @@ pub fn damping_torque(
 /// 1. [`evaluate_zone_coefficients`] → [`zone_force_world`] per zone.
 /// 2. Moment-arm torques `(r_zone − r_CG) × F` accumulated.
 /// 3. Pre-computed engine thrust via [`accumulate_engine_force`].
-/// 4. Whole-aircraft induced drag CD_i = CL²/(π·e·AR).
+/// 4. Whole-aircraft induced drag CD_i = CL²/(π · e · AR).
 pub fn compute_aero_forces(
     mut root_query: Query<(
         &mut ConstantForce,
@@ -883,7 +883,7 @@ mod tests {
         let expected = 0.1 + 4.0 / 50.0;
         assert!(
             (alpha_l - expected).abs() < 1e-12,
-            "Δα_roll should be p·y/V, got {alpha_l}"
+            "Δα_roll should be p · y/V, got {alpha_l}"
         );
         assert!(
             (beta_l - 0.0).abs() < 1e-12,
@@ -934,7 +934,7 @@ mod tests {
         let expected_beta = 0.05 + 3.0 / 50.0;
         assert!(
             (beta_l - expected_beta).abs() < 1e-12,
-            "Δβ_yaw should be r·y/V, got {beta_l}"
+            "Δβ_yaw should be r · y/V, got {beta_l}"
         );
         assert!(
             (alpha_l - 0.0).abs() < 1e-12,
@@ -954,8 +954,8 @@ mod tests {
     #[test]
     fn all_layers_combine_additively() {
         // p=1, q=1, r=1; x=2, y=3; V=10
-        // α_local = α + (p·y + q·x)/V = 0.1 + (3+2)/10 = 0.6
-        // β_local = β + r·y/V = 0.05 + 3/10 = 0.35
+        // α_local = α + (p · y + q · x)/V = 0.1 + (3+2)/10 = 0.6
+        // β_local = β + r · y/V = 0.05 + 3/10 = 0.35
         let (a, b) = zone_local_angles(0.1, 0.05, 1.0, 1.0, 1.0, 2.0, 3.0, 10.0);
         assert!((a - 0.6).abs() < 1e-12, "combined α layers, got {a}");
         assert!((b - 0.35).abs() < 1e-12, "combined β layers, got {b}");
@@ -965,7 +965,7 @@ mod tests {
     /// produce differential lift under roll rate that opposes the roll.
     #[test]
     fn emergent_roll_damping_from_symmetric_zones() {
-        // Wing zone with a simple linear CL curve: CL = 5·α (slope ~0.088/deg)
+        // Wing zone with a simple linear CL curve: CL = 5 · α (slope ~0.088/deg)
         let zone = AeroZone {
             cl: AeroCoeff::Table1D {
                 breakpoints: vec![-0.5, 0.5],

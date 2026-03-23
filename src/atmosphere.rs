@@ -16,15 +16,15 @@
 //!
 //! Troposphere (h ≤ 11 000 m):
 //! ```text
-//! T = T₀ − L·h          T₀ = 288.15 K,  L = 0.0065 K/m
-//! p = p₀·(T/T₀)^n       n = g/(R·L) ≈ 5.2559,  g = 9.80665 m/s²,  R = 287.05287 J/(kg·K)
+//! T = T₀ − L · h          T₀ = 288.15 K,  L = 0.0065 K/m
+//! p = p₀ · (T/T₀)^n       n = g/(R · L) ≈ 5.2559,  g = 9.80665 m/s²,  R = 287.05287 J/(kg·K)
 //! ρ = p/(R·T)
 //! ```
 //!
 //! Stratosphere (11 000 m < h ≤ 20 000 m):
 //! ```text
 //! T = 216.65 K  (isothermal)
-//! p = p₁₁·exp(−g·(h−h₁₁)/(R·T₁₁))
+//! p = p₁₁ · exp(−g · (h−h₁₁)/(R · T₁₁))
 //! ρ = p/(R·T)
 //! ```
 //!
@@ -34,7 +34,7 @@
 //! collide more at higher T, transferring more momentum across flow layers).
 //!
 //! ```text
-//! μ = μ_ref·(T/T_ref)^(3/2)·(T_ref + S)/(T + S)
+//! μ = μ_ref · (T/T_ref)^(3/2) · (T_ref + S)/(T + S)
 //! μ_ref = 1.716×10⁻⁵ kg/(m·s),  T_ref = 273.15 K,  S = 110.4 K
 //! ```
 

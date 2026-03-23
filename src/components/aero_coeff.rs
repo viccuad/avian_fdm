@@ -12,7 +12,7 @@
 //! around a trim condition:
 //!
 //! ```text
-//! CL(α, Re) ≈ CL₀ + CL_α · α + CL_q · (q·c̄/2V) + …
+//! CL(α, Re) ≈ CL₀ + CL_α · α + CL_q · (q · c̄/2V) + …
 //! ```
 //!
 //! For a high-fidelity simulation (matching JSBSim to ±1%), pre-computed

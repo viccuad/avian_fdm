@@ -165,7 +165,7 @@
 //! velocity (−Z_stability), drag as opposing it (−X_stability):
 //!
 //! ```text
-//! force_stability = (−C_D·q̄·S,  C_Y·q̄·S,  −C_L·q̄·S)
+//! force_stability = (−C_D · q̄ · S,  C_Y · q̄ · S,  −C_L · q̄ · S)
 //! force_body      = R_y(−α) · force_stability
 //! force_world     = q_root  · force_body
 //! ```
@@ -341,7 +341,7 @@
 //! 4. Scale by `Failure.remaining` ∈ [0, 1] — zones at zero remaining contribute nothing.
 //! 5. Construct the force vector in **stability axes**:
 //!    ```text
-//!    F_stab = (−C_D·q̄·S,  C_Y·q̄·S,  −C_L·q̄·S)
+//!    F_stab = (−C_D · q̄ · S,  C_Y · q̄ · S,  −C_L · q̄ · S)
 //!    ```
 //! 6. Rotate to world: `F_world = q_root · R_y(−α) · F_stab`
 //! 7. Write to [`components::ZoneForce`] on the zone entity.
@@ -358,9 +358,9 @@
 //! Nelson (1998), Table B1, for the J3Cub:
 //!
 //! ```text
-//! ΔM = C_Mq · (q·c̄/2V) · q̄·S·c̄   (pitch damping,  C_Mq = −12)
-//! ΔL = C_lp · (p·b/2V) · q̄·S·b    (roll  damping,  C_lp = −0.45)
-//! ΔN = C_nr · (r·b/2V) · q̄·S·b    (yaw   damping,  C_nr = −0.12)
+//! ΔM = C_Mq · (q · c̄/2V) · q̄ · S · c̄   (pitch damping,  C_Mq = −12)
+//! ΔL = C_lp · (p · b/2V) · q̄ · S · b    (roll  damping,  C_lp = −0.45)
+//! ΔN = C_nr · (r · b/2V) · q̄ · S · b    (yaw   damping,  C_nr = −0.12)
 //! ```
 //!
 //! These provide the rate-dependent restoring moments that prevent unrealistic

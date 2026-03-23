@@ -19,9 +19,9 @@ use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 /// # Non-dimensional form
 ///
 /// ```text
-/// ΔL = Cl_p · (p·b / 2V) · q̄ · S · b     roll  damping → body X
-/// ΔM = Cm_q · (q·c̄ / 2V) · q̄ · S · c̄    pitch damping → body Y
-/// ΔN = Cn_r · (r·b / 2V) · q̄ · S · b     yaw   damping → body Z
+/// ΔL = Cl_p · (p · b / 2V) · q̄ · S · b     roll  damping → body X
+/// ΔM = Cm_q · (q · c̄ / 2V) · q̄ · S · c̄    pitch damping → body Y
+/// ΔN = Cn_r · (r · b / 2V) · q̄ · S · b     yaw   damping → body Z
 /// ```
 ///
 /// All derivatives should be negative (damping opposes motion).
@@ -30,13 +30,13 @@ use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct LodDamping {
-    /// Roll damping derivative ∂Cl/∂p̂, where p̂ = p·b/(2V).
+    /// Roll damping derivative ∂Cl/∂p̂, where p̂ = p · b/(2V).
     /// Typical range: −0.4 to −0.5 for light aircraft.
     pub cl_p: f64,
-    /// Pitch damping derivative ∂Cm/∂q̂, where q̂ = q·c̄/(2V).
+    /// Pitch damping derivative ∂Cm/∂q̂, where q̂ = q · c̄/(2V).
     /// Typical range: −10 to −20 for light aircraft.
     pub cm_q: f64,
-    /// Yaw damping derivative ∂Cn/∂r̂, where r̂ = r·b/(2V).
+    /// Yaw damping derivative ∂Cn/∂r̂, where r̂ = r · b/(2V).
     /// Typical range: −0.1 to −0.15 for light aircraft.
     pub cn_r: f64,
 }
@@ -80,7 +80,7 @@ pub struct InducedDrag {
 }
 
 /// Wing and tail geometry constants used for aerodynamic non-dimensionalisation
-/// (q̄·S, q̄·S·b, q̄·S·c̄).
+/// (q̄ · S, q̄ · S · b, q̄ · S · c̄).
 ///
 /// Lives on the **aircraft root entity** as part of [`AircraftCoreBundle`].
 ///
