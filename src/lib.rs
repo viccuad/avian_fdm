@@ -89,16 +89,24 @@
 //! the state forward in time. `avian_fdm` is the FDM; [Avian] is the
 //! integrator.
 //!
-//! ### Scope of this library
+//! ### Scope of this library for now
 //!
-//! | In scope | Out of scope |
-//! |----------|-------------|
-//! | ISA atmosphere (0–20 km) | Ground contact / landing gear forces |
-//! | Lift, drag, side-force per zone | Structural elasticity / aeroelasticity |
-//! | Pitch/roll/yaw damping derivatives | Compressibility (transonic/supersonic) |
-//! | Piston engine + fixed-pitch propeller | Turbine / jet engine cycles |
-//! | Failure degradation and detachment | Fuel burn / weight change over time |
-//! | 6-DoF integration (via Avian) | Autopilot / stability augmentation |
+//! **In scope:**
+//! - ISA atmosphere (0–20 km)
+//! - Lift, drag, and side-force per zone
+//! - Pitch, roll, and yaw damping derivatives
+//! - Piston engine + fixed-pitch propeller model
+//! - Failure degradation (performance loss as `remaining` → 0)
+//! - 6-DoF integration (via Avian)
+//!
+//! **Out of scope** (or game's responsibility):
+//! - Ground contact and landing gear forces
+//! - Structural elasticity / aeroelasticity
+//! - Compressibility effects (transonic / supersonic)
+//! - Turbine and jet engine cycles
+//! - Fuel burn and weight change over time
+//! - Autopilot and stability augmentation
+//! - Physical detachment of damaged zones
 //!
 //! ### Stability-derivative approach
 //!
