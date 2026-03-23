@@ -34,22 +34,52 @@ use crate::components::zone_force::ZoneForce;
 /// Failure state is tracked separately via [`super::Failure`]. When absent, the
 /// zone is treated as fully intact.
 ///
+/// ## Coefficient presence semantics
+///
+/// Primary coefficients (`cl`, `cd`) are always present — use
+/// [`AeroCoeff::Scalar`]`(0.0)` (with a [`crate::sourced!`] note) for intentional zeros.
+///
+/// Secondary coefficients (`cy`, `cm`, `croll`, `cn`) are `Option`:
+///
+/// | Field value | Meaning |
+/// |---|---|
+/// | `None` (default) | Absent by design — symmetric section, no contribution |
+/// | `Some(Placeholder)` | Contribution expected but not yet modelled |
+/// | `Some(Scalar(0.0))` | Explicitly zero (document with `sourced!`) |
+/// | `Some(Table1D/2D)` | Fully modelled |
+///
 /// Lives on each **AeroZone child entity** (child of the aircraft root).
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct AeroZone {
     /// Partial contribution to CL (lift coefficient).
+    ///
+    /// Always present. Defaults to [`AeroCoeff::Placeholder`] so unset zones warn.
     pub cl: AeroCoeff,
     /// Partial contribution to CD (drag coefficient).
+    ///
+    /// Always present. Defaults to [`AeroCoeff::Placeholder`] so unset zones warn.
     pub cd: AeroCoeff,
     /// Partial contribution to CY (side-force coefficient).
-    pub cy: AeroCoeff,
+    ///
+    /// `None` = absent by design (most symmetric zones).
+    /// `Some(Placeholder)` = expected but not yet modelled.
+    pub cy: Option<AeroCoeff>,
     /// Partial contribution to CM (pitching-moment coefficient, about c̄).
-    pub cm: AeroCoeff,
+    ///
+    /// `None` = absent by design (moment handled via tail geometry).
+    /// `Some(Placeholder)` = expected but not yet modelled.
+    pub cm: Option<AeroCoeff>,
     /// Partial contribution to Cl (rolling-moment coefficient, about b).
-    pub croll: AeroCoeff,
+    ///
+    /// `None` = absent by design (handled emergently by zone geometry).
+    /// `Some(Placeholder)` = expected but not yet modelled.
+    pub croll: Option<AeroCoeff>,
     /// Partial contribution to Cn (yawing-moment coefficient, about b).
-    pub cn: AeroCoeff,
+    ///
+    /// `None` = absent by design (handled emergently by zone geometry).
+    /// `Some(Placeholder)` = expected but not yet modelled.
+    pub cn: Option<AeroCoeff>,
     /// Offset from the zone entity's local origin to the aerodynamic centre,
     /// in the zone's local coordinate frame (metres).
     ///
@@ -156,12 +186,12 @@ pub struct AeroZoneBundle {
 impl Default for AeroZone {
     fn default() -> Self {
         Self {
-            cl: AeroCoeff::Scalar(0.0),
-            cd: AeroCoeff::Scalar(0.0),
-            cy: AeroCoeff::Scalar(0.0),
-            cm: AeroCoeff::Scalar(0.0),
-            croll: AeroCoeff::Scalar(0.0),
-            cn: AeroCoeff::Scalar(0.0),
+            cl: AeroCoeff::Placeholder,
+            cd: AeroCoeff::Placeholder,
+            cy: None,
+            cm: None,
+            croll: None,
+            cn: None,
             ac_offset: Vec3::ZERO,
             control_role: None,
             damage_drag_coeff: None,

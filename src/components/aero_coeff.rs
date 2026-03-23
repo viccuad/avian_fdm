@@ -41,9 +41,38 @@ use serde::{Deserialize, Serialize};
 ///
 /// Call [`AeroCoeff::evaluate`] each frame to obtain a `f64` value at the
 /// current flight conditions.
+///
+/// ## `Placeholder` and `Option<AeroCoeff>` — completeness system
+///
+/// Two complementary mechanisms signal unmodelled coefficients:
+///
+/// | Value | Meaning | Runtime |
+/// |---|---|---|
+/// | `None` (field absent) | Absent by design — symmetric section, no CY, etc. | Silent 0.0 |
+/// | `Some(Placeholder)` | Should exist but not yet modelled | `warn_once!` + 0.0 |
+/// | `Some(Scalar(0.0))` | Intentional zero (document with `sourced!`) | Silent 0.0 |
+/// | `Some(Table1D/2D)` | Fully modelled | Interpolated value |
+///
+/// `Placeholder` is the `Default` for `AeroCoeff`, so any zone field left
+/// unfilled (or a new field added to `AeroZone`) automatically warns at
+/// runtime rather than silently contributing zero force.
 #[derive(Reflect, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[reflect(Serialize, Deserialize)]
 pub enum AeroCoeff {
+    /// Explicit "not yet modelled" sentinel.
+    ///
+    /// Evaluates to `0.0` (same as `Scalar(0.0)`) but emits a
+    /// `warn_once!` on the first evaluation to notify the aircraft
+    /// author that this coefficient still needs data.
+    ///
+    /// This is the [`Default`] value for `AeroCoeff`. Any `AeroZone`
+    /// field that is not explicitly set will be `Placeholder`, ensuring
+    /// gaps are visible at runtime rather than silently contributing zero.
+    ///
+    /// Replace with [`AeroCoeff::Scalar`] (annotated with [`crate::sourced!`])
+    /// or a lookup table once you have data.
+    Placeholder,
+
     /// Constant value. Suitable for simple linear models.
     Scalar(f64),
 
@@ -74,13 +103,30 @@ pub enum AeroCoeff {
     },
 }
 
+impl Default for AeroCoeff {
+    /// Returns [`AeroCoeff::Placeholder`] so that any unset coefficient is
+    /// flagged at runtime rather than silently producing zero.
+    fn default() -> Self {
+        AeroCoeff::Placeholder
+    }
+}
+
 impl AeroCoeff {
+    /// Returns `true` if this coefficient is `Placeholder` (not yet modelled).
+    ///
+    /// Useful for validation and tooling; the hot path should just call
+    /// [`evaluate`](Self::evaluate) which handles the warning automatically.
+    pub fn is_placeholder(&self) -> bool {
+        matches!(self, AeroCoeff::Placeholder)
+    }
+
     /// Evaluate the coefficient at the given primary angle (rad) and Reynolds number.
     ///
     /// The primary angle is the first table axis:
     /// - For CL, CD, CM, Croll, Cn: pass the local angle of attack `α_local`.
     /// - For CY (side force): pass the local sideslip angle `β_local`.
     ///
+    /// - [`AeroCoeff::Placeholder`]: emits `warn_once!` and returns `0.0`.
     /// - [`AeroCoeff::Scalar`]: returns the constant; ignores both inputs.
     /// - [`AeroCoeff::Table1D`]: linearly interpolates on `angle_rad`; `re` is ignored.
     ///   Clamps to the first/last breakpoint with a [`bevy::log::warn_once`] if
@@ -92,6 +138,13 @@ impl AeroCoeff {
     /// (empty breakpoints) after a [`bevy::log::warn`].
     pub fn evaluate(&self, angle_rad: f64, re: f64) -> f64 {
         match self {
+            AeroCoeff::Placeholder => {
+                warn_once!(
+                    "AeroCoeff::Placeholder evaluated — this coefficient has no data yet. \
+                     Replace with Scalar, Table1D, or Table2D."
+                );
+                0.0
+            }
             AeroCoeff::Scalar(v) => *v,
             AeroCoeff::Table1D { breakpoints, values } => {
                 if breakpoints.is_empty() {
@@ -313,5 +366,35 @@ mod tests {
         assert!((c.evaluate(0.5, 1e6) - 1.0).abs() < 1e-12, "midpoint on alpha");
         // Re clamping: out-of-range Re should still work
         assert!((c.evaluate(0.5, 999.0) - 1.0).abs() < 1e-12, "Re clamped to only column");
+    }
+
+    // ── Placeholder variant ───────────────────────────────────────────────────
+
+    #[test]
+    fn placeholder_evaluates_to_zero() {
+        assert_eq!(AeroCoeff::Placeholder.evaluate(0.3, 1e6), 0.0);
+        assert_eq!(AeroCoeff::Placeholder.evaluate(-1.0, 2e6), 0.0);
+    }
+
+    #[test]
+    fn placeholder_is_placeholder_true() {
+        assert!(AeroCoeff::Placeholder.is_placeholder());
+    }
+
+    #[test]
+    fn scalar_is_placeholder_false() {
+        assert!(!AeroCoeff::Scalar(0.0).is_placeholder());
+        assert!(!AeroCoeff::Scalar(1.2).is_placeholder());
+    }
+
+    #[test]
+    fn table1d_is_placeholder_false() {
+        let c = AeroCoeff::Table1D { breakpoints: vec![0.0], values: vec![1.0] };
+        assert!(!c.is_placeholder());
+    }
+
+    #[test]
+    fn default_aero_coeff_is_placeholder() {
+        assert!(AeroCoeff::default().is_placeholder());
     }
 }

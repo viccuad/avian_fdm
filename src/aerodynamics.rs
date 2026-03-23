@@ -49,6 +49,7 @@ use crate::components::{
     AeroZone, AircraftGeometry, ControlInputs, ControlSurfaceRole,
     Failure, FlightState, InducedDrag, LodDamping, ZoneForce, get_remaining,
 };
+use crate::components::aero_coeff::AeroCoeff;
 use crate::math::to_dvec3;
 #[cfg(feature = "propulsion")]
 use crate::components::EngineZone;
@@ -190,14 +191,16 @@ pub(crate) fn evaluate_zone_coefficients(
     remaining: f64,
 ) -> ZoneCoefficients {
     // Raw table lookups at the current flight condition.
-    // CL, CD, CM, Croll, Cn depend on local angle of attack.
+    // CL, CD depend on local angle of attack.
     // CY (side force) depends on local sideslip.
+    // Secondary coefficients (cy, cm, croll, cn) are Option — None means absent
+    // by design and evaluates to 0.0 silently.
     let cl_base = zone.cl.evaluate(alpha_local, re);
     let cd_base = zone.cd.evaluate(alpha_local, re);
-    let cy_base = zone.cy.evaluate(beta_local, re);
-    let cm_base = zone.cm.evaluate(alpha_local, re);
-    let croll_base = zone.croll.evaluate(alpha_local, re);
-    let cn_base = zone.cn.evaluate(alpha_local, re);
+    let cy_base = eval_opt(zone.cy.as_ref(), beta_local, re);
+    let cm_base = eval_opt(zone.cm.as_ref(), alpha_local, re);
+    let croll_base = eval_opt(zone.croll.as_ref(), alpha_local, re);
+    let cn_base = eval_opt(zone.cn.as_ref(), alpha_local, re);
 
     // Control-surface scaling.
     let (scale, cd_scale) = match &zone.control_role {
@@ -221,6 +224,18 @@ pub(crate) fn evaluate_zone_coefficients(
         cm: cm_base * scale * remaining,
         croll: croll_base * scale * remaining,
         cn: cn_base * scale * remaining,
+    }
+}
+
+/// Evaluate an `Option<AeroCoeff>`, returning `0.0` silently when `None`.
+///
+/// `None` means the coefficient is absent by design — no warning is emitted.
+/// Use `Some(AeroCoeff::Placeholder)` to get a warning for unmodelled coefficients.
+#[inline]
+fn eval_opt(coeff: Option<&AeroCoeff>, angle: f64, re: f64) -> f64 {
+    match coeff {
+        None => 0.0,
+        Some(c) => c.evaluate(angle, re),
     }
 }
 
@@ -937,7 +952,7 @@ mod tests {
     #[test]
     fn rudder_scales_side_force() {
         let mut zone = AeroZone {
-            cy: AeroCoeff::Scalar(1.0),
+            cy: Some(AeroCoeff::Scalar(1.0)),
             ..Default::default()
         };
         zone.control_role = Some(ControlSurfaceRole::Rudder);
@@ -1024,5 +1039,41 @@ mod tests {
         let tol = 1e-5;
         assert!((damp_rotated.length() - damp_identity.length()).abs() < tol,
             "rotation should not change damping magnitude");
+    }
+
+    // ── eval_opt: Option<AeroCoeff> helpers ──────────────────────────────────
+
+    #[test]
+    fn eval_opt_none_returns_zero() {
+        assert_eq!(eval_opt(None, 0.3, 1e6), 0.0, "None → silent 0.0");
+        assert_eq!(eval_opt(None, -0.5, 2e6), 0.0);
+    }
+
+    #[test]
+    fn eval_opt_some_scalar_returns_value() {
+        assert!((eval_opt(Some(&AeroCoeff::Scalar(3.7)), 0.0, 1e6) - 3.7).abs() < 1e-12);
+    }
+
+    #[test]
+    fn eval_opt_some_placeholder_returns_zero() {
+        assert_eq!(eval_opt(Some(&AeroCoeff::Placeholder), 0.3, 1e6), 0.0,
+            "Placeholder delegate to evaluate() returns 0.0");
+    }
+
+    #[test]
+    fn option_aero_coeff_none_secondary_fields_produce_no_moment() {
+        // A zone with no secondary coefficients set (all None) should produce
+        // zero pure torque contribution regardless of flight conditions.
+        let zone = AeroZone {
+            cl: AeroCoeff::Scalar(1.0),
+            cd: AeroCoeff::Scalar(0.1),
+            cy: None, cm: None, croll: None, cn: None,
+            ..Default::default()
+        };
+        let ctrl = neutral_controls();
+        let coeffs = evaluate_zone_coefficients(&zone, &ctrl, 0.2, 0.0, 1e6, 1000.0, 1.0);
+        assert_eq!(coeffs.cm,    0.0, "cm None → 0");
+        assert_eq!(coeffs.croll, 0.0, "croll None → 0");
+        assert_eq!(coeffs.cn,    0.0, "cn None → 0");
     }
 }
