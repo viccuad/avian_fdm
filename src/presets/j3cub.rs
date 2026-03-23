@@ -358,6 +358,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(sourced!(188.0, "Calibration — fuselage fwd includes pilot + fuel + instruments; tuned for 499 kg total")),
+                fuse_fwd_contours(),
             ));
 
             // ── Fuselage aft (tail boom) ─────────────────────────────────────
@@ -377,6 +378,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(sourced!(119.0, "Calibration — tail boom lighter than fwd fuselage; tuned for aft CG position")),
+                fuse_aft_contours(),
             ));
 
             // ── Cabin / windshield ───────────────────────────────────────────
@@ -395,6 +397,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(sourced!(130.0, "Calibration — cabin/windshield structure; mostly air volume, low effective density")),
+                cabin_contours(),
             ));
 
             // ── Wing struts ──────────────────────────────────────────────────
