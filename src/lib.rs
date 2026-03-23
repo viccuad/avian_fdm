@@ -465,23 +465,17 @@
 //! induced drag). At `remaining = 0`, the zone contributes zero force — it has
 //! effectively separated from the airframe and produces no net aerodynamic effect.
 //!
-//! ### Physical detachment (`DetachPlugin`)
+//! ### Physical detachment
 //!
-//! *Only compiled with `features = ["damage"]`.* See [`detach`].
+//! `avian_fdm` does **not** implement detachment logic — that is the game's
+//! responsibility. When `remaining` reaches `0.0`, the zone silently contributes
+//! zero force. The game may then choose to:
 //!
-//! When `remaining` reaches exactly 0.0, [`detach::DetachPlugin`] (if registered)
-//! removes the zone from the aircraft hierarchy and inserts
-//! [`avian3d::prelude::RigidBody::Dynamic`] onto it, giving it independent
-//! physics. The piece inherits the aircraft's current linear and angular
-//! velocity, so it flies off with realistic momentum.
-//!
-//! Avian **automatically recomputes** the aircraft's mass, CG, and inertia
-//! tensor after detachment — a wing detaching shifts the CG and changes roll/
-//! yaw inertia without any manual update.
-//!
-//! Games that want debris-free failure (zones simply stop contributing without
-//! flying away) can omit `DetachPlugin`; zones at `remaining = 0` already
-//! produce no force by default.
+//! - Remove the zone entity entirely
+//! - Detach it by removing [`bevy::prelude::ChildOf`] and inserting
+//!   [`avian3d::prelude::RigidBody::Dynamic`] (Avian recomputes mass/CG automatically)
+//! - Replace it with a particle effect
+//! - Leave it in place (zero-force zone costs very little)
 //!
 //! ---
 //!
@@ -594,14 +588,14 @@
 //!
 //! | Feature      | Default | Description |
 //! |--------------|---------|-------------|
-//! | `damage`     | **on**  | [`components::Failure`] component and [`detach::DetachPlugin`] |
 //! | `propulsion` | **on**  | Piston engine ([`components::EngineZone`]) and propwash model |
-//! | `debug-viz`  | off     | Bevy Gizmo overlays + egui HUD via [`debug`] |
+//! | `debug-plugin` | off   | Bevy Gizmo overlays for forces, moments, and zones ([`debug_render`]) |
 //! | `presets`    | off     | Reference aircraft presets ([`presets`], e.g. J-3 Cub) |
 //!
-//! The `damage` and `propulsion` features are on by default because most
-//! flight simulators need both. Disable with `default-features = false` if your
-//! aircraft is immortal and un-powered (e.g. a glider with no failure model).
+//! [`components::Failure`] is always available — no feature gate needed.
+//! Detachment behaviour when `remaining = 0` is the game's responsibility.
+//! Disable `propulsion` with `default-features = false` for gliders and
+//! unpowered aircraft.
 //!
 //! ---
 //!
@@ -708,9 +702,6 @@ pub mod aerodynamics;
 pub mod systems;
 pub mod plugin;
 
-#[cfg(feature = "damage")]
-pub mod detach;
-
 #[cfg(feature = "propulsion")]
 pub mod propulsion;
 
@@ -730,11 +721,9 @@ pub mod prelude {
         aero_coeff::AeroCoeff,
         GizmoShape, GizmoContours,
         ZoneForce,
+        Failure,
     };
     pub use crate::plugin::AircraftFdmPlugin;
-
-    #[cfg(feature = "damage")]
-    pub use crate::components::Failure;
 
     #[cfg(feature = "debug-plugin")]
     pub use crate::debug_render::{AircraftFdmDebugPlugin, FdmGizmos, FdmDebugRender};

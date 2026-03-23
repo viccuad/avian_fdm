@@ -29,13 +29,8 @@ impl Plugin for AircraftFdmPlugin {
            .register_type::<AeroZone>()
            .register_type::<ZoneForce>()
            .register_type::<GizmoShape>()
-           .register_type::<GizmoContours>();
-
-        #[cfg(feature = "damage")]
-        app.register_type::<Failure>();
-
-        #[cfg(feature = "damage")]
-        app.add_plugins(crate::detach::DetachPlugin);
+           .register_type::<GizmoContours>()
+           .register_type::<Failure>();
 
         #[cfg(feature = "propulsion")]
         {

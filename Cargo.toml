@@ -6,8 +6,7 @@ description = "6-DoF Flight Dynamics Model for Bevy + Avian 0.6"
 license = "MIT OR Apache-2.0"
 
 [features]
-default = ["damage", "propulsion"]
-damage = []
+default = ["propulsion"]
 propulsion = []
 debug-plugin = ["bevy/bevy_gizmos", "bevy/bevy_render"]
 presets = []
