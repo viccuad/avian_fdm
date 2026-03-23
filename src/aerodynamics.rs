@@ -7,18 +7,18 @@
 //! ```text
 //! For each aircraft root:
 //!   For each AeroZone child:
-//!     0. zone_local_angles           — per-zone effective α/β from body rates
+//!     0. zone_local_angles           - per-zone effective alpha/beta from body rates
 //!                                      (roll/pitch/yaw-rate corrections)
-//!     1. evaluate_zone_coefficients  — lookup CL/CD/… tables at local α/β,
+//!     1. evaluate_zone_coefficients  - lookup CL/CD/... tables at local alpha/beta,
 //!                                      apply control-surface scaling and damage
-//!     2. zone_force_world            — rotate stability-frame forces to world,
+//!     2. zone_force_world            - rotate stability-frame forces to world,
 //!                                      compute pure aerodynamic torques
 //!   For each EngineZone child:
-//!     3. accumulate_engine_force     — add pre-computed thrust (from propulsion
+//!     3. accumulate_engine_force     - add pre-computed thrust (from propulsion
 //!                                      system) and its moment-arm torque
 //!   Once per aircraft:
-//!     4. induced_drag                — whole-aircraft CD_i = CL²/(π · e · AR)
-//!     5. damping_torque (LOD fallback) — only when `lod_damping` is `Some`;
+//!     4. induced_drag                - whole-aircraft CD_i = CL^2/(pi * e * AR)
+//!     5. damping_torque (LOD fallback) - only when lod_damping is Some;
 //!                                        skipped for full-fidelity zone layouts
 //! ```
 //!
@@ -26,7 +26,7 @@
 //!
 //! With per-zone local α/β (step 0), asymmetric stall, snap rolls, spins,
 //! adverse yaw, Dutch roll, and pitch-rate tail authority limits **emerge
-//! naturally** from zone geometry — no special-case logic needed.
+//! naturally** from zone geometry, no special-case logic needed.
 //!
 //! The two modes are **mutually exclusive**:
 //!
@@ -59,7 +59,7 @@ use crate::math::to_dvec3;
 /// its effective angle of attack and sideslip beyond the whole-aircraft values.
 /// Three additive correction layers are applied:
 ///
-/// **Layer 1 — Roll-rate Δα (asymmetric stall, snap rolls, spins)**
+/// **Layer 1. Roll-rate Δα (asymmetric stall, snap rolls, spins)**
 ///
 /// A zone at spanwise station `y` (metres, positive starboard) sees a
 /// body-Z velocity increment `Δw = p · y` from roll rate `p` (rad/s).
@@ -72,9 +72,9 @@ use crate::math::to_dvec3;
 ///
 /// At p = 1 rad/s, V = 50 m/s, y = +4.57 m (J3 Cub wing tip): Δα ≈ +5.2°.
 /// When the aircraft is near stall, the descending tip stalls while the rising
-/// tip keeps flying — producing uncommanded roll that can steepen into a spin.
+/// tip keeps flying, producing uncommanded roll that can steepen into a spin.
 ///
-/// **Layer 2 — Pitch-rate Δα (tail authority limits, CG sensitivity)**
+/// **Layer 2. Pitch-rate Δα (tail authority limits, CG sensitivity)**
 ///
 /// A zone at longitudinal station `x` (metres, positive forward from CG) sees
 /// a body-Z velocity increment from pitch rate `q` (rad/s):
@@ -90,7 +90,7 @@ use crate::math::to_dvec3;
 /// (q > 0), limiting tail authority at high pitch rates and reproducing the
 /// pitch-up departure tendency naturally.
 ///
-/// **Layer 3 — Yaw-rate Δβ (adverse yaw, Dutch roll)**
+/// **Layer 3. Yaw-rate Δβ (adverse yaw, Dutch roll)**
 ///
 /// A zone at spanwise station `y` sees a body-Y velocity increment from yaw
 /// rate `r` (rad/s):
@@ -116,7 +116,7 @@ use crate::math::to_dvec3;
 ///
 /// # Returns
 ///
-/// `(alpha_local, beta_local)` — both in radians.
+/// `(alpha_local, beta_local)`, both in radians.
 pub fn zone_local_angles(
     alpha: f64,
     beta: f64,
@@ -156,14 +156,14 @@ pub(crate) struct ZoneCoefficients {
 ///
 /// # How it works
 ///
-/// 1. **Table lookup** — CL, CD, CM, Croll, Cn are evaluated at `alpha_local`
+/// 1. **Table lookup**. CL, CD, CM, Croll, Cn are evaluated at `alpha_local`
 ///    (the per-zone effective angle of attack, already corrected for body rates
 ///    via [`zone_local_angles`]).  CY (side force) is evaluated at `beta_local`
 ///    (the per-zone effective sideslip).  Tables may be a constant (`Scalar`),
 ///    a 1-D function of the primary angle (`Table1D`), or a 2-D function of
 ///    (angle, Re) (`Table2D`).
 ///
-/// 2. **Control-surface scaling** — If the zone is tagged with a
+/// 2. **Control-surface scaling**. If the zone is tagged with a
 ///    [`ControlSurfaceRole`], its lift/side/moment coefficients are multiplied
 ///    by the corresponding pilot input ∈ [−1, 1].  The coefficients in the
 ///    table represent *full-deflection* authority; scaling by the input gives
@@ -175,7 +175,7 @@ pub(crate) struct ZoneCoefficients {
 ///    deflects the left aileron trailing-edge down (more lift) and the right
 ///    one trailing-edge up (less lift).
 ///
-/// 3. **Failure degradation** — All coefficients are multiplied by
+/// 3. **Failure degradation**. All coefficients are multiplied by
 ///    `remaining ∈ (0, 1]`.  A wing at 0.5 remaining produces half the lift.
 ///    Additionally, structural deformation adds parasitic drag that peaks at
 ///    intermediate failure:
@@ -218,7 +218,7 @@ pub(crate) fn evaluate_zone_coefficients(
         None => (1.0, 1.0),
     };
 
-    // Failure degradation: structural deformation drag grows as remaining → 0.
+    // Failure degradation: structural deformation drag grows as remaining toward 0.
     // Only computed when the zone has a damage-drag model (most zones don't).
     let extra_cd = zone
         .damage_drag_coeff
@@ -235,7 +235,7 @@ pub(crate) fn evaluate_zone_coefficients(
     }
 }
 
-// ── Step 2: Stability-frame forces → world ───────────────────────────────────
+// ── Step 2: Stability-frame forces to world ───────────────────────────────────
 
 /// World-space force and torque produced by a single zone.
 pub(crate) struct ZoneWorldForce {
@@ -245,7 +245,7 @@ pub(crate) struct ZoneWorldForce {
     ///
     /// This is the couple that exists independently of the zone's position
     /// (e.g. an airfoil's pitching moment about its own aerodynamic centre).
-    /// It is *not* the moment-arm torque — that is computed separately by the
+    /// It is *not* the moment-arm torque, that is computed separately by the
     /// caller using `(zone_position − CG) × force`.
     pub torque: DVec3,
 }
@@ -268,8 +268,8 @@ pub(crate) struct ZoneWorldForce {
 /// ```
 ///
 /// The force is then rotated to body frame and then to world.
-/// **Undo the angle-of-attack rotation (stability → body), then apply the
-/// aircraft's orientation quaternion (body → world):**
+/// **Undo the angle-of-attack rotation (stability to body), then apply the
+/// aircraft's orientation quaternion (body to world):**
 ///
 /// ```text
 /// F_body  = R_y(−α) · F_stability      (stab_to_body rotation)
@@ -279,7 +279,7 @@ pub(crate) struct ZoneWorldForce {
 /// # Pure aerodynamic torques
 ///
 /// Each zone also produces moment coefficients (CM, Croll, Cn) that represent
-/// pure couples — torques that exist even if the zone were at the CG.  These
+/// pure couples, torques that exist even if the zone were at the CG.  These
 /// are expressed directly in body frame (not stability frame).
 /// **Pure torque = moment coefficient × dynamic pressure × wing area × reference
 /// length. Roll and yaw use wingspan (lateral reference); pitch uses chord
@@ -351,7 +351,7 @@ fn accumulate_engine_force(
 ///
 /// This is an **LOD fallback** for aircraft with too few zones to produce
 /// realistic physical damping from geometry alone.  At full fidelity, call
-/// [`zone_local_angles`] per zone instead — the differential forces from wing
+/// [`zone_local_angles`] per zone instead, the differential forces from wing
 /// and tail zones naturally oppose body rates without any explicit derivatives.
 ///
 /// # When to use
@@ -368,7 +368,7 @@ fn accumulate_engine_force(
 /// - **Roll damping (Cl_p):** When the aircraft rolls right (p > 0), the
 ///   descending right wing sees increased angle of attack, producing more lift,
 ///   while the rising left wing sees less.  The differential lift opposes the
-///   roll — a restoring moment proportional to roll rate.
+///   roll, a restoring moment proportional to roll rate.
 ///
 /// - **Pitch damping (Cm_q):** When the aircraft pitches nose-up (q > 0), the
 ///   horizontal tail moves downward, increasing its angle of attack and
@@ -382,7 +382,7 @@ fn accumulate_engine_force(
 ///
 /// **Damping moment = damping derivative × normalised angular rate × dynamic
 /// pressure × wing area × reference length. The normalised rate (rate × length
-/// ÷ 2 × airspeed) is dimensionless — it compares rotational tip speed to
+/// ÷ 2 × airspeed) is dimensionless, it compares rotational tip speed to
 /// forward speed. All derivatives are negative (oppose motion). See:
 /// aerodynamic damping derivatives, roll damping Clp, pitch damping Cmq.**
 ///
@@ -434,13 +434,13 @@ pub fn damping_torque(
 /// - Roll/pitch/yaw damping emerges from differential zone forces.
 /// - Step 5 is skipped.
 ///
-/// **LOD mode** (`lod_damping = Some(…)`):
+/// **LOD mode** (`lod_damping = Some(...)`):
 /// - Step 0 is skipped; all zones evaluate at the global α/β.
 /// - Step 5 applies explicit `Cl_p`/`Cm_q`/`Cn_r` derivatives as the sole
 ///   source of damping.
 ///
 /// Steps common to both modes:
-/// 1. [`evaluate_zone_coefficients`] → [`zone_force_world`] per zone.
+/// 1. [`evaluate_zone_coefficients`] then [`zone_force_world`] per zone.
 /// 2. Moment-arm torques `(r_zone − r_CG) × F` accumulated.
 /// 3. Pre-computed engine thrust via [`accumulate_engine_force`].
 /// 4. Whole-aircraft induced drag CD_i = CL²/(π · e · AR).
@@ -492,7 +492,7 @@ pub fn compute_aero_forces(
         let c = geo.chord_m;
 
         let body_to_world = DQuat::from_array(rot.0.to_array().map(|x| x as f64));
-        // Global stab_to_body (at whole-aircraft α) — used for induced drag and LOD mode.
+        // Global stab_to_body (at whole-aircraft α), used for induced drag and LOD mode.
         let stab_to_body_global = DQuat::from_rotation_y(-alpha);
         let com_world: Vec3 = pos.0 + rot.0 * com.0;
         // CG in world space as DVec3, used to measure zone moment arms.
@@ -516,7 +516,7 @@ pub fn compute_aero_forces(
                     continue;
                 }
 
-                // Step 0: per-zone local α/β — skipped in LOD mode.
+                // Step 0: per-zone local α/β, skipped in LOD mode.
                 // In full-fidelity mode, measure the zone's body-frame position
                 // relative to the CG and apply roll/pitch/yaw-rate corrections.
                 let (alpha_local, beta_local, stab_to_body_local) = if use_lod {
@@ -547,7 +547,7 @@ pub fn compute_aero_forces(
                     zone_force_world(&coeffs, qbar, s, b, c, stab_to_body_local, body_to_world);
 
                 if !wf.force.is_finite() || !wf.torque.is_finite() {
-                    warn_once!("Non-finite aero force/torque on zone — zeroed");
+                    warn_once!("Non-finite aero force/torque on zone: zeroed");
                     continue;
                 }
 
@@ -575,7 +575,7 @@ pub fn compute_aero_forces(
             }
         }
 
-        // Step 4: induced drag — CD_i = CL² / (π · e · AR).
+        // Step 4: induced drag. CD_i = CL² / (π · e · AR).
         //
         // Only applied when the `InducedDrag` component is present.
         // Absent for gliders (CD already in polar), missiles, or aircraft
@@ -589,7 +589,7 @@ pub fn compute_aero_forces(
             cf.0 += drag_world.as_vec3();
         }
 
-        // Step 5: global damping torque — LOD mode only.
+        // Step 5: global damping torque. LOD mode only.
         // Mutually exclusive with per-zone local angles (step 0): when the
         // `LodDamping` component is present, zones evaluated at global α/β
         // produce no emergent damping, so the derivatives here are the sole source.
@@ -732,7 +732,7 @@ mod tests {
             cn: 0.0,
         };
         // At α=0 and level flight: stab_to_body is identity, body_to_world
-        // rotates body-Z(down) to world-−Y(down), so lift (−Z_s) → world +Y.
+        // rotates body-Z(down) to world-−Y(down), so lift (−Z_s) to world +Y.
         let stab_to_body = DQuat::IDENTITY;
         let body_to_world = DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2);
 
@@ -855,7 +855,7 @@ mod tests {
             wing_area_m2: 16.0,
         };
         let damp = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
-        // p > 0 and cl_p < 0 → roll damping moment should be negative (opposes roll).
+        // p > 0 and cl_p < 0: roll damping moment should be negative (opposes roll).
         assert!(
             damp.x < 0.0,
             "roll damping should oppose positive p, got {}",
@@ -900,10 +900,10 @@ mod tests {
 
     // ── zone_local_angles ────────────────────────────────────────────────
 
-    /// Layer 1: positive roll rate + positive spanwise station → increased local α.
+    /// Layer 1: positive roll rate + positive spanwise station, producing increased local α.
     #[test]
     fn roll_rate_increases_alpha_at_positive_y() {
-        // p = 1 rad/s, y = 4 m (starboard tip), V = 50 m/s → Δα = +0.08 rad
+        // p = 1 rad/s, y = 4 m (starboard tip), V = 50 m/s: Δα = +0.08 rad
         let (alpha_l, beta_l) = zone_local_angles(0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 4.0, 50.0);
         let expected = 0.1 + 4.0 / 50.0;
         assert!(
@@ -927,11 +927,11 @@ mod tests {
         );
     }
 
-    /// Layer 2: positive pitch rate + negative longitudinal station (tail) → decreased α.
+    /// Layer 2: positive pitch rate + negative longitudinal station (tail), producing decreased α.
     /// This reproduces tail authority limits: pulling hard reduces tail restoring moment.
     #[test]
     fn pitch_rate_decreases_alpha_at_tail() {
-        // q = 1 rad/s, x = -4 m (aft of CG), V = 50 m/s → Δα = -0.08 rad
+        // q = 1 rad/s, x = -4 m (aft of CG), V = 50 m/s: Δα = -0.08 rad
         let (alpha_l, _) = zone_local_angles(0.1, 0.0, 0.0, 1.0, 0.0, -4.0, 0.0, 50.0);
         let expected = 0.1 - 4.0 / 50.0;
         assert!(
@@ -940,7 +940,7 @@ mod tests {
         );
     }
 
-    /// Layer 2: positive pitch rate + positive longitudinal station (nose) → increased α.
+    /// Layer 2: positive pitch rate + positive longitudinal station (nose), producing increased α.
     #[test]
     fn pitch_rate_increases_alpha_at_nose() {
         let (alpha_l, _) = zone_local_angles(0.1, 0.0, 0.0, 1.0, 0.0, 4.0, 0.0, 50.0);
@@ -954,7 +954,7 @@ mod tests {
     /// Layer 3: yaw rate shifts sideslip proportional to spanwise station.
     #[test]
     fn yaw_rate_shifts_beta_at_spanwise_station() {
-        // r = 1 rad/s, y = 3 m, V = 50 m/s → Δβ = +0.06 rad
+        // r = 1 rad/s, y = 3 m, V = 50 m/s: Δβ = +0.06 rad
         let (alpha_l, beta_l) = zone_local_angles(0.0, 0.05, 0.0, 0.0, 1.0, 0.0, 3.0, 50.0);
         let expected_beta = 0.05 + 3.0 / 50.0;
         assert!(
@@ -967,7 +967,7 @@ mod tests {
         );
     }
 
-    /// Zero body rates → local angles equal global angles.
+    /// Zero body rates: local angles equal global angles.
     #[test]
     fn zero_rates_leave_angles_unchanged() {
         let (a, b) = zone_local_angles(0.2, 0.1, 0.0, 0.0, 0.0, -2.0, 3.0, 30.0);
@@ -1000,7 +1000,7 @@ mod tests {
             ..Default::default()
         };
         let ctrl = neutral_controls();
-        let alpha = 0.1_f64; // 5.7° — well below stall
+        let alpha = 0.1_f64; // 5.7°: well below stall
         let v = 50.0_f64;
         let p = 1.0_f64; // positive roll rate (right wing down)
         let re = 1e6;
@@ -1080,7 +1080,7 @@ mod tests {
         accumulate_engine_force(&zf, com, &mut total_force, &mut total_torque);
 
         // moment arm = (0,2,0) × (500,0,0) = (0·0 − 0·0, 0·500 − 2·0, 2·0 − 0·500)
-        //            = (0, 0, -1000)  → yaw left (nose-left) torque about world -Z
+        //            = (0, 0, -1000): yaw left (nose-left) torque about world -Z
         assert!(
             (total_torque.z - (-1000.0)).abs() < 1e-4,
             "starboard engine should produce nose-left yaw torque, got z={}",
@@ -1100,14 +1100,14 @@ mod tests {
         let mut total_torque = Vec3::new(0.0, 50.0, 0.0);
         accumulate_engine_force(&zf, Vec3::ZERO, &mut total_force, &mut total_torque);
 
-        // Totals must be unchanged — zero force is the short-circuit path.
+        // Totals must be unchanged, zero force is the short-circuit path.
         assert!((total_force - Vec3::new(100.0, 0.0, 0.0)).length() < 1e-5);
         assert!((total_torque - Vec3::new(0.0, 50.0, 0.0)).length() < 1e-5);
     }
 
     // ── evaluate_zone_coefficients: missing coverage ─────────────────────
 
-    /// Rudder scales CY (side force), not CL — the unique control axis test.
+    /// Rudder scales CY (side force), not CL, the unique control axis test.
     #[test]
     fn rudder_scales_side_force() {
         let mut zone = AeroZone {
@@ -1129,8 +1129,8 @@ mod tests {
         let c_half = evaluate_zone_coefficients(&zone, &ctrl_half, 0.0, 0.0, 1e6, 1000.0, 1.0);
 
         // CY should be scaled by rudder input.
-        assert!((c_full.cy - 1.0).abs() < 1e-12, "full rudder → CY=1");
-        assert!((c_half.cy - 0.5).abs() < 1e-12, "half rudder → CY=0.5");
+        assert!((c_full.cy - 1.0).abs() < 1e-12, "full rudder -> CY=1");
+        assert!((c_half.cy - 0.5).abs() < 1e-12, "half rudder -> CY=0.5");
         // CL must be unaffected by rudder.
         assert_eq!(c_full.cl, 0.0, "rudder must not affect CL");
     }
@@ -1183,7 +1183,7 @@ mod tests {
         };
         let damp = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
 
-        // All three rates positive, all derivatives negative → all moments negative.
+        // All three rates positive, all derivatives negative, so all moments negative.
         assert!(
             damp.x < 0.0,
             "roll damping should oppose positive p, got x={}",
@@ -1210,7 +1210,7 @@ mod tests {
         );
     }
 
-    /// Damping torque with non-identity rotation — moment direction rotates with aircraft.
+    /// Damping torque with non-identity rotation, moment direction rotates with aircraft.
     #[test]
     fn damping_torque_rotates_with_body() {
         let flight = FlightState {
@@ -1271,7 +1271,7 @@ mod tests {
 
     #[test]
     fn absent_secondary_fields_produce_no_moment() {
-        // Default AeroZone has cy/cm/croll/cn = Absent — all produce zero silently.
+        // Default AeroZone has cy/cm/croll/cn = Absent, all produce zero silently.
         let zone = AeroZone {
             cl: AeroCoeff::Scalar(1.0),
             cd: AeroCoeff::Scalar(0.1),
@@ -1279,9 +1279,9 @@ mod tests {
         };
         let ctrl = neutral_controls();
         let coeffs = evaluate_zone_coefficients(&zone, &ctrl, 0.2, 0.0, 1e6, 1000.0, 1.0);
-        assert_eq!(coeffs.cy, 0.0, "Absent cy → 0");
-        assert_eq!(coeffs.cm, 0.0, "Absent cm → 0");
-        assert_eq!(coeffs.croll, 0.0, "Absent croll → 0");
-        assert_eq!(coeffs.cn, 0.0, "Absent cn → 0");
+        assert_eq!(coeffs.cy, 0.0, "Absent cy -> 0");
+        assert_eq!(coeffs.cm, 0.0, "Absent cm -> 0");
+        assert_eq!(coeffs.croll, 0.0, "Absent croll -> 0");
+        assert_eq!(coeffs.cn, 0.0, "Absent cn -> 0");
     }
 }

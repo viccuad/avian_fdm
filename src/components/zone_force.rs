@@ -1,4 +1,4 @@
-//! [`ZoneForce`] — per-zone force and torque output written by the FDM
+//! [`ZoneForce`], per-zone force and torque output written by the FDM
 //! `compute_aero_forces` system (and `compute_engine_zone_forces` for thrust).
 //! Also read by the debug visualisation for per-zone force arrows.
 
@@ -17,9 +17,9 @@ use bevy::prelude::*;
 #[derive(Component, Reflect, Default, Clone, Copy, Debug)]
 #[reflect(Component)]
 pub struct ZoneForce {
-    /// World-space force contribution (N) — from CL, CD, CY coefficients.
+    /// World-space force contribution (N), from CL, CD, CY coefficients.
     pub force: Vec3,
-    /// World-space pure aerodynamic torque (N·m) — from CM, Croll, Cn
+    /// World-space pure aerodynamic torque (N·m), from CM, Croll, Cn
     /// coefficients. This is a couple (moment without net force), distinct
     /// from the moment-arm torque computed as (zone_pos − CG) × force.
     pub torque: Vec3,

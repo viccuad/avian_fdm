@@ -9,12 +9,12 @@
 //! Dynamic pressure q̄ = ½ρV² scales every aerodynamic force and moment.
 //! A 20% reduction in density (roughly 2 500 m altitude) means 20% less lift
 //! and drag at the same airspeed. Reynolds number Re = ρVc̄/μ controls which
-//! part of the CL/CD table is used — at low Re the boundary layer behaves very
+//! part of the CL/CD table is used, at low Re the boundary layer behaves very
 //! differently (sharper stall, higher CD₀).
 //!
 //! ## ISA derivation summary (ICAO Doc 7488)
 //!
-//! **Troposphere (h ≤ 11 000 m)** — temperature drops linearly with altitude
+//! **Troposphere (h ≤ 11 000 m)**, temperature drops linearly with altitude
 //! (lapse rate 6.5 K/km); pressure follows a power law from that lapse rate;
 //! density is derived from the ideal gas law (pressure ÷ gas constant ÷ temperature):
 //! ```text
@@ -23,7 +23,7 @@
 //! ρ = p/(R·T)
 //! ```
 //!
-//! **Stratosphere (11 000 m < h ≤ 20 000 m)** — temperature is constant
+//! **Stratosphere (11 000 m < h ≤ 20 000 m)**, temperature is constant
 //! (isothermal layer at −56.5 °C); pressure decays exponentially with altitude
 //! (barometric formula); density again from the ideal gas law:
 //! ```text
@@ -34,7 +34,7 @@
 //!
 //! ## Sutherland's law (dynamic viscosity)
 //!
-//! Gas viscosity *increases* with temperature (unlike liquids — gas molecules
+//! Gas viscosity *increases* with temperature (unlike liquids, gas molecules
 //! collide more at higher T, transferring more momentum across flow layers).
 //! **Dynamic viscosity = reference viscosity × (T/273)^(3/2) corrected by
 //! Sutherland's constant (110.4 K) for real-gas behaviour. See:
@@ -163,7 +163,7 @@ pub fn update_flight_state(
     for (transform, lin_vel, ang_vel, atm, geom, mut fs) in &mut query {
         let altitude_m = transform.translation().y as f64;
 
-        // Body angular rates — rotate world AngularVelocity to body frame.
+        // Body angular rates, rotate world AngularVelocity to body frame.
         let q = DQuat::from_array(transform.rotation().to_array().map(|x| x as f64));
         let av_world = to_dvec3(ang_vel.0);
         let omega_body = q.inverse() * av_world;

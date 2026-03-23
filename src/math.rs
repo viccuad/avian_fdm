@@ -1,7 +1,7 @@
 //! Shared math utilities: body-frame ↔ world-frame rotations, and other
 //! helpers used across subsystems.
 //!
-//! All functions operate in `f64` (`DVec3`, `DQuat`). The `f64 → f32`
+//! All functions operate in `f64` (`DVec3`, `DQuat`). The `f64`-to-`f32`
 //! conversion to Avian components is performed in [`crate::systems`].
 
 use bevy::math::{DQuat, DVec3};
@@ -47,8 +47,8 @@ mod tests {
         (a - b).length() < EPS
     }
 
-    /// `body_to_world` with identity rotation is a no-op — it does not apply
-    /// any implicit basis change. The "body X → world −Z at identity rotation"
+    /// `body_to_world` with identity rotation is a no-op, it does not apply
+    /// any implicit basis change. The "body X to world −Z at identity rotation"
     /// convention is enforced by *how the aircraft mesh is authored* (facing
     /// world −Z), not by this function. This test confirms the function is
     /// a pure quaternion rotation with no hidden transform.

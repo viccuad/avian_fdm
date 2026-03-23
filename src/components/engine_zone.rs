@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// [`avian3d::prelude::ColliderDensity`].
 ///
 /// Thrust is applied via `apply_force_at_point` at the engine's world
-/// position — Avian computes the torque contribution automatically.
+/// position. Avian computes the torque contribution automatically.
 ///
 /// Failure state is read from [`super::Failure`] if present on the same entity.
 /// When absent the engine is treated as fully intact.
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 pub struct EngineZone {
     /// Sea-level static maximum thrust (N).
     pub max_thrust_n: f64,
-    /// Throttle → thrust-fraction lookup. Each entry is `[throttle, fraction]`.
+    /// Throttle-to-thrust-fraction lookup table. Each entry is `[throttle, fraction]`.
     /// `throttle` ∈ [0, 1]. Must be strictly increasing in throttle.
     pub throttle_curve: Vec<[f64; 2]>,
     /// Propeller diameter (m). Used to compute induced velocity:
@@ -56,7 +56,7 @@ impl Default for EngineZone {
     }
 }
 
-/// Propwash state — propeller-induced velocity over the wing root.
+/// Propwash state, propeller-induced velocity over the wing root.
 ///
 /// Written each frame by `compute_propulsion`. Read by `compute_aerodynamics`
 /// to apply a propwash lift increment on nearby `AeroZone` children.

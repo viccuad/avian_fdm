@@ -10,7 +10,7 @@ use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 /// sparse to produce realistic physical damping from geometry alone (e.g. a
 /// single-zone missile body, or a low-fidelity AI aircraft).
 ///
-/// **Mutually exclusive with per-zone local α/β** — when this component is
+/// **Mutually exclusive with per-zone local α/β**, when this component is
 /// present, [`compute_aero_forces`](crate::aerodynamics::compute_aero_forces)
 /// evaluates all zones at the global α/β (no rate corrections) and uses these
 /// derivatives as the sole source of angular damping.  When absent, per-zone
@@ -20,7 +20,7 @@ use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 ///
 /// **Damping moment = damping derivative × normalised angular rate × dynamic
 /// pressure × wing area × reference length. The normalised rate (e.g. roll rate
-/// × wingspan ÷ 2 × airspeed) is dimensionless — it compares rotational tip
+/// × wingspan ÷ 2 × airspeed) is dimensionless, it compares rotational tip
 /// speed to forward speed. Negative derivatives mean damping opposes motion.**
 ///
 /// ```text
@@ -58,11 +58,11 @@ pub struct LodDamping {
 /// ```
 ///
 /// **Omit this component** for:
-/// - **Gliders** — induced drag is typically already embedded in the wing zone
+/// - **Gliders**, induced drag is typically already embedded in the wing zone
 ///   CD tables from measured polar data.
-/// - **Missiles and projectiles** — no significant spanwise lift distribution;
+/// - **Missiles and projectiles**, no significant spanwise lift distribution;
 ///   the bluff-body drag dominates.
-/// - **Aircraft whose zone CD tables already include induced drag** — adding
+/// - **Aircraft whose zone CD tables already include induced drag**, adding
 ///   this component would double-count.
 ///
 /// **Include this component** for:
@@ -91,9 +91,9 @@ pub struct InducedDrag {
 ///
 /// Lives on the **aircraft root entity** as part of [`AircraftCoreBundle`].
 ///
-/// Optional components — add separately to the root entity as needed:
-/// - [`LodDamping`] — explicit damping derivatives for sparse-zone LOD aircraft.
-/// - [`InducedDrag`] — lift-induced drag for conventional lifting aircraft.
+/// Optional components, add separately to the root entity as needed:
+/// - [`LodDamping`], explicit damping derivatives for sparse-zone LOD aircraft.
+/// - [`InducedDrag`], lift-induced drag for conventional lifting aircraft.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct AircraftGeometry {
@@ -116,9 +116,9 @@ pub struct AircraftGeometry {
 ///
 /// # Optional components (add to the same entity after spawning)
 ///
-/// - [`InducedDrag`] — add for conventional lifting aircraft (most fixed-wing).
+/// - [`InducedDrag`], add for conventional lifting aircraft (most fixed-wing).
 ///   Omit for gliders with polar-based CDs, missiles, or LOD AI.
-/// - [`LodDamping`] — add only for sparse-zone aircraft where zone geometry
+/// - [`LodDamping`], add only for sparse-zone aircraft where zone geometry
 ///   cannot produce realistic roll/pitch/yaw damping.
 ///
 /// # Example
@@ -135,7 +135,7 @@ pub struct AircraftGeometry {
 pub struct AircraftCoreBundle {
     /// Wing/tail geometry constants.
     pub geometry: AircraftGeometry,
-    /// Control surface inputs — write each frame from your input system.
+    /// Control surface inputs, write each frame from your input system.
     pub controls: crate::components::ControlInputs,
     /// Derived flight-state quantities (written by the library).
     pub flight_state: crate::components::FlightState,

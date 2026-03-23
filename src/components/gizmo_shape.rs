@@ -1,9 +1,9 @@
-//! [`GizmoShape`] — optional visual override for debug wireframe drawing.
+//! [`GizmoShape`], optional visual override for debug wireframe drawing.
 //!
 //! ## Hybrid visualisation approach
 //!
 //! Most zones are drawn directly from their [`avian3d::prelude::Collider`]
-//! shape — no `GizmoShape` needed. This ensures the debug wireframe always
+//! shape, no `GizmoShape` needed. This ensures the debug wireframe always
 //! matches what the physics engine sees.
 //!
 //! Attach `GizmoShape` **only** when the collider shape doesn't represent the
@@ -17,13 +17,13 @@
 //! | Round instead of box  | Wheel             | `Sphere`           |
 //!
 //! Aerodynamic surfaces (wings, h-stab, ailerons, elevator) use thin colliders
-//! (≈ 2 cm) whose cuboid outline naturally looks like a flat panel — they need
+//! (≈ 2 cm) whose cuboid outline naturally looks like a flat panel, they need
 //! no `GizmoShape` at all.
 //!
 //! ## Contour detail
 //!
 //! [`GizmoContours`] adds arbitrary linestrips to a zone for visual detail
-//! beyond what the collider shape shows — curved fuselage profiles, airfoil
+//! beyond what the collider shape shows, curved fuselage profiles, airfoil
 //! cross-sections, rounded wingtips. These are purely decorative but are
 //! zone-aware: they inherit damage colouring and disappear when the zone is
 //! destroyed.
@@ -37,7 +37,7 @@ fn default_cylinder_axis() -> Vec3 {
 
 /// Describes how a zone entity should be drawn in the gizmo debug view.
 ///
-/// This is purely visual — it has no effect on physics or aerodynamics.
+/// This is purely visual, it has no effect on physics or aerodynamics.
 /// Multiple shapes can approximate curved surfaces (fuselage cross-sections,
 /// rounded wingtips) that the physics collider doesn't need to model.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
@@ -96,7 +96,7 @@ pub enum GizmoShape {
 /// cross-section rings, airfoil sections, or any detail that the collider
 /// shape doesn't capture.
 ///
-/// Contours inherit the zone's damage colour — they fade toward red as
+/// Contours inherit the zone's damage colour, they fade toward red as
 /// health decreases and vanish when the zone is destroyed.
 ///
 /// # Example

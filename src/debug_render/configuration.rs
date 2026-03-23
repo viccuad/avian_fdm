@@ -42,7 +42,7 @@ pub struct FdmGizmos {
     pub roll_moment_color: Option<Color>,
     /// Color for yawing-moment arcs. `None` = disabled.
     pub yaw_moment_color: Option<Color>,
-    /// Color for zone collider wireframes, tinted green→red by [`Failure::remaining`].
+    /// Color for zone collider wireframes, tinted green to red by [`Failure::remaining`].
     /// `None` = disabled.
     ///
     /// [`Failure::remaining`]: crate::components::Failure

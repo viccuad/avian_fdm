@@ -99,7 +99,7 @@ pub(super) fn debug_render_moments(
 
 // ── Zone health wireframes ────────────────────────────────────────────────────
 
-/// Draw zone collider wireframes, tinted green→red by Failure::remaining.
+/// Draw zone collider wireframes, tinted green to red by Failure::remaining.
 pub(super) fn debug_render_zones(
     mut _gizmos: Gizmos<FdmGizmos>,
     _store: Res<GizmoConfigStore>,

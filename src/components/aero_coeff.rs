@@ -1,4 +1,4 @@
-//! [`AeroCoeff`] — aerodynamic coefficient storage and lookup.
+//! [`AeroCoeff`], aerodynamic coefficient storage and lookup.
 //!
 //! An aerodynamic coefficient (e.g. CL, CD) can be a constant, a 1-D table
 //! over angle of attack, or a 2-D table over angle of attack × Reynolds
@@ -31,27 +31,27 @@
 //! and serialises efficiently.
 //!
 //! A `Vec<Vec<f64>>` (jagged array) would require one allocation per row
-//! and has poor cache behaviour — it is intentionally avoided.
+//! and has poor cache behaviour, it is intentionally avoided.
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// An aerodynamic coefficient value: constant, 1-D table, or 2-D table.
 ///
-/// Used for CL, CD, CY, CM, Cl, Cn — any dimensionless coefficient that
+/// Used for CL, CD, CY, CM, Cl, Cn, any dimensionless coefficient that
 /// may depend on angle of attack and/or Reynolds number.
 ///
 /// Call [`AeroCoeff::evaluate`] each frame to obtain a `f64` value at the
 /// current flight conditions.
 ///
-/// ## Completeness system — `Absent`, `Placeholder`, and data variants
+/// ## Completeness system, `Absent`, `Placeholder`, and data variants
 ///
 /// Every coefficient field in [`crate::components::AeroZone`] is an `AeroCoeff`.
 /// Three variants carry distinct meaning for unmodelled coefficients:
 ///
 /// | Variant | Meaning | Runtime |
 /// |---|---|---|
-/// | `Absent` (default for secondary fields) | Not applicable by design — symmetric section, no CY, etc. | Silent 0.0 |
+/// | `Absent` (default for secondary fields) | Not applicable by design, symmetric section, no CY, etc. | Silent 0.0 |
 /// | `Placeholder` (default for primary fields) | Should exist but not yet modelled | `warn_once!` + 0.0 |
 /// | `Scalar(0.0)` with [`crate::sourced!`] | Intentional explicit zero | Silent 0.0 |
 /// | `Table1D` / `Table2D` | Fully modelled | Interpolated value |
@@ -61,7 +61,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Reflect, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[reflect(Serialize, Deserialize)]
 pub enum AeroCoeff {
-    /// Absent by design — this coefficient does not apply to this zone.
+    /// Absent by design. This coefficient does not apply to this zone.
     ///
     /// Evaluates to `0.0` silently (no warning). Use for secondary
     /// coefficients that structurally don't exist on a given zone:
@@ -162,7 +162,7 @@ impl AeroCoeff {
             AeroCoeff::Absent => 0.0,
             AeroCoeff::Placeholder => {
                 warn_once!(
-                    "AeroCoeff::Placeholder evaluated — this coefficient has no data yet. \
+                    "AeroCoeff::Placeholder evaluated: this coefficient has no data yet. \
                      Replace with Scalar, Table1D, or Table2D."
                 );
                 0.0
@@ -208,7 +208,7 @@ fn clamp_with_warn(v: f64, lo: f64, hi: f64, label: &'static str) -> f64 {
 /// Linear interpolation in a 1-D table. `x` must be within `[bp[0], bp[last]]`.
 pub(crate) fn lerp_1d(x: f64, bp: &[f64], vals: &[f64]) -> f64 {
     debug_assert_eq!(bp.len(), vals.len());
-    // Degenerate: single-point table — no interval to interpolate.
+    // Degenerate: single-point table, no interval to interpolate.
     if bp.len() == 1 {
         return vals[0];
     }
@@ -230,7 +230,7 @@ fn bilerp(angle_rad: f64, re: f64, rows: &[f64], cols: &[f64], data: &[f64]) -> 
     let ci = cols.partition_point(|&c| c <= re).saturating_sub(1)
                  .min(cols.len().saturating_sub(2));
 
-    // If only one row or one column, the "next" index is the same — t = 0.
+    // If only one row or one column, the "next" index is the same, t = 0.
     let ri1 = (ri + 1).min(rows.len() - 1);
     let ci1 = (ci + 1).min(cols.len() - 1);
 
@@ -282,7 +282,7 @@ mod tests {
             breakpoints: vec![0.1, 0.2],
             values: vec![10.0, 20.0],
         };
-        // Below minimum → clamped to first value
+        // Below minimum: clamped to first value
         assert!((c.evaluate(-1.0, 0.0) - 10.0).abs() < 1e-12);
     }
 
@@ -292,7 +292,7 @@ mod tests {
             breakpoints: vec![0.1, 0.2],
             values: vec![10.0, 20.0],
         };
-        // Above maximum → clamped to last value
+        // Above maximum: clamped to last value
         assert!((c.evaluate(99.0, 0.0) - 20.0).abs() < 1e-12);
     }
 
@@ -339,9 +339,9 @@ mod tests {
             cols: vec![0.0, 1.0],
             data: vec![1.0, 2.0, 3.0, 4.0],
         };
-        // Out of range on both axes → no panic, returns corner value
+        // Out of range on both axes: no panic, returns corner value
         let v = c.evaluate(-99.0, 99.0);
-        assert!((v - 2.0).abs() < 1e-12); // clamped to alpha=0.0, re=1.0 → 2.0
+        assert!((v - 2.0).abs() < 1e-12); // clamped to alpha=0.0, re=1.0, returns 2.0
     }
 
     #[test]
@@ -374,7 +374,7 @@ mod tests {
         assert!((c.evaluate(99.0, 0.0) - 7.5).abs() < 1e-12, "clamped above");
     }
 
-    /// Table2D with a single Re column — bilerp must handle the degenerate
+    /// Table2D with a single Re column, bilerp must handle the degenerate
     /// `cols[ci1] == cols[ci]` case without dividing by zero.
     #[test]
     fn table2d_single_re_column_no_panic() {

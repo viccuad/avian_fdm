@@ -2,7 +2,7 @@
 //!
 //! # Overview
 //!
-//! Gagg–Ferrar altitude correction — **thrust = max thrust × health fraction ×
+//! Gagg–Ferrar altitude correction, **thrust = max thrust × health fraction ×
 //! throttle position × air density ratio raised to the 0.7 power. The 0.7
 //! exponent is empirical for naturally-aspirated piston engines: thrust falls
 //! with altitude as air thins. See: Gagg-Ferrar piston engine model.**
@@ -11,7 +11,7 @@
 //! T = T_max · remaining · throttle_fraction · (ρ / ρ₀)^0.7
 //! ```
 //!
-//! Propeller induced velocity via **actuator disk theory** — **induced airspeed
+//! Propeller induced velocity via **actuator disk theory**, **induced airspeed
 //! behind the propeller = square root of (thrust ÷ (2 × air density × disk area)).
 //! Disk area = π × propeller radius². See: actuator disk theory,
 //! momentum theory propeller.**
@@ -66,7 +66,7 @@ pub fn compute_engine_zone_forces(
         let Ok((ctrl, atmos, flight, root_gt)) =
             root_query.get_mut(col_of.body) else { continue };
 
-        // 1. Throttle → thrust fraction.
+        // 1. Throttle to thrust fraction.
         let throttle = ctrl.throttle.clamp(0.0, 1.0);
         let thrust_fraction = interp_curve(&engine.throttle_curve, throttle);
 
@@ -97,12 +97,12 @@ pub fn compute_engine_zone_forces(
         propwash.induced_velocity_ms = v_ind;
         propwash.direction_body = engine.thrust_axis_body.normalize_or_zero();
 
-        // 4. Rotate thrust axis body → world and write ZoneForce.
+        // 4. Rotate thrust axis body to world and write ZoneForce.
         let q = DQuat::from_array(root_gt.rotation().to_array().map(|x| x as f64));
         let thrust_world = q * (engine.thrust_axis_body.normalize_or_zero() * thrust_n);
 
         if !thrust_world.is_finite() {
-            warn_once!("Non-finite thrust force — zeroed");
+            warn_once!("Non-finite thrust force, zeroed");
             continue;
         }
 
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn interp_curve_three_breakpoints() {
-        // Idle→mid: 0.0→0.5 maps to 0.0→0.6; mid→full: 0.5→1.0 maps to 0.6→1.0
+        // Idle to mid: 0.0 to 0.5 maps to 0.0 to 0.6; mid to full: 0.5 to 1.0 maps to 0.6 to 1.0
         let curve = vec![[0.0, 0.0], [0.5, 0.6], [1.0, 1.0]];
         assert!((interp_curve(&curve, 0.0)  - 0.0).abs() < 1e-12, "lower clamp");
         assert!((interp_curve(&curve, 0.25) - 0.3).abs() < 1e-12, "lower segment mid");
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn interp_curve_clamps_outside_range() {
         let curve = vec![[0.2, 0.1], [0.8, 0.9]];
-        assert!((interp_curve(&curve, 0.0) - 0.1).abs() < 1e-12, "below range → first value");
-        assert!((interp_curve(&curve, 1.0) - 0.9).abs() < 1e-12, "above range → last value");
+        assert!((interp_curve(&curve, 0.0) - 0.1).abs() < 1e-12, "below range clamps to first value");
+        assert!((interp_curve(&curve, 1.0) - 0.9).abs() < 1e-12, "above range clamps to last value");
     }
 }

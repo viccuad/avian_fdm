@@ -1,4 +1,4 @@
-//! [`Failure`] component — fraction of a zone's capability that remains after damage.
+//! [`Failure`] component, fraction of a zone's capability that remains after damage.
 //! Written by the game's hit/damage system; read by domain systems independently.
 
 use bevy::prelude::*;
@@ -10,22 +10,22 @@ use serde::{Deserialize, Serialize};
 /// projectile / collision damage handler) and read independently by multiple
 /// domain systems:
 ///
-/// - `compute_aerodynamics` — scales coefficients and adds structural drag.
-/// - `compute_propulsion` — scales engine thrust.
-/// - `DetachPlugin` (optional) — detaches the entity from the Bevy hierarchy
+/// - `compute_aerodynamics`, scales coefficients and adds structural drag.
+/// - `compute_propulsion`, scales engine thrust.
+/// - `DetachPlugin` (optional), detaches the entity from the Bevy hierarchy
 ///   when `remaining` reaches `0.0`.
 ///
 /// The name `Failure` describes the *state* of the zone, not the *cause*.
-/// Future typed failure modes (`SurfaceBuckle`, `CylinderLoss`, …) will sit
+/// Future typed failure modes (`SurfaceBuckle`, `CylinderLoss`, ...) will sit
 /// alongside this component; a resolver system will combine them into domain
 /// state structs. For now this scalar covers the common case.
 ///
 /// # Semantics
-/// - `1.0` — fully intact; no performance loss.
-/// - `0.0` — completely failed / detached from the airframe.
+/// - `1.0`, fully intact; no performance loss.
+/// - `0.0`, completely failed / detached from the airframe.
 ///   Domain systems must treat `0.0` as **absent**: zero aerodynamic
-///   contribution, zero thrust — not maximum drag.
-/// - `(0.0, 1.0)` — partial failure; outputs are scaled by `remaining`.
+///   contribution, zero thrust, not maximum drag.
+/// - `(0.0, 1.0)`, partial failure; outputs are scaled by `remaining`.
 ///   - An `AeroZone` at `0.4` produces 40 % of its nominal lift/drag.
 ///   - An `EngineZone` at `0.4` produces 40 % of its nominal thrust.
 ///
@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 /// ```rust
 /// use avian_fdm::components::Failure;
 ///
-/// // Zone at full capability — default state.
+/// // Zone at full capability, the default state.
 /// let f = Failure::default();
 /// assert_eq!(f.remaining, 1.0);
 ///

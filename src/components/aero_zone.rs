@@ -40,7 +40,7 @@ use crate::components::zone_force::ZoneForce;
 ///
 /// | Value | Meaning | Runtime |
 /// |---|---|---|
-/// | `Absent` (default for `cy/cm/croll/cn`) | Not applicable by design — symmetric section, no contribution | Silent 0.0 |
+/// | `Absent` (default for `cy/cm/croll/cn`) | Not applicable by design: symmetric section, no contribution | Silent 0.0 |
 /// | `Placeholder` (default for `cl/cd`) | Should exist but not yet modelled | `warn_once!` + 0.0 |
 /// | `Scalar(0.0)` with [`crate::sourced!`] | Explicitly zero | Silent 0.0 |
 /// | `Table1D` / `Table2D` | Fully modelled | Interpolated value |
@@ -59,28 +59,28 @@ pub struct AeroZone {
     pub cd: AeroCoeff,
     /// Partial contribution to CY (side-force coefficient).
     ///
-    /// Defaults to [`AeroCoeff::Absent`] — most symmetric zones produce no side force.
+    /// Defaults to [`AeroCoeff::Absent`]. Most symmetric zones produce no side force.
     /// Set to [`AeroCoeff::Placeholder`] if this zone should contribute CY but data is pending.
     pub cy: AeroCoeff,
     /// Partial contribution to CM (pitching-moment coefficient, about c̄).
     ///
-    /// Defaults to [`AeroCoeff::Absent`] — pitching moment is often handled via tail geometry.
+    /// Defaults to [`AeroCoeff::Absent`]. Pitching moment is often handled via tail geometry.
     /// Set to [`AeroCoeff::Placeholder`] if this zone should contribute CM but data is pending.
     pub cm: AeroCoeff,
     /// Partial contribution to Cl (rolling-moment coefficient, about b).
     ///
-    /// Defaults to [`AeroCoeff::Absent`] — roll is often handled emergently by zone geometry.
+    /// Defaults to [`AeroCoeff::Absent`]. Roll is often handled emergently by zone geometry.
     /// Set to [`AeroCoeff::Placeholder`] if this zone should contribute Cl but data is pending.
     pub croll: AeroCoeff,
     /// Partial contribution to Cn (yawing-moment coefficient, about b).
     ///
-    /// Defaults to [`AeroCoeff::Absent`] — yaw is often handled emergently by zone geometry.
+    /// Defaults to [`AeroCoeff::Absent`]. Yaw is often handled emergently by zone geometry.
     /// Set to [`AeroCoeff::Placeholder`] if this zone should contribute Cn but data is pending.
     pub cn: AeroCoeff,
     /// Offset from the zone entity's local origin to the aerodynamic centre,
     /// in the zone's local coordinate frame (metres).
     ///
-    /// When `Vec3::ZERO` (default), the entity origin *is* the AC — i.e. the
+    /// When `Vec3::ZERO` (default), the entity origin *is* the AC, i.e. the
     /// zone's [`Transform`] position is both mesh centre and force application
     /// point (the legacy behaviour).
     ///
@@ -94,8 +94,8 @@ pub struct AeroZone {
     /// Extra drag added when the zone is partially failed but still attached
     /// (`remaining > 0`). Represents structural drag from deformation.
     ///
-    /// `None` (the default) means this zone has no damage-drag model — the
-    /// common case for most zones. `Some(coeff)` enables the calculation.
+    /// `None` (the default) means this zone has no damage-drag model. This is
+    /// the common case for most zones. `Some(coeff)` enables the calculation.
     /// **Extra drag = damage coefficient × fraction destroyed ÷ dynamic pressure.
     /// Peaks at intermediate failure; zero when fully intact or fully detached.**
     ///
@@ -143,15 +143,15 @@ pub mod materials {
     pub const CARBON_FIBRE: f64 = 1_600.0;
     /// Glass fibre reinforced polymer (GFRP).
     pub const GLASS_FIBRE: f64 = 1_800.0;
-    /// Balsa wood — used in RC aircraft ribs and formers.
+    /// Balsa wood, used in RC aircraft ribs and formers.
     pub const BALSA: f64 = 150.0;
     /// Aircraft-grade plywood.
     pub const PLYWOOD: f64 = 600.0;
     /// Expanded polystyrene (EPS) foam.
     pub const FOAM: f64 = 30.0;
-    /// Rubber — tyres, seals.
+    /// Rubber (tyres, seals).
     pub const RUBBER: f64 = 1_200.0;
-    /// Perspex / acrylic — canopy glazing.
+    /// Perspex / acrylic (canopy glazing).
     pub const PERSPEX: f64 = 1_190.0;
 }
 
@@ -172,7 +172,7 @@ pub struct AeroZoneBundle {
     pub zone: AeroZone,
     /// Per-frame force output (written by FDM, read by accumulation system).
     pub zone_force: ZoneForce,
-    /// Avian collider — required for hit detection and for Avian to include
+    /// Avian collider, required for hit detection and for Avian to include
     /// this zone's mass (via [`avian3d::prelude::ColliderDensity`]) in the
     /// parent rigid body's [`avian3d::prelude::ComputedMass`].
     pub collider: Collider,

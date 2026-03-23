@@ -4,7 +4,7 @@
 //! angle-of-attack indicators as Bevy gizmos.
 //!
 //! Only compiled with `features = ["debug-plugin"]`. Add alongside
-//! [`AircraftFdmPlugin`] — not included in it by default:
+//! [`AircraftFdmPlugin`], not included in it by default:
 //!
 //! ```rust,no_run
 //! use avian_fdm::plugin::AircraftFdmPlugin;
@@ -42,7 +42,7 @@ use gizmos::*;
 
 /// Plugin that adds all FDM debug gizmo overlays.
 ///
-/// Must be added **separately** from [`AircraftFdmPlugin`] — it is not included
+/// Must be added **separately** from [`AircraftFdmPlugin`], it is not included
 /// by default (following Avian's [`PhysicsDebugPlugin`] convention).
 ///
 /// [`AircraftFdmPlugin`]: crate::plugin::AircraftFdmPlugin

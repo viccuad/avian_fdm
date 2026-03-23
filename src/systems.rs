@@ -1,13 +1,13 @@
-//! System wiring — registers all FDM systems into Avian's `PhysicsSchedule`
+//! System wiring, registers all FDM systems into Avian's `PhysicsSchedule`
 //! in the correct dependency order.
 //!
 //! ## Execution order within `PhysicsStepSystems::BroadPhase`
 //!
 //! ```text
 //! update_atmosphere
-//!   → update_flight_state         (needs ρ for Re; also writes p/q/r body rates)
-//!   → compute_engine_zone_forces  (propulsion feature; writes ZoneForce + PropwashState)
-//!   → compute_aero_forces         (per-zone eval + accumulation + damping)
+//!   then update_flight_state         (needs rho for Re; also writes p/q/r body rates)
+//!   then compute_engine_zone_forces  (propulsion feature; writes ZoneForce + PropwashState)
+//!   then compute_aero_forces         (per-zone eval + accumulation + damping)
 //! ```
 //!
 //! The FDM chain runs in `BroadPhase` (not `First`) to avoid a Bevy static
@@ -50,7 +50,7 @@ use crate::propulsion::compute_engine_zone_forces;
 /// Avian's `update_child_collider_position` (which writes `Position`/`Rotation`
 /// for child colliders) also runs in `PhysicsStepSystems::First`. Bevy's static
 /// ambiguity checker sees a conflict with `compute_aero_forces` reading
-/// `Position`/`Rotation` on *root* entities — even though the entity sets are
+/// `Position`/`Rotation` on *root* entities, even though the entity sets are
 /// disjoint at runtime. Placing our chain in `BroadPhase` (which runs after
 /// `First`) eliminates the false ambiguity while keeping forces written well
 /// before the `Solver` reads them via `ForceSystems::ApplyConstantForces`.
