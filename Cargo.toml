@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 default = ["damage", "propulsion"]
 damage = []
 propulsion = []
-debug-viz = ["dep:bevy_egui"]
+debug-plugin = ["bevy/bevy_gizmos", "bevy/bevy_render"]
 presets = []
 
 [dependencies]
@@ -17,16 +17,26 @@ presets = []
 # capsules) for AeroZone colliders. Mesh-based colliders would require AssetPlugin +
 # MeshPlugin in headless apps, and are never needed for a flight dynamics library.
 avian3d = { version = "0.6", default-features = false, features = [
-    "3d", "f32", "parry-f32", "default-collider", "xpbd_joints", "parallel",
+    "3d",
+    "f32",
+    "parry-f32",
+    "default-collider",
+    "xpbd_joints",
+    "parallel",
 ] }
-bevy = { version = "0.18", default-features = false, features = ["bevy_scene", "bevy_asset", "bevy_render"] }
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_scene",
+    "bevy_asset",
+    "bevy_render",
+] }
 serde = { version = "1", features = ["derive"] }
 
-# Optional — only with debug-viz feature
-bevy_egui = { version = "0.39", optional = true }
-
 [dev-dependencies]
-bevy = { version = "0.18", features = ["bevy_winit", "bevy_pbr", "bevy_gizmos"] }
+bevy = { version = "0.18", features = [
+    "bevy_winit",
+    "bevy_pbr",
+    "bevy_gizmos",
+] }
 criterion = { version = "0.5", features = ["html_reports"] }
 parry3d = "0.26"
 
@@ -40,4 +50,4 @@ required-features = ["presets"]
 
 [[example]]
 name = "j3cub_visual"
-required-features = ["presets"]
+required-features = ["presets", "debug-plugin"]

@@ -714,8 +714,8 @@ pub mod detach;
 #[cfg(feature = "propulsion")]
 pub mod propulsion;
 
-#[cfg(feature = "debug-viz")]
-pub mod debug;
+#[cfg(feature = "debug-plugin")]
+pub mod debug_render;
 
 #[cfg(feature = "presets")]
 pub mod presets;
@@ -735,6 +735,9 @@ pub mod prelude {
 
     #[cfg(feature = "damage")]
     pub use crate::components::Failure;
+
+    #[cfg(feature = "debug-plugin")]
+    pub use crate::debug_render::{AircraftFdmDebugPlugin, FdmGizmos, FdmDebugRender};
 
     #[cfg(feature = "propulsion")]
     pub use crate::components::{EngineZone, PropwashState};

@@ -11,7 +11,7 @@
 //!
 //! **Run with:**
 //! ```sh
-//! cargo run --example j3cub_visual --features presets
+//! cargo run --example j3cub_visual --features presets,debug-plugin
 //! ```
 //!
 //! **Camera controls:**
@@ -44,6 +44,13 @@ fn main() {
         )
         .add_plugins(PhysicsPlugins::default())
         .add_plugins(AircraftFdmPlugin)
+        .add_plugins(AircraftFdmDebugPlugin)
+        // At cruise (~4300 N lift), the yellow total-force arrow will be ~7 m long —
+        // comparable to the aircraft fuselage, so it's easy to read.
+        .insert_gizmo_config(
+            FdmGizmos { force_scale: 1.0 / 600.0, ..FdmGizmos::default() },
+            GizmoConfig::default(),
+        )
         .init_resource::<OrbitCamera>()
         .init_resource::<ShowColliders>()
         .add_systems(Startup, (spawn_aircraft, spawn_scene))
@@ -215,11 +222,6 @@ fn orbit_camera(
     cam.look_at(focus, Vec3::Y);
 }
 
-// ── Force scale: 1 N → FORCE_SCALE metres of arrow ───────────────────────────
-// At cruise (~4300 N lift), the yellow total-force arrow will be ~7 m long —
-// comparable to the aircraft fuselage length, so it's easy to read.
-const FORCE_SCALE: f32 = 1.0 / 600.0;
-
 /// When true, draws raw collider shapes instead of contours / GizmoShape.
 /// Toggle with **C**.
 #[derive(Resource, Default)]
@@ -237,7 +239,7 @@ struct ShowColliders(bool);
 /// | Orange      | Engine zone                                  |
 /// | Grey        | Non-lifting / structural (fuselage, struts)  |
 fn draw_aircraft_outline(
-    mut gizmos: Gizmos,
+    mut gizmos: Gizmos<FdmGizmos>,
     root_query: Query<&Transform, With<AircraftGeometry>>,
     zone_query: Query<(
         &Transform,
@@ -437,7 +439,8 @@ fn draw_aircraft_outline(
 
 /// Draws per-zone forces (cyan/green) plus total-force, weight and net-force arrows.
 fn draw_forces(
-    mut gizmos: Gizmos,
+    mut gizmos: Gizmos<FdmGizmos>,
+    store: Res<GizmoConfigStore>,
     // No ColliderOf — Avian adds it lazily and it may be absent on the engine
     // zone, causing a silent query miss. With one aircraft, root_query.single()
     // gives us the root Transform for all world-position calculations.
@@ -454,6 +457,7 @@ fn draw_forces(
     >,
 ) {
     let Ok((root_tf, rot, cf, mass, com)) = root_query.single() else { return };
+    let force_scale = store.config::<FdmGizmos>().1.force_scale;
 
     // ── Per-zone force arrows ─────────────────────────────────────────────────
     for (zf, zone_local_tf, is_engine) in &zone_query {
@@ -463,9 +467,9 @@ fn draw_forces(
         // Compute world position from root's current Transform (no GlobalTransform lag).
         let start = root_tf.transform_point(zone_local_tf.translation);
         if is_engine {
-            gizmos.arrow(start, start + zf.force * FORCE_SCALE, Color::srgb(0.1, 1.0, 0.1));
+            gizmos.arrow(start, start + zf.force * force_scale, Color::srgb(0.1, 1.0, 0.1));
         } else {
-            gizmos.arrow(start, start + zf.force * FORCE_SCALE, Color::srgb(0.0, 0.9, 0.9));
+            gizmos.arrow(start, start + zf.force * force_scale, Color::srgb(0.0, 0.9, 0.9));
         }
     }
 
@@ -473,16 +477,16 @@ fn draw_forces(
     let cg = root_tf.translation + rot.0 * com.0;
 
     // Total aerodynamic + propulsive force (yellow).
-    gizmos.arrow(cg, cg + cf.0 * FORCE_SCALE, Color::srgb(1.0, 1.0, 0.0));
+    gizmos.arrow(cg, cg + cf.0 * force_scale, Color::srgb(1.0, 1.0, 0.0));
 
     // Weight (red, downward).
     let weight = Vec3::new(0.0, -mass.value() * 9.806_65, 0.0);
-    gizmos.arrow(cg, cg + weight * FORCE_SCALE, Color::srgb(1.0, 0.2, 0.2));
+    gizmos.arrow(cg, cg + weight * force_scale, Color::srgb(1.0, 0.2, 0.2));
 
     // Net force = aero + weight (white) — near-zero at trim.
     let net = cf.0 + weight;
     if net.length_squared() > 1.0 {
-        gizmos.arrow(cg, cg + net * FORCE_SCALE, Color::WHITE);
+        gizmos.arrow(cg, cg + net * force_scale, Color::WHITE);
     }
 
     // CG marker cross.
