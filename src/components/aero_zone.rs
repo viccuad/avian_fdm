@@ -64,12 +64,12 @@ pub struct AeroZone {
     /// If `Some`, this zone acts as a control surface. Its coefficients are
     /// additionally scaled by the matching [`super::ControlInputs`] value.
     pub control_role: Option<ControlSurfaceRole>,
-    /// Drag pressure (Pa) added per unit of damage while the zone is still
-    /// attached (`health > 0`). Represents structural drag from deformation.
+    /// Drag pressure (Pa) added when the zone is partially failed but still
+    /// attached (`remaining > 0`). Represents structural drag from deformation.
     ///
     /// ```text
-    /// struct_drag = damage_drag_coeff × (1 − health)   when health > 0
-    ///             = 0                                   when health == 0 (detached)
+    /// struct_drag = damage_drag_coeff × (1 − remaining)   when remaining > 0
+    ///             = 0                                      when remaining == 0 (detached)
     /// ```
     pub damage_drag_coeff: f64,
 }

@@ -55,6 +55,17 @@ use crate::propulsion::compute_engine_zone_forces;
 /// `First`) eliminates the false ambiguity while keeping forces written well
 /// before the `Solver` reads them via `ForceSystems::ApplyConstantForces`.
 pub(crate) fn register_fdm_systems(app: &mut App) {
+    // The engine force system is only compiled with the `propulsion` feature.
+    // Both configurations chain in BroadPhase so forces are written before the
+    // Avian Solver reads them via ForceSystems::ApplyConstantForces.
+    #[cfg(not(feature = "propulsion"))]
+    app.add_systems(
+        PhysicsSchedule,
+        (update_atmosphere, update_flight_state, compute_aero_forces)
+            .chain()
+            .in_set(PhysicsStepSystems::BroadPhase),
+    );
+
     #[cfg(feature = "propulsion")]
     app.add_systems(
         PhysicsSchedule,
@@ -62,18 +73,6 @@ pub(crate) fn register_fdm_systems(app: &mut App) {
             update_atmosphere,
             update_flight_state,
             compute_engine_zone_forces,
-            compute_aero_forces,
-        )
-            .chain()
-            .in_set(PhysicsStepSystems::BroadPhase),
-    );
-
-    #[cfg(not(feature = "propulsion"))]
-    app.add_systems(
-        PhysicsSchedule,
-        (
-            update_atmosphere,
-            update_flight_state,
             compute_aero_forces,
         )
             .chain()

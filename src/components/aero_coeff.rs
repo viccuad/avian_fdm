@@ -131,8 +131,12 @@ fn clamp_with_warn(v: f64, lo: f64, hi: f64, label: &'static str) -> f64 {
 }
 
 /// Linear interpolation in a 1-D table. `x` must be within `[bp[0], bp[last]]`.
-fn lerp_1d(x: f64, bp: &[f64], vals: &[f64]) -> f64 {
+pub(crate) fn lerp_1d(x: f64, bp: &[f64], vals: &[f64]) -> f64 {
     debug_assert_eq!(bp.len(), vals.len());
+    // Degenerate: single-point table — no interval to interpolate.
+    if bp.len() == 1 {
+        return vals[0];
+    }
     // Find the interval containing x.
     let idx = bp.partition_point(|&b| b <= x).saturating_sub(1);
     let idx = idx.min(bp.len() - 2);
@@ -280,5 +284,34 @@ mod tests {
     fn table1d_empty_returns_zero() {
         let c = AeroCoeff::Table1D { breakpoints: vec![], values: vec![] };
         assert_eq!(c.evaluate(0.0, 0.0), 0.0);
+    }
+
+    /// A single-breakpoint Table1D must return that value for any input
+    /// (the bug: lerp_1d would panic accessing bp[1] before the guard was added).
+    #[test]
+    fn table1d_single_breakpoint_returns_value() {
+        let c = AeroCoeff::Table1D {
+            breakpoints: vec![0.3],
+            values: vec![7.5],
+        };
+        assert!((c.evaluate(0.3, 0.0) - 7.5).abs() < 1e-12, "exact hit");
+        assert!((c.evaluate(-5.0, 0.0) - 7.5).abs() < 1e-12, "clamped below");
+        assert!((c.evaluate(99.0, 0.0) - 7.5).abs() < 1e-12, "clamped above");
+    }
+
+    /// Table2D with a single Re column — bilerp must handle the degenerate
+    /// `cols[ci1] == cols[ci]` case without dividing by zero.
+    #[test]
+    fn table2d_single_re_column_no_panic() {
+        let c = AeroCoeff::Table2D {
+            rows: vec![0.0, 1.0],
+            cols: vec![1e6],        // single Re column
+            data: vec![0.0, 2.0],  // CL = 0 at α=0, CL = 2 at α=1
+        };
+        assert!((c.evaluate(0.0, 1e6) - 0.0).abs() < 1e-12);
+        assert!((c.evaluate(1.0, 1e6) - 2.0).abs() < 1e-12);
+        assert!((c.evaluate(0.5, 1e6) - 1.0).abs() < 1e-12, "midpoint on alpha");
+        // Re clamping: out-of-range Re should still work
+        assert!((c.evaluate(0.5, 999.0) - 1.0).abs() < 1e-12, "Re clamped to only column");
     }
 }

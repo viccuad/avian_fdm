@@ -15,7 +15,7 @@ pub use aero_coeff::AeroCoeff;
 pub use aero_zone::{AeroZone, AeroZoneBundle, ControlSurfaceRole, materials};
 pub use aircraft::{AircraftGeometry, AircraftCoreBundle, LodDamping, InducedDrag};
 pub use controls::ControlInputs;
-pub use failure::Failure;
+pub use failure::{Failure, get_remaining};
 pub use flight_state::{FlightState, AtmosphereState, WindResource};
 pub use gizmo_shape::{GizmoShape, GizmoContours};
 pub use zone_force::ZoneForce;

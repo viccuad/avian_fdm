@@ -5,6 +5,16 @@
 //! conversion to Avian components is performed in [`crate::systems`].
 
 use bevy::math::{DQuat, DVec3};
+use bevy::prelude::Vec3;
+
+/// Convert a Bevy `Vec3` (f32) to a `DVec3` (f64) for FDM calculations.
+///
+/// Used throughout the codebase to bridge Avian's f32 physics transforms
+/// with the FDM's f64 arithmetic.
+#[inline]
+pub fn to_dvec3(v: Vec3) -> DVec3 {
+    DVec3::new(v.x as f64, v.y as f64, v.z as f64)
+}
 
 /// Rotate a vector from the aircraft body frame into the Bevy world frame.
 ///

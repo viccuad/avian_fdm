@@ -56,3 +56,47 @@ impl Default for Failure {
         Self { remaining: 1.0 }
     }
 }
+
+/// Extract `Failure::remaining` from an optional component, defaulting to `1.0`
+/// (fully intact) when the component is absent.
+///
+/// This is the standard pattern used by all FDM domain systems: a zone without
+/// a `Failure` component is treated as undamaged.
+///
+/// ```rust
+/// use avian_fdm::components::{Failure, get_remaining};
+/// assert_eq!(get_remaining(None), 1.0);
+/// let f = Failure { remaining: 0.4 };
+/// assert_eq!(get_remaining(Some(&f)), 0.4);
+/// ```
+#[inline]
+pub fn get_remaining(failure: Option<&Failure>) -> f64 {
+    failure.map(|f| f.remaining).unwrap_or(1.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn none_means_fully_intact() {
+        assert_eq!(get_remaining(None), 1.0);
+    }
+
+    #[test]
+    fn some_failure_returns_remaining() {
+        let f = Failure { remaining: 0.4 };
+        assert!((get_remaining(Some(&f)) - 0.4).abs() < 1e-12);
+    }
+
+    #[test]
+    fn zero_remaining_is_fully_failed() {
+        let f = Failure { remaining: 0.0 };
+        assert_eq!(get_remaining(Some(&f)), 0.0);
+    }
+
+    #[test]
+    fn default_is_fully_intact() {
+        assert_eq!(Failure::default().remaining, 1.0);
+    }
+}
