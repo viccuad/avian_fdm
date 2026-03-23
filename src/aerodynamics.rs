@@ -526,8 +526,8 @@ pub fn compute_aero_forces(
                     continue;
                 }
 
-                let force_world = Vec3::from(wf.force.as_vec3());
-                let torque_world = Vec3::from(wf.torque.as_vec3());
+                let force_world = wf.force.as_vec3();
+                let torque_world = wf.torque.as_vec3();
 
                 // Write per-zone output for debug visualisation.
                 zone_force.force = force_world;
@@ -561,7 +561,7 @@ pub fn compute_aero_forces(
             let drag_i = cd_i * qbar * s;
             let drag_stab = DVec3::new(-drag_i, 0.0, 0.0);
             let drag_world = body_to_world * (stab_to_body_global * drag_stab);
-            cf.0 += Vec3::from(drag_world.as_vec3());
+            cf.0 += drag_world.as_vec3();
         }
 
         // Step 5: global damping torque — LOD mode only.
@@ -571,7 +571,7 @@ pub fn compute_aero_forces(
         if let Some(lod) = lod_damping {
             let damp = damping_torque(flight, lod, geo, body_to_world);
             if damp.is_finite() {
-                ct.0 += Vec3::from(damp.as_vec3());
+                ct.0 += damp.as_vec3();
             }
         }
     }
@@ -828,7 +828,6 @@ mod tests {
             wing_span_m: 10.0,
             chord_m: 1.6,
             wing_area_m2: 16.0,
-            ..Default::default()
         };
         let damp = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
         // p > 0 and cl_p < 0 → roll damping moment should be negative (opposes roll).
@@ -858,7 +857,6 @@ mod tests {
             wing_span_m: 10.0,
             chord_m: 1.6,
             wing_area_m2: 16.0,
-            ..Default::default()
         };
         let damp = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
         assert!(
@@ -1157,7 +1155,6 @@ mod tests {
             wing_span_m: 10.0,
             chord_m: 1.6,
             wing_area_m2: 16.0,
-            ..Default::default()
         };
         let damp = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
 
@@ -1208,7 +1205,6 @@ mod tests {
             wing_span_m: 10.0,
             chord_m: 1.6,
             wing_area_m2: 16.0,
-            ..Default::default()
         };
         let damp_identity = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
 
