@@ -39,20 +39,17 @@
 //! them top-to-bottom gives a self-contained introduction to how the FDM
 //! converts aerodynamic data into Avian forces.
 
+use avian3d::prelude::{ComputedCenterOfMass, ConstantForce, ConstantTorque, Position, Rotation};
+use bevy::math::{DQuat, DVec3};
 use bevy::prelude::*;
-use bevy::math::{DVec3, DQuat};
-use avian3d::prelude::{
-    ConstantForce, ConstantTorque, Position, Rotation, ComputedCenterOfMass,
-};
 
-use crate::components::{
-    AeroZone, AircraftGeometry, ControlInputs, ControlSurfaceRole,
-    Failure, FlightState, InducedDrag, LodDamping, ZoneForce, get_remaining,
-};
-use crate::components::aero_coeff::AeroCoeff;
-use crate::math::to_dvec3;
 #[cfg(feature = "propulsion")]
 use crate::components::EngineZone;
+use crate::components::{
+    get_remaining, AeroZone, AircraftGeometry, ControlInputs, ControlSurfaceRole, Failure,
+    FlightState, InducedDrag, LodDamping, ZoneForce,
+};
+use crate::math::to_dvec3;
 
 // ── Step 0: Per-zone local angle of attack and sideslip ──────────────────────
 
@@ -212,7 +209,8 @@ pub(crate) fn evaluate_zone_coefficients(
 
     // Failure degradation: structural deformation drag grows as remaining → 0.
     // Only computed when the zone has a damage-drag model (most zones don't).
-    let extra_cd = zone.damage_drag_coeff
+    let extra_cd = zone
+        .damage_drag_coeff
         .map(|coeff| coeff * (1.0 - remaining) / qbar.max(1e-4))
         .unwrap_or(0.0);
 
@@ -441,11 +439,13 @@ pub fn compute_aero_forces(
         &mut ZoneForce,
         Option<&Failure>,
     )>,
-    #[cfg(feature = "propulsion")]
-    engine_zone_query: Query<&ZoneForce, (With<EngineZone>, Without<AeroZone>)>,
+    #[cfg(feature = "propulsion")] engine_zone_query: Query<
+        &ZoneForce,
+        (With<EngineZone>, Without<AeroZone>),
+    >,
 ) {
-    for (mut cf, mut ct, pos, rot, com, flight, geo, ctrl, children, lod_damping, induced_drag)
-        in root_query.iter_mut()
+    for (mut cf, mut ct, pos, rot, com, flight, geo, ctrl, children, lod_damping, induced_drag) in
+        root_query.iter_mut()
     {
         cf.0 = Vec3::ZERO;
         ct.0 = Vec3::ZERO;
@@ -455,13 +455,13 @@ pub fn compute_aero_forces(
         }
 
         let alpha = flight.alpha_rad;
-        let beta  = flight.beta_rad;
-        let re    = flight.reynolds_number;
-        let qbar  = flight.dynamic_pressure_pa;
-        let v     = flight.airspeed_ms;
-        let p     = flight.p_rads;
-        let q     = flight.q_rads;
-        let r     = flight.r_rads;
+        let beta = flight.beta_rad;
+        let re = flight.reynolds_number;
+        let qbar = flight.dynamic_pressure_pa;
+        let v = flight.airspeed_ms;
+        let p = flight.p_rads;
+        let q = flight.q_rads;
+        let r = flight.r_rads;
         let s = geo.wing_area_m2;
         let b = geo.wing_span_m;
         let c = geo.chord_m;
@@ -507,14 +507,19 @@ pub fn compute_aero_forces(
 
                 // Step 1: evaluate coefficients at local α/β.
                 let coeffs = evaluate_zone_coefficients(
-                    zone, ctrl, alpha_local, beta_local, re, qbar, remaining,
+                    zone,
+                    ctrl,
+                    alpha_local,
+                    beta_local,
+                    re,
+                    qbar,
+                    remaining,
                 );
                 total_cl += coeffs.cl;
 
                 // Step 2: convert to world-space force and torque.
-                let wf = zone_force_world(
-                    &coeffs, qbar, s, b, c, stab_to_body_local, body_to_world,
-                );
+                let wf =
+                    zone_force_world(&coeffs, qbar, s, b, c, stab_to_body_local, body_to_world);
 
                 if !wf.force.is_finite() || !wf.torque.is_finite() {
                     warn_once!("Non-finite aero force/torque on zone — zeroed");
@@ -588,7 +593,12 @@ mod tests {
     }
 
     fn neutral_controls() -> ControlInputs {
-        ControlInputs { elevator: 0.0, aileron: 0.0, rudder: 0.0, throttle: 0.0 }
+        ControlInputs {
+            elevator: 0.0,
+            aileron: 0.0,
+            rudder: 0.0,
+            throttle: 0.0,
+        }
     }
 
     // ── evaluate_zone_coefficients ────────────────────────────────────────
@@ -596,7 +606,8 @@ mod tests {
     #[test]
     fn zero_remaining_produces_zero_coefficients() {
         let zone = simple_zone(0.5, 0.03);
-        let coeffs = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 0.0, 1e6, 1000.0, 0.0);
+        let coeffs =
+            evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 0.0, 1e6, 1000.0, 0.0);
         assert_eq!(coeffs.cl, 0.0);
         assert_eq!(coeffs.cd, 0.0);
     }
@@ -604,8 +615,10 @@ mod tests {
     #[test]
     fn half_remaining_halves_lift() {
         let zone = simple_zone(1.0, 0.0);
-        let full = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 0.0, 1e6, 1000.0, 1.0);
-        let half = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 0.0, 1e6, 1000.0, 0.5);
+        let full =
+            evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 0.0, 1e6, 1000.0, 1.0);
+        let half =
+            evaluate_zone_coefficients(&zone, &neutral_controls(), 0.1, 0.0, 1e6, 1000.0, 0.5);
         assert!((half.cl - full.cl * 0.5).abs() < 1e-12);
     }
 
@@ -618,7 +631,10 @@ mod tests {
         let full = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.0, 0.0, 1e6, qbar, 1.0);
         let half = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.0, 0.0, 1e6, qbar, 0.5);
         // At remaining=1: no damage drag.  At remaining=0.5: extra drag present.
-        assert!(half.cd > full.cd * 0.5, "damage drag should add extra at intermediate remaining");
+        assert!(
+            half.cd > full.cd * 0.5,
+            "damage drag should add extra at intermediate remaining"
+        );
     }
 
     #[test]
@@ -626,8 +642,14 @@ mod tests {
         let mut zone = simple_zone(1.0, 0.0);
         zone.control_role = Some(ControlSurfaceRole::Elevator);
 
-        let ctrl_half = ControlInputs { elevator: 0.5, ..neutral_controls() };
-        let ctrl_full = ControlInputs { elevator: 1.0, ..neutral_controls() };
+        let ctrl_half = ControlInputs {
+            elevator: 0.5,
+            ..neutral_controls()
+        };
+        let ctrl_full = ControlInputs {
+            elevator: 1.0,
+            ..neutral_controls()
+        };
 
         let c_half = evaluate_zone_coefficients(&zone, &ctrl_half, 0.1, 0.0, 1e6, 1000.0, 1.0);
         let c_full = evaluate_zone_coefficients(&zone, &ctrl_full, 0.1, 0.0, 1e6, 1000.0, 1.0);
@@ -642,10 +664,16 @@ mod tests {
         let mut zone_r = simple_zone(cl_val, 0.0);
         zone_r.control_role = Some(ControlSurfaceRole::AileronRight);
 
-        let ctrl = ControlInputs { aileron: 0.6, ..neutral_controls() };
+        let ctrl = ControlInputs {
+            aileron: 0.6,
+            ..neutral_controls()
+        };
         let cl_left = evaluate_zone_coefficients(&zone_l, &ctrl, 0.1, 0.0, 1e6, 1000.0, 1.0).cl;
         let cl_right = evaluate_zone_coefficients(&zone_r, &ctrl, 0.1, 0.0, 1e6, 1000.0, 1.0).cl;
-        assert!((cl_left + cl_right).abs() < 1e-12, "ailerons should produce opposite CL");
+        assert!(
+            (cl_left + cl_right).abs() < 1e-12,
+            "ailerons should produce opposite CL"
+        );
     }
 
     #[test]
@@ -653,40 +681,92 @@ mod tests {
         let mut zone = simple_zone(0.0, 0.05);
         zone.control_role = Some(ControlSurfaceRole::Elevator);
 
-        let neutral = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.0, 0.0, 1e6, 1000.0, 1.0);
-        let ctrl_pos = ControlInputs { elevator: 0.8, ..neutral_controls() };
+        let neutral =
+            evaluate_zone_coefficients(&zone, &neutral_controls(), 0.0, 0.0, 1e6, 1000.0, 1.0);
+        let ctrl_pos = ControlInputs {
+            elevator: 0.8,
+            ..neutral_controls()
+        };
         let deflected = evaluate_zone_coefficients(&zone, &ctrl_pos, 0.0, 0.0, 1e6, 1000.0, 1.0);
-        assert!(deflected.cd >= neutral.cd * 0.8 - 1e-12, "deflection should not reduce drag");
+        assert!(
+            deflected.cd >= neutral.cd * 0.8 - 1e-12,
+            "deflection should not reduce drag"
+        );
     }
 
     // ── zone_force_world ─────────────────────────────────────────────────
 
     #[test]
     fn lift_opposes_gravity_at_zero_alpha() {
-        let coeffs = ZoneCoefficients { cl: 1.0, cd: 0.0, cy: 0.0, cm: 0.0, croll: 0.0, cn: 0.0 };
+        let coeffs = ZoneCoefficients {
+            cl: 1.0,
+            cd: 0.0,
+            cy: 0.0,
+            cm: 0.0,
+            croll: 0.0,
+            cn: 0.0,
+        };
         // At α=0 and level flight: stab_to_body is identity, body_to_world
         // rotates body-Z(down) to world-−Y(down), so lift (−Z_s) → world +Y.
         let stab_to_body = DQuat::IDENTITY;
         let body_to_world = DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2);
 
-        let wf = zone_force_world(&coeffs, 1000.0, 16.0, 10.0, 1.6, stab_to_body, body_to_world);
-        assert!(wf.force.y > 0.0, "lift should point up (+Y world), got {}", wf.force.y);
+        let wf = zone_force_world(
+            &coeffs,
+            1000.0,
+            16.0,
+            10.0,
+            1.6,
+            stab_to_body,
+            body_to_world,
+        );
+        assert!(
+            wf.force.y > 0.0,
+            "lift should point up (+Y world), got {}",
+            wf.force.y
+        );
     }
 
     #[test]
     fn drag_opposes_forward_motion() {
-        let coeffs = ZoneCoefficients { cl: 0.0, cd: 1.0, cy: 0.0, cm: 0.0, croll: 0.0, cn: 0.0 };
+        let coeffs = ZoneCoefficients {
+            cl: 0.0,
+            cd: 1.0,
+            cy: 0.0,
+            cm: 0.0,
+            croll: 0.0,
+            cn: 0.0,
+        };
         let stab_to_body = DQuat::IDENTITY;
         let body_to_world = DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2);
 
-        let wf = zone_force_world(&coeffs, 1000.0, 16.0, 10.0, 1.6, stab_to_body, body_to_world);
+        let wf = zone_force_world(
+            &coeffs,
+            1000.0,
+            16.0,
+            10.0,
+            1.6,
+            stab_to_body,
+            body_to_world,
+        );
         // Body X = forward = world X after the 90° rotation.  Drag is −X_s.
-        assert!(wf.force.x < 0.0, "drag should oppose forward motion, got {}", wf.force.x);
+        assert!(
+            wf.force.x < 0.0,
+            "drag should oppose forward motion, got {}",
+            wf.force.x
+        );
     }
 
     #[test]
     fn force_scales_with_dynamic_pressure() {
-        let coeffs = ZoneCoefficients { cl: 0.5, cd: 0.0, cy: 0.0, cm: 0.0, croll: 0.0, cn: 0.0 };
+        let coeffs = ZoneCoefficients {
+            cl: 0.5,
+            cd: 0.0,
+            cy: 0.0,
+            cm: 0.0,
+            croll: 0.0,
+            cn: 0.0,
+        };
         let stab = DQuat::IDENTITY;
         let b2w = DQuat::IDENTITY;
 
@@ -694,12 +774,22 @@ mod tests {
         let wf2 = zone_force_world(&coeffs, 2000.0, 16.0, 10.0, 1.6, stab, b2w);
         // q̄ ratio is 4:1, so force ratio should be 4:1.
         let ratio = wf2.force.length() / wf1.force.length();
-        assert!((ratio - 4.0).abs() < 1e-10, "force should scale with q̄, ratio = {ratio}");
+        assert!(
+            (ratio - 4.0).abs() < 1e-10,
+            "force should scale with q̄, ratio = {ratio}"
+        );
     }
 
     #[test]
     fn pitching_moment_uses_chord_not_span() {
-        let coeffs = ZoneCoefficients { cl: 0.0, cd: 0.0, cy: 0.0, cm: 1.0, croll: 0.0, cn: 0.0 };
+        let coeffs = ZoneCoefficients {
+            cl: 0.0,
+            cd: 0.0,
+            cy: 0.0,
+            cm: 1.0,
+            croll: 0.0,
+            cn: 0.0,
+        };
         let b2w = DQuat::IDENTITY;
         let stab = DQuat::IDENTITY;
 
@@ -707,7 +797,10 @@ mod tests {
         let wf_b = zone_force_world(&coeffs, 1000.0, 1.0, 10.0, 4.0, stab, b2w);
         // Pitching moment ∝ chord; doubling chord should double torque.
         let ratio = wf_b.torque.y / wf_a.torque.y;
-        assert!((ratio - 2.0).abs() < 1e-10, "CM should scale with chord, ratio = {ratio}");
+        assert!(
+            (ratio - 2.0).abs() < 1e-10,
+            "CM should scale with chord, ratio = {ratio}"
+        );
     }
 
     // ── damping_torque ───────────────────────────────────────────────────
@@ -715,35 +808,63 @@ mod tests {
     #[test]
     fn roll_damping_opposes_roll_rate() {
         let flight = FlightState {
-            p_rads: 1.0, q_rads: 0.0, r_rads: 0.0,
-            airspeed_ms: 50.0, dynamic_pressure_pa: 1531.0,
-            alpha_rad: 0.0, beta_rad: 0.0, mach: 0.15,
-            reynolds_number: 3e6, altitude_m: 0.0,
+            p_rads: 1.0,
+            q_rads: 0.0,
+            r_rads: 0.0,
+            airspeed_ms: 50.0,
+            dynamic_pressure_pa: 1531.0,
+            alpha_rad: 0.0,
+            beta_rad: 0.0,
+            mach: 0.15,
+            reynolds_number: 3e6,
+            altitude_m: 0.0,
         };
-        let lod = crate::components::LodDamping { cl_p: -0.45, cm_q: 0.0, cn_r: 0.0 };
+        let lod = crate::components::LodDamping {
+            cl_p: -0.45,
+            cm_q: 0.0,
+            cn_r: 0.0,
+        };
         let geo = AircraftGeometry {
-            wing_span_m: 10.0, chord_m: 1.6, wing_area_m2: 16.0,
+            wing_span_m: 10.0,
+            chord_m: 1.6,
+            wing_area_m2: 16.0,
             ..Default::default()
         };
         let damp = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
         // p > 0 and cl_p < 0 → roll damping moment should be negative (opposes roll).
-        assert!(damp.x < 0.0, "roll damping should oppose positive p, got {}", damp.x);
+        assert!(
+            damp.x < 0.0,
+            "roll damping should oppose positive p, got {}",
+            damp.x
+        );
     }
 
     #[test]
     fn zero_rates_produce_zero_damping() {
         let flight = FlightState {
-            p_rads: 0.0, q_rads: 0.0, r_rads: 0.0,
-            airspeed_ms: 50.0, dynamic_pressure_pa: 1531.0,
+            p_rads: 0.0,
+            q_rads: 0.0,
+            r_rads: 0.0,
+            airspeed_ms: 50.0,
+            dynamic_pressure_pa: 1531.0,
             ..Default::default()
         };
-        let lod = crate::components::LodDamping { cl_p: -0.45, cm_q: -12.0, cn_r: -0.12 };
+        let lod = crate::components::LodDamping {
+            cl_p: -0.45,
+            cm_q: -12.0,
+            cn_r: -0.12,
+        };
         let geo = AircraftGeometry {
-            wing_span_m: 10.0, chord_m: 1.6, wing_area_m2: 16.0,
+            wing_span_m: 10.0,
+            chord_m: 1.6,
+            wing_area_m2: 16.0,
             ..Default::default()
         };
         let damp = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
-        assert!(damp.length() < 1e-10, "zero rates should produce zero damping");
+        assert!(
+            damp.length() < 1e-10,
+            "zero rates should produce zero damping"
+        );
     }
 
     // ── AeroCoeff (kept from original) ───────────────────────────────────
@@ -762,9 +883,14 @@ mod tests {
         // p = 1 rad/s, y = 4 m (starboard tip), V = 50 m/s → Δα = +0.08 rad
         let (alpha_l, beta_l) = zone_local_angles(0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 4.0, 50.0);
         let expected = 0.1 + 4.0 / 50.0;
-        assert!((alpha_l - expected).abs() < 1e-12,
-            "Δα_roll should be p·y/V, got {alpha_l}");
-        assert!((beta_l - 0.0).abs() < 1e-12, "roll rate should not affect β");
+        assert!(
+            (alpha_l - expected).abs() < 1e-12,
+            "Δα_roll should be p·y/V, got {alpha_l}"
+        );
+        assert!(
+            (beta_l - 0.0).abs() < 1e-12,
+            "roll rate should not affect β"
+        );
     }
 
     /// Layer 1: negative spanwise station (port side) gets reduced α under roll.
@@ -772,8 +898,10 @@ mod tests {
     fn roll_rate_decreases_alpha_at_negative_y() {
         let (alpha_l, _) = zone_local_angles(0.1, 0.0, 1.0, 0.0, 0.0, 0.0, -4.0, 50.0);
         let expected = 0.1 - 4.0 / 50.0;
-        assert!((alpha_l - expected).abs() < 1e-12,
-            "port wing tip should see reduced α under positive roll");
+        assert!(
+            (alpha_l - expected).abs() < 1e-12,
+            "port wing tip should see reduced α under positive roll"
+        );
     }
 
     /// Layer 2: positive pitch rate + negative longitudinal station (tail) → decreased α.
@@ -783,8 +911,10 @@ mod tests {
         // q = 1 rad/s, x = -4 m (aft of CG), V = 50 m/s → Δα = -0.08 rad
         let (alpha_l, _) = zone_local_angles(0.1, 0.0, 0.0, 1.0, 0.0, -4.0, 0.0, 50.0);
         let expected = 0.1 - 4.0 / 50.0;
-        assert!((alpha_l - expected).abs() < 1e-12,
-            "tail should see reduced α during pull (q > 0), got {alpha_l}");
+        assert!(
+            (alpha_l - expected).abs() < 1e-12,
+            "tail should see reduced α during pull (q > 0), got {alpha_l}"
+        );
     }
 
     /// Layer 2: positive pitch rate + positive longitudinal station (nose) → increased α.
@@ -792,8 +922,10 @@ mod tests {
     fn pitch_rate_increases_alpha_at_nose() {
         let (alpha_l, _) = zone_local_angles(0.1, 0.0, 0.0, 1.0, 0.0, 4.0, 0.0, 50.0);
         let expected = 0.1 + 4.0 / 50.0;
-        assert!((alpha_l - expected).abs() < 1e-12,
-            "nose should see increased α during pull (q > 0), got {alpha_l}");
+        assert!(
+            (alpha_l - expected).abs() < 1e-12,
+            "nose should see increased α during pull (q > 0), got {alpha_l}"
+        );
     }
 
     /// Layer 3: yaw rate shifts sideslip proportional to spanwise station.
@@ -802,9 +934,14 @@ mod tests {
         // r = 1 rad/s, y = 3 m, V = 50 m/s → Δβ = +0.06 rad
         let (alpha_l, beta_l) = zone_local_angles(0.0, 0.05, 0.0, 0.0, 1.0, 0.0, 3.0, 50.0);
         let expected_beta = 0.05 + 3.0 / 50.0;
-        assert!((beta_l - expected_beta).abs() < 1e-12,
-            "Δβ_yaw should be r·y/V, got {beta_l}");
-        assert!((alpha_l - 0.0).abs() < 1e-12, "yaw rate should not affect α");
+        assert!(
+            (beta_l - expected_beta).abs() < 1e-12,
+            "Δβ_yaw should be r·y/V, got {beta_l}"
+        );
+        assert!(
+            (alpha_l - 0.0).abs() < 1e-12,
+            "yaw rate should not affect α"
+        );
     }
 
     /// Zero body rates → local angles equal global angles.
@@ -842,7 +979,7 @@ mod tests {
         let ctrl = neutral_controls();
         let alpha = 0.1_f64; // 5.7° — well below stall
         let v = 50.0_f64;
-        let p = 1.0_f64;     // positive roll rate (right wing down)
+        let p = 1.0_f64; // positive roll rate (right wing down)
         let re = 1e6;
         let qbar = 1500.0;
 
@@ -855,8 +992,12 @@ mod tests {
         let cl = evaluate_zone_coefficients(&zone, &ctrl, al_l, bl_l, re, qbar, 1.0);
 
         // Starboard (descending) tip sees more lift; port (ascending) tip sees less.
-        assert!(cr.cl > cl.cl,
-            "starboard tip should have higher CL under positive roll: {:.3} vs {:.3}", cr.cl, cl.cl);
+        assert!(
+            cr.cl > cl.cl,
+            "starboard tip should have higher CL under positive roll: {:.3} vs {:.3}",
+            cr.cl,
+            cl.cl
+        );
 
         // Both zones produce a lift force in world frame.
         // World: body_to_world = identity; stab_to_body = identity (α_local ≈ 0 for small Δ)
@@ -874,8 +1015,10 @@ mod tests {
         let net_roll = roll_r + roll_l;
 
         // Net roll moment should oppose positive roll rate (i.e. be negative about X).
-        assert!(net_roll < 0.0,
-            "emergent roll damping should oppose p>0, net roll moment = {net_roll:.2} N·m");
+        assert!(
+            net_roll < 0.0,
+            "emergent roll damping should oppose p>0, net roll moment = {net_roll:.2} N·m"
+        );
     }
 
     // ── accumulate_engine_force ──────────────────────────────────────────
@@ -885,7 +1028,7 @@ mod tests {
     fn engine_at_cg_no_moment() {
         let zf = ZoneForce {
             force: Vec3::new(500.0, 0.0, 0.0),
-            world_point: Vec3::ZERO,  // coincides with CG
+            world_point: Vec3::ZERO, // coincides with CG
             torque: Vec3::ZERO,
         };
         let mut total_force = Vec3::ZERO;
@@ -893,7 +1036,10 @@ mod tests {
         accumulate_engine_force(&zf, Vec3::ZERO, &mut total_force, &mut total_torque);
 
         assert!((total_force - Vec3::new(500.0, 0.0, 0.0)).length() < 1e-5);
-        assert!(total_torque.length() < 1e-5, "on-axis engine must not produce torque");
+        assert!(
+            total_torque.length() < 1e-5,
+            "on-axis engine must not produce torque"
+        );
     }
 
     /// An off-centre engine (e.g. starboard twin) produces a yawing moment.
@@ -912,8 +1058,11 @@ mod tests {
 
         // moment arm = (0,2,0) × (500,0,0) = (0·0 − 0·0, 0·500 − 2·0, 2·0 − 0·500)
         //            = (0, 0, -1000)  → yaw left (nose-left) torque about world -Z
-        assert!((total_torque.z - (-1000.0)).abs() < 1e-4,
-            "starboard engine should produce nose-left yaw torque, got z={}", total_torque.z);
+        assert!(
+            (total_torque.z - (-1000.0)).abs() < 1e-4,
+            "starboard engine should produce nose-left yaw torque, got z={}",
+            total_torque.z
+        );
     }
 
     /// A zero-force engine produces no force and no moment (short-circuit).
@@ -944,8 +1093,14 @@ mod tests {
         };
         zone.control_role = Some(ControlSurfaceRole::Rudder);
 
-        let ctrl_full = ControlInputs { rudder: 1.0, ..neutral_controls() };
-        let ctrl_half = ControlInputs { rudder: 0.5, ..neutral_controls() };
+        let ctrl_full = ControlInputs {
+            rudder: 1.0,
+            ..neutral_controls()
+        };
+        let ctrl_half = ControlInputs {
+            rudder: 0.5,
+            ..neutral_controls()
+        };
 
         let c_full = evaluate_zone_coefficients(&zone, &ctrl_full, 0.0, 0.0, 1e6, 1000.0, 1.0);
         let c_half = evaluate_zone_coefficients(&zone, &ctrl_half, 0.0, 0.0, 1e6, 1000.0, 1.0);
@@ -962,14 +1117,20 @@ mod tests {
     fn combined_damage_and_control_deflection() {
         let mut zone = simple_zone(1.0, 0.1);
         zone.control_role = Some(ControlSurfaceRole::Elevator);
-        let ctrl = ControlInputs { elevator: 0.5, ..neutral_controls() };
+        let ctrl = ControlInputs {
+            elevator: 0.5,
+            ..neutral_controls()
+        };
 
-        let intact  = evaluate_zone_coefficients(&zone, &ctrl, 0.0, 0.0, 1e6, 1000.0, 1.0);
+        let intact = evaluate_zone_coefficients(&zone, &ctrl, 0.0, 0.0, 1e6, 1000.0, 1.0);
         let damaged = evaluate_zone_coefficients(&zone, &ctrl, 0.0, 0.0, 1e6, 1000.0, 0.5);
 
         // CL: base * elevator_scale * remaining = 1.0 * 0.5 * remaining
-        assert!((intact.cl  - 0.5).abs() < 1e-12, "intact CL");
-        assert!((damaged.cl - 0.25).abs() < 1e-12, "half-remaining halves CL further");
+        assert!((intact.cl - 0.5).abs() < 1e-12, "intact CL");
+        assert!(
+            (damaged.cl - 0.25).abs() < 1e-12,
+            "half-remaining halves CL further"
+        );
 
         // Damaged should always produce less lift than intact at same deflection.
         assert!(damaged.cl < intact.cl);
@@ -980,39 +1141,73 @@ mod tests {
     #[test]
     fn all_axes_damping_combine_independently() {
         let flight = FlightState {
-            p_rads: 1.0, q_rads: 1.0, r_rads: 1.0,
-            airspeed_ms: 50.0, dynamic_pressure_pa: 1531.0,
+            p_rads: 1.0,
+            q_rads: 1.0,
+            r_rads: 1.0,
+            airspeed_ms: 50.0,
+            dynamic_pressure_pa: 1531.0,
             ..Default::default()
         };
-        let lod = crate::components::LodDamping { cl_p: -0.45, cm_q: -12.0, cn_r: -0.12 };
+        let lod = crate::components::LodDamping {
+            cl_p: -0.45,
+            cm_q: -12.0,
+            cn_r: -0.12,
+        };
         let geo = AircraftGeometry {
-            wing_span_m: 10.0, chord_m: 1.6, wing_area_m2: 16.0,
+            wing_span_m: 10.0,
+            chord_m: 1.6,
+            wing_area_m2: 16.0,
             ..Default::default()
         };
         let damp = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
 
         // All three rates positive, all derivatives negative → all moments negative.
-        assert!(damp.x < 0.0, "roll damping should oppose positive p, got x={}", damp.x);
-        assert!(damp.y < 0.0, "pitch damping should oppose positive q, got y={}", damp.y);
-        assert!(damp.z < 0.0, "yaw damping should oppose positive r, got z={}", damp.z);
+        assert!(
+            damp.x < 0.0,
+            "roll damping should oppose positive p, got x={}",
+            damp.x
+        );
+        assert!(
+            damp.y < 0.0,
+            "pitch damping should oppose positive q, got y={}",
+            damp.y
+        );
+        assert!(
+            damp.z < 0.0,
+            "yaw damping should oppose positive r, got z={}",
+            damp.z
+        );
 
         // Yaw damping (cn_r=-0.12) should be weaker than roll (cl_p=-0.45) at equal rates
         // because |cn_r| < |cl_p| and both use span b as reference length.
-        assert!(damp.z.abs() < damp.x.abs(),
-            "yaw damp should be weaker than roll (|cn_r| < |cl_p|), z={}, x={}", damp.z, damp.x);
+        assert!(
+            damp.z.abs() < damp.x.abs(),
+            "yaw damp should be weaker than roll (|cn_r| < |cl_p|), z={}, x={}",
+            damp.z,
+            damp.x
+        );
     }
 
     /// Damping torque with non-identity rotation — moment direction rotates with aircraft.
     #[test]
     fn damping_torque_rotates_with_body() {
         let flight = FlightState {
-            p_rads: 1.0, q_rads: 0.0, r_rads: 0.0,
-            airspeed_ms: 50.0, dynamic_pressure_pa: 1531.0,
+            p_rads: 1.0,
+            q_rads: 0.0,
+            r_rads: 0.0,
+            airspeed_ms: 50.0,
+            dynamic_pressure_pa: 1531.0,
             ..Default::default()
         };
-        let lod = crate::components::LodDamping { cl_p: -0.45, cm_q: 0.0, cn_r: 0.0 };
+        let lod = crate::components::LodDamping {
+            cl_p: -0.45,
+            cm_q: 0.0,
+            cn_r: 0.0,
+        };
         let geo = AircraftGeometry {
-            wing_span_m: 10.0, chord_m: 1.6, wing_area_m2: 16.0,
+            wing_span_m: 10.0,
+            chord_m: 1.6,
+            wing_area_m2: 16.0,
             ..Default::default()
         };
         let damp_identity = damping_torque(&flight, &lod, &geo, DQuat::IDENTITY);
@@ -1024,8 +1219,10 @@ mod tests {
 
         // Magnitude should be equal regardless of rotation.
         let tol = 1e-5;
-        assert!((damp_rotated.length() - damp_identity.length()).abs() < tol,
-            "rotation should not change damping magnitude");
+        assert!(
+            (damp_rotated.length() - damp_identity.length()).abs() < tol,
+            "rotation should not change damping magnitude"
+        );
     }
 
     // ── AeroCoeff::Absent variant ─────────────────────────────────────────────
@@ -1057,13 +1254,13 @@ mod tests {
         let zone = AeroZone {
             cl: AeroCoeff::Scalar(1.0),
             cd: AeroCoeff::Scalar(0.1),
-            ..Default::default()  // cy/cm/croll/cn = Absent
+            ..Default::default() // cy/cm/croll/cn = Absent
         };
         let ctrl = neutral_controls();
         let coeffs = evaluate_zone_coefficients(&zone, &ctrl, 0.2, 0.0, 1e6, 1000.0, 1.0);
-        assert_eq!(coeffs.cy,    0.0, "Absent cy → 0");
-        assert_eq!(coeffs.cm,    0.0, "Absent cm → 0");
+        assert_eq!(coeffs.cy, 0.0, "Absent cy → 0");
+        assert_eq!(coeffs.cm, 0.0, "Absent cm → 0");
         assert_eq!(coeffs.croll, 0.0, "Absent croll → 0");
-        assert_eq!(coeffs.cn,    0.0, "Absent cn → 0");
+        assert_eq!(coeffs.cn, 0.0, "Absent cn → 0");
     }
 }
