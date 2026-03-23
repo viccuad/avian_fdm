@@ -530,27 +530,27 @@
 //! ```text
 //! ┌── PhysicsStepSystems::BroadPhase (each physics substep) ─────────────────┐
 //! │  1. update_atmosphere    reads: Position(root)                           │
-//! │                          writes: AtmosphereState{ρ, p, T, a, μ}         │
-//! │                                                                           │
+//! │                          writes: AtmosphereState{ρ, p, T, a, μ}          │
+//! │                                                                          │
 //! │  2. update_flight_state  reads: AtmosphereState, LinearVelocity(root),   │
 //! │                                 Rotation(root)                           │
-//! │                          writes: FlightState{α, β, V, q̄, Re, Mach, p,   │
+//! │                          writes: FlightState{α, β, V, q̄, Re, Mach, p,    │
 //! │                                              q, r}                       │
-//! │                                                                           │
+//! │                                                                          │
 //! │  3. compute_engine_zone_forces  [propulsion feature]                     │
 //! │                          reads: FlightState, AtmosphereState,            │
 //! │                                 ControlInputs, EngineZone                │
 //! │                          writes: ZoneForce(engine), PropwashState        │
-//! │                                                                           │
+//! │                                                                          │
 //! │  4. compute_aero_forces                                                  │
 //! │                          reads: FlightState, AircraftGeometry,           │
 //! │                                 ControlInputs, AeroZone, Failure,        │
-//! │                                 GlobalTransform(zone), Children,        │
+//! │                                 GlobalTransform(zone), Children,         │
 //! │                                 Position(root), Rotation(root),          │
 //! │                                 ComputedCenterOfMass(root)               │
-//! │                          writes: ZoneForce per child (side-effect),     │
+//! │                          writes: ZoneForce per child (side-effect),      │
 //! │                                  ConstantForce(root),                    │
-//! │                                  ConstantTorque(root)                   │
+//! │                                  ConstantTorque(root)                    │
 //! └──────────────────────────────────────────────────────────────────────────┘
 //!         │
 //!         ▼  PhysicsStepSystems::Solver — Avian integrates forces
@@ -695,12 +695,12 @@ macro_rules! sourced {
     };
 }
 
+pub mod aerodynamics;
+pub mod atmosphere;
 pub mod components;
 pub mod math;
-pub mod atmosphere;
-pub mod aerodynamics;
-pub mod systems;
 pub mod plugin;
+pub mod systems;
 
 #[cfg(feature = "propulsion")]
 pub mod propulsion;
@@ -713,20 +713,16 @@ pub mod presets;
 
 /// Re-exports for convenient glob import: `use avian_fdm::prelude::*;`
 pub mod prelude {
-    pub use crate::sourced;
     pub use crate::components::{
-        AeroZone, AeroZoneBundle, ControlSurfaceRole, materials,
-        AircraftCoreBundle, AircraftGeometry,
-        ControlInputs, FlightState, AtmosphereState,
-        aero_coeff::AeroCoeff,
-        GizmoShape, GizmoContours,
-        ZoneForce,
-        Failure,
+        aero_coeff::AeroCoeff, materials, AeroZone, AeroZoneBundle, AircraftCoreBundle,
+        AircraftGeometry, AtmosphereState, ControlInputs, ControlSurfaceRole, Failure, FlightState,
+        GizmoContours, GizmoShape, ZoneForce,
     };
     pub use crate::plugin::AircraftFdmPlugin;
+    pub use crate::sourced;
 
     #[cfg(feature = "debug-plugin")]
-    pub use crate::debug_render::{AircraftFdmDebugPlugin, FdmGizmos, FdmDebugRender};
+    pub use crate::debug_render::{AircraftFdmDebugPlugin, FdmDebugRender, FdmGizmos};
 
     #[cfg(feature = "propulsion")]
     pub use crate::components::{EngineZone, PropwashState};

@@ -20,35 +20,36 @@
 //!
 //! The simulation runs on its own. Press **Escape** to quit.
 
-use avian_fdm::prelude::*;
-use avian_fdm::presets::j3cub;
 use avian3d::prelude::{
     Collider, ComputedCenterOfMass, ComputedMass, ConstantForce, LinearVelocity, PhysicsPlugins,
     Rotation,
 };
+use avian_fdm::prelude::*;
+use avian_fdm::presets::j3cub;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::math::{Isometry3d, Quat};
 use bevy::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "avian_fdm — J-3 Cub force visualisation".into(),
-                    resolution: (1280u32, 720u32).into(),
-                    ..default()
-                }),
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "avian_fdm — J-3 Cub force visualisation".into(),
+                resolution: (1280u32, 720u32).into(),
                 ..default()
             }),
-        )
+            ..default()
+        }))
         .add_plugins(PhysicsPlugins::default())
         .add_plugins(AircraftFdmPlugin)
         .add_plugins(AircraftFdmDebugPlugin)
         // At cruise (~4300 N lift), the yellow total-force arrow will be ~7 m long —
         // comparable to the aircraft fuselage, so it's easy to read.
         .insert_gizmo_config(
-            FdmGizmos { force_scale: 1.0 / 600.0, ..FdmGizmos::default() },
+            FdmGizmos {
+                force_scale: 1.0 / 600.0,
+                ..FdmGizmos::default()
+            },
             GizmoConfig::default(),
         )
         .init_resource::<OrbitCamera>()
@@ -119,8 +120,7 @@ fn spawn_scene(mut commands: Commands) {
     // ── Camera ────────────────────────────────────────────────────────────────
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(-30.0, 308.0, 0.0)
-            .looking_at(Vec3::new(0.0, 300.0, 0.0), Vec3::Y),
+        Transform::from_xyz(-30.0, 308.0, 0.0).looking_at(Vec3::new(0.0, 300.0, 0.0), Vec3::Y),
         TrackingCamera,
     ));
 
@@ -153,11 +153,13 @@ fn spawn_scene(mut commands: Commands) {
     // ── Legend ────────────────────────────────────────────────────────────────
     commands.spawn((
         Text::new(
-            "■ Cyan   per-zone aero forces\n\
-             ■ Green  thrust\n\
-             ■ Yellow total aero+thrust (from CG)\n\
-             ■ Red    weight\n\
-             ■ White  net force (≈0 at trim)\n\
+            "-> Cyan   per-zone aero forces\n\
+             -> Green  thrust\n\
+             -> Yellow total aero+thrust (from CG)\n\
+             -> Red    weight\n\
+             -> White  net force (~0 at trim)\n\
+              o Grey   centre of gravity (CG)\n\
+              + Cyan   aerodynamic centre (AC)\n\
              \n\
              LMB drag  orbit\n\
              Scroll    zoom",
@@ -179,10 +181,7 @@ fn spawn_scene(mut commands: Commands) {
 // ── Per-frame systems ─────────────────────────────────────────────────────────
 
 /// Linearly ramp throttle from 50 % → 75 % over the first 12.5 seconds.
-fn ramp_throttle(
-    mut query: Query<&mut ControlInputs, With<AircraftGeometry>>,
-    time: Res<Time>,
-) {
+fn ramp_throttle(mut query: Query<&mut ControlInputs, With<AircraftGeometry>>, time: Res<Time>) {
     let t = time.elapsed_secs_f64();
     let throttle = (0.5 + t / 50.0).min(0.75);
     for mut ctrl in &mut query {
@@ -204,13 +203,15 @@ fn orbit_camera(
 
     // Left-drag to orbit.
     if buttons.pressed(MouseButton::Left) {
-        orbit.yaw   -= motion.delta.x * 0.005;
-        orbit.pitch  = (orbit.pitch - motion.delta.y * 0.005)
-            .clamp(-1.48, 1.48); // stay just short of poles
+        orbit.yaw -= motion.delta.x * 0.005;
+        orbit.pitch = (orbit.pitch - motion.delta.y * 0.005).clamp(-1.48, 1.48);
+        // stay just short of poles
     }
 
-    let Ok(ac)      = aircraft.single()   else { return };
-    let Ok(mut cam) = camera.single_mut() else { return };
+    let Ok(ac) = aircraft.single() else { return };
+    let Ok(mut cam) = camera.single_mut() else {
+        return;
+    };
 
     // Spherical → Cartesian offset from the focus point.
     let (sy, cy) = orbit.yaw.sin_cos();
@@ -241,14 +242,17 @@ struct ShowColliders(bool);
 fn draw_aircraft_outline(
     mut gizmos: Gizmos<FdmGizmos>,
     root_query: Query<&Transform, With<AircraftGeometry>>,
-    zone_query: Query<(
-        &Transform,
-        Option<&AeroZone>,
-        Option<&Collider>,
-        Option<&GizmoShape>,
-        Option<&GizmoContours>,
-        Option<&EngineZone>,
-    ), Or<(With<AeroZone>, With<EngineZone>)>>,
+    zone_query: Query<
+        (
+            &Transform,
+            Option<&AeroZone>,
+            Option<&Collider>,
+            Option<&GizmoShape>,
+            Option<&GizmoContours>,
+            Option<&EngineZone>,
+        ),
+        Or<(With<AeroZone>, With<EngineZone>)>,
+    >,
     keys: Res<ButtonInput<KeyCode>>,
     mut show_colliders: ResMut<ShowColliders>,
 ) {
@@ -264,20 +268,20 @@ fn draw_aircraft_outline(
 
     let to_world = |body: Vec3| t + r * body;
     // Zone-local point → world, respecting zone rotation.
-    let zone_to_world = |zone_tf: &Transform, local: Vec3| {
-        to_world(zone_tf.translation + zone_tf.rotation * local)
-    };
+    let zone_to_world =
+        |zone_tf: &Transform, local: Vec3| to_world(zone_tf.translation + zone_tf.rotation * local);
     let iso_at = |zone_tf: &Transform, extra_rot: Quat| {
         Isometry3d::new(
             t + r * zone_tf.translation,
-            Quat::from_array(r.to_array()) * Quat::from_array(zone_tf.rotation.to_array()) * extra_rot,
+            Quat::from_array(r.to_array())
+                * Quat::from_array(zone_tf.rotation.to_array())
+                * extra_rot,
         )
     };
 
     let collider_color = Color::srgba(0.8, 0.5, 0.2, 0.5);
 
     for (zone_tf, aero, collider, shape, contours, engine) in &zone_query {
-
         // ── Collider-only mode (toggle with C) ──────────────────────────
         if show_colliders.0 {
             if let Some(col) = collider {
@@ -295,14 +299,14 @@ fn draw_aircraft_outline(
                             &bevy::math::primitives::Sphere::new(b.radius as f32),
                             iso_at(zone_tf, Quat::IDENTITY),
                             collider_color,
-                        );
+                        ).resolution(32);
                     }
                     TypedShape::Cylinder(c) => {
                         gizmos.primitive_3d(
                             &Cylinder::new(c.radius as f32, c.half_height as f32 * 2.0),
                             iso_at(zone_tf, Quat::IDENTITY),
                             collider_color,
-                        );
+                        ).resolution(32);
                     }
                     TypedShape::Capsule(c) => {
                         gizmos.primitive_3d(
@@ -322,26 +326,28 @@ fn draw_aircraft_outline(
         let color = if engine.is_some() {
             Color::srgba(0.95, 0.65, 0.15, 0.9) // orange
         } else if aero.is_some_and(|a| a.control_role.is_some()) {
-            Color::srgba(0.3, 1.0, 0.5, 0.7)    // green
+            Color::srgba(0.3, 1.0, 0.5, 0.7) // green
         } else if aero.is_some_and(|a| a.cl.evaluate(0.1, 2e6).abs() > 0.01) {
-            Color::srgba(0.4, 0.85, 1.0, 0.7)   // cyan — lifting surface
+            Color::srgba(0.4, 0.85, 1.0, 0.7) // cyan — lifting surface
         } else {
-            Color::srgba(0.6, 0.6, 0.6, 0.6)    // grey — structural / drag-only
+            Color::srgba(0.6, 0.6, 0.6, 0.6) // grey — structural / drag-only
         };
-
 
         // Draw contour linestrips when present.
         if let Some(contour_data) = contours {
             for line in &contour_data.lines {
-                if line.len() < 2 { continue; }
-                let world_pts: Vec<Vec3> = line.iter()
-                    .map(|p| zone_to_world(zone_tf, *p))
-                    .collect();
+                if line.len() < 2 {
+                    continue;
+                }
+                let world_pts: Vec<Vec3> =
+                    line.iter().map(|p| zone_to_world(zone_tf, *p)).collect();
                 gizmos.linestrip(world_pts, color);
             }
             // If there's no GizmoShape, contours are the only visual — skip
             // the collider fallback below.
-            if shape.is_none() { continue; }
+            if shape.is_none() {
+                continue;
+            }
         }
 
         // Draw GizmoShape override, or fall back to Collider shape.
@@ -354,16 +360,19 @@ fn draw_aircraft_outline(
                         color,
                     );
                 }
-                GizmoShape::Cylinder { radius, length } => {
+                GizmoShape::Cylinder { radius, length, axis } => {
                     gizmos.primitive_3d(
                         &Cylinder::new(*radius, *length),
-                        iso_at(zone_tf, Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
+                        iso_at(zone_tf, Quat::from_rotation_arc(Vec3::Y, *axis)),
                         color,
-                    );
+                    ).resolution(32);
                 }
                 GizmoShape::Cone { radius, length } => {
                     gizmos.primitive_3d(
-                        &Cone { radius: *radius, height: *length },
+                        &Cone {
+                            radius: *radius,
+                            height: *length,
+                        },
                         iso_at(zone_tf, Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)),
                         color,
                     );
@@ -376,7 +385,8 @@ fn draw_aircraft_outline(
                     );
                 }
                 GizmoShape::Quad { corners } => {
-                    let pts: Vec<Vec3> = corners.iter()
+                    let pts: Vec<Vec3> = corners
+                        .iter()
                         .chain(std::iter::once(&corners[0]))
                         .map(|c| zone_to_world(zone_tf, *c))
                         .collect();
@@ -407,14 +417,14 @@ fn draw_aircraft_outline(
                         &bevy::math::primitives::Sphere::new(b.radius as f32),
                         iso_at(zone_tf, Quat::IDENTITY),
                         color,
-                    );
+                    ).resolution(32);
                 }
                 TypedShape::Cylinder(c) => {
                     gizmos.primitive_3d(
                         &Cylinder::new(c.radius as f32, c.half_height as f32 * 2.0),
                         iso_at(zone_tf, Quat::IDENTITY),
                         color,
-                    );
+                    ).resolution(32);
                 }
                 TypedShape::Capsule(c) => {
                     gizmos.primitive_3d(
@@ -456,7 +466,9 @@ fn draw_forces(
         With<AircraftGeometry>,
     >,
 ) {
-    let Ok((root_tf, rot, cf, mass, com)) = root_query.single() else { return };
+    let Ok((root_tf, rot, cf, mass, com)) = root_query.single() else {
+        return;
+    };
     let force_scale = store.config::<FdmGizmos>().1.force_scale;
 
     // ── Per-zone force arrows ─────────────────────────────────────────────────
@@ -467,9 +479,17 @@ fn draw_forces(
         // Compute world position from root's current Transform (no GlobalTransform lag).
         let start = root_tf.transform_point(zone_local_tf.translation);
         if is_engine {
-            gizmos.arrow(start, start + zf.force * force_scale, Color::srgb(0.1, 1.0, 0.1));
+            gizmos.arrow(
+                start,
+                start + zf.force * force_scale,
+                Color::srgb(0.1, 1.0, 0.1),
+            );
         } else {
-            gizmos.arrow(start, start + zf.force * force_scale, Color::srgb(0.0, 0.9, 0.9));
+            gizmos.arrow(
+                start,
+                start + zf.force * force_scale,
+                Color::srgb(0.0, 0.9, 0.9),
+            );
         }
     }
 
@@ -488,12 +508,6 @@ fn draw_forces(
     if net.length_squared() > 1.0 {
         gizmos.arrow(cg, cg + net * force_scale, Color::WHITE);
     }
-
-    // CG marker cross.
-    let h = 0.5;
-    gizmos.line(cg - Vec3::X * h, cg + Vec3::X * h, Color::WHITE);
-    gizmos.line(cg - Vec3::Y * h, cg + Vec3::Y * h, Color::WHITE);
-    gizmos.line(cg - Vec3::Z * h, cg + Vec3::Z * h, Color::WHITE);
 }
 
 /// Updates the flight-state HUD in the upper-left corner.
@@ -502,8 +516,12 @@ fn update_hud(
     time: Res<Time>,
     mut hud: Query<&mut Text, With<HudText>>,
 ) {
-    let Ok(fs) = flight_query.single() else { return };
-    let Ok(mut text) = hud.single_mut() else { return };
+    let Ok(fs) = flight_query.single() else {
+        return;
+    };
+    let Ok(mut text) = hud.single_mut() else {
+        return;
+    };
     let t = time.elapsed_secs();
 
     text.0 = format!(
@@ -516,7 +534,7 @@ fn update_hud(
         alt = fs.altitude_m,
         tas = fs.airspeed_ms,
         aoa = fs.alpha_rad.to_degrees(),
-        q   = fs.dynamic_pressure_pa,
-        re  = fs.reynolds_number,
+        q = fs.dynamic_pressure_pa,
+        re = fs.reynolds_number,
     );
 }

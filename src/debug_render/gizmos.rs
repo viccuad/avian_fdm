@@ -6,9 +6,58 @@
 //!
 //! [`AircraftFdmDebugPlugin`]: super::AircraftFdmDebugPlugin
 
+use avian3d::prelude::{ComputedCenterOfMass, Rotation};
 use bevy::prelude::*;
 
+use crate::components::{AeroZone, AircraftGeometry};
 use super::configuration::FdmGizmos;
+
+// ── Centre of gravity ─────────────────────────────────────────────────────────
+
+/// Draw a sphere at the aircraft's centre of gravity (CG).
+///
+/// Uses Avian's [`ComputedCenterOfMass`] (local offset from entity origin) and
+/// [`Rotation`] (physics rotation) to compute the world-space CG position.
+pub(super) fn debug_render_cg(
+    mut gizmos: Gizmos<FdmGizmos>,
+    store: Res<GizmoConfigStore>,
+    query: Query<(&GlobalTransform, &Rotation, &ComputedCenterOfMass), With<AircraftGeometry>>,
+) {
+    let config = store.config::<FdmGizmos>().1;
+    let Some(color) = config.cg_color else { return };
+
+    for (gt, rot, com) in &query {
+        let cg = gt.translation() + rot.0 * com.0;
+        gizmos.sphere(Isometry3d::from_translation(cg), config.marker_radius, color);
+    }
+}
+
+// ── Aerodynamic centres ───────────────────────────────────────────────────────
+
+/// Draw a sphere at each zone's aerodynamic centre (AC).
+///
+/// The AC is stored as [`AeroZone::ac_offset`] in the zone's local frame.
+/// `GlobalTransform::transform_point` converts it to world space.
+///
+/// Rendered as a 3-axis cross (±X/Y/Z arms) so it remains clearly visible
+/// even when the AC coincides with the zone entity origin, where a sphere
+/// wireframe would blend into the zone outlines.
+pub(super) fn debug_render_ac(
+    mut gizmos: Gizmos<FdmGizmos>,
+    store: Res<GizmoConfigStore>,
+    query: Query<(&GlobalTransform, &AeroZone)>,
+) {
+    let config = store.config::<FdmGizmos>().1;
+    let Some(color) = config.ac_color else { return };
+
+    let arm = config.marker_radius;
+    for (gt, zone) in &query {
+        let ac = gt.transform_point(zone.ac_offset);
+        gizmos.line(ac - Vec3::X * arm, ac + Vec3::X * arm, color);
+        gizmos.line(ac - Vec3::Y * arm, ac + Vec3::Y * arm, color);
+        gizmos.line(ac - Vec3::Z * arm, ac + Vec3::Z * arm, color);
+    }
+}
 
 // ── Force arrows ──────────────────────────────────────────────────────────────
 

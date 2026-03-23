@@ -61,6 +61,8 @@ impl Plugin for AircraftFdmDebugPlugin {
         app.add_systems(
             PostUpdate,
             (
+                debug_render_cg,
+                debug_render_ac,
                 debug_render_zone_forces,
                 debug_render_thrust,
                 debug_render_resultant,

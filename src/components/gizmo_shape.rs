@@ -31,6 +31,10 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
+fn default_cylinder_axis() -> Vec3 {
+    Vec3::X
+}
+
 /// Describes how a zone entity should be drawn in the gizmo debug view.
 ///
 /// This is purely visual — it has no effect on physics or aerodynamics.
@@ -48,12 +52,15 @@ pub enum GizmoShape {
         /// Full extent along local Z (down).
         z: f32,
     },
-    /// Cylinder aligned along local X (forward axis).
+    /// Cylinder aligned along a local axis.
     Cylinder {
         /// Radius (metres).
         radius: f32,
-        /// Length along local X (metres).
+        /// Length along the axis (metres).
         length: f32,
+        /// Local-frame axis the cylinder is aligned along. Default: `Vec3::X` (forward).
+        #[serde(default = "default_cylinder_axis")]
+        axis: Vec3,
     },
     /// Cone pointing along local +X (forward), base at −X.
     Cone {

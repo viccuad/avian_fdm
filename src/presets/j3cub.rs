@@ -474,6 +474,8 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         global_transform: GlobalTransform::default(),
                     },
                     ColliderDensity(sourced!(1200.0, "Estimate — 8-ply tyre + aluminium rim; composite density ≈ rubber 1100 + Al 2700")),
+                    // Wheels roll around Y (spanwise axis); radius 0.15 m, width 0.10 m.
+                    GizmoShape::Cylinder { radius: 0.15, length: 0.10, axis: Vec3::Y },
                 ));
             }
 
@@ -491,6 +493,8 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     global_transform: GlobalTransform::default(),
                 },
                 ColliderDensity(sourced!(1200.0, "Estimate — tailwheel tyre + stub axle; same composite density as main wheels")),
+                // Tailwheel rolls around Y; radius 0.06 m, width 0.06 m.
+                GizmoShape::Cylinder { radius: 0.06, length: 0.06, axis: Vec3::Y },
             ));
 
             // ── Horizontal stabiliser ─────────────────────────────────────────
@@ -552,7 +556,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     Collider::cuboid(0.50, 0.40, 0.40),
                     ColliderDensity(sourced!(860.0, "JSBSim:J3Cub.xml — Continental A-65 dry mass ≈ 69 kg; 69/(0.50×0.40×0.40)≈862")),
                 ),
-                GizmoShape::Cylinder { radius: 0.20, length: 0.50 },
+                GizmoShape::Cylinder { radius: 0.20, length: 0.50, axis: Vec3::X },
                 engine_contours(),
             ));
         })

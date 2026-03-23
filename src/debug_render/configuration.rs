@@ -49,6 +49,12 @@ pub struct FdmGizmos {
     pub zone_color: Option<Color>,
     /// Color for the relative-wind / angle-of-attack indicator arrow. `None` = disabled.
     pub wind_color: Option<Color>,
+    /// Color for the CG (centre of gravity) sphere. `None` = disabled.
+    pub cg_color: Option<Color>,
+    /// Color for the aerodynamic-centre spheres on each zone. `None` = disabled.
+    pub ac_color: Option<Color>,
+    /// Radius (metres) of the CG and AC marker spheres.
+    pub marker_radius: f32,
     /// World-space metres per Newton for force arrow length.
     pub force_scale: f32,
 }
@@ -66,6 +72,9 @@ impl Default for FdmGizmos {
             yaw_moment_color: Some(VIOLET.into()),
             zone_color: Some(ORANGE.into()),
             wind_color: Some(LIGHT_CYAN.into()),
+            cg_color: Some(SILVER.into()),
+            ac_color: Some(AQUA.into()),
+            marker_radius: 0.075,
             force_scale: 0.001,
         }
     }
@@ -90,6 +99,9 @@ impl FdmGizmos {
             yaw_moment_color: None,
             zone_color: None,
             wind_color: None,
+            cg_color: None,
+            ac_color: None,
+            marker_radius: 0.075,
             force_scale: 0.001,
         }
     }
@@ -97,11 +109,11 @@ impl FdmGizmos {
     /// Only force arrows (lift, drag, side force, thrust, resultant) enabled.
     pub fn forces() -> Self {
         Self {
-            lift_color:      Some(LIME.into()),
-            drag_color:      Some(RED.into()),
+            lift_color:       Some(LIME.into()),
+            drag_color:       Some(RED.into()),
             side_force_color: Some(YELLOW.into()),
-            thrust_color:    Some(AQUA.into()),
-            resultant_color: Some(WHITE.into()),
+            thrust_color:     Some(AQUA.into()),
+            resultant_color:  Some(WHITE.into()),
             ..Self::none()
         }
     }
