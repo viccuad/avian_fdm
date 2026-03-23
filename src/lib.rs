@@ -26,6 +26,7 @@
 //! 6. [Aerodynamic Forces and Moments](#aerodynamic-forces-and-moments)
 //! 7. [Propulsion Coupling](#propulsion-coupling)
 //! 8. [Zone Decomposition and Damage](#zone-decomposition-and-damage)
+//!    - [Collider strategy](#collider-strategy)
 //! 9. [Reading Simulation Output](#reading-simulation-output)
 //! 10. [Data Flow](#data-flow)
 //! 11. [Feature Flags](#feature-flags)
@@ -442,6 +443,29 @@
 //! | V-tail | Yaw stability (mass placeholder) | C_Y = 0 until v2 |
 //! | Rudder | Yaw control | C_Y scaled by rudder input |
 //! | Engine zone | Thrust + mass | — |
+//!
+//! ### Collider strategy
+//!
+//! Zone colliders serve two purposes: **mass/inertia** (via `ColliderDensity`)
+//! and **debug visualisation**. The right collider type depends on the zone's role:
+//!
+//! | Collider type | Mass | Hit detection | When to use |
+//! |---|---|---|---|
+//! | Primitive (`cuboid`, `ball`, `cylinder`) | ✅ exact analytic | Approximate | Aero surfaces, structural parts — tune `ColliderDensity` to match target mass |
+//! | `ConvexHull` (from mesh) | ✅ from hull volume | Good convex approx | Volumetric parts where hull ≈ real shape (engine cowl, fuselage bulkhead) |
+//! | `TriMesh` | ❌ none — static only | Exact | Never on AeroZones; use only for terrain or static scenery |
+//!
+//! In practice, **aero zones use primitives** and the detailed 3D model is a
+//! separate visual-only child entity (no `Collider`, no `RigidBody`). The
+//! primitive wireframes are diagnostic; the player sees the mesh.
+//!
+//! For accurate **hit detection** in a combat game, add a `Sensor` collider as a
+//! child of the AeroZone — either a `ConvexHull` or `TriMesh` of the visual mesh.
+//! Sensors fire `CollisionStarted`/`CollisionEnded` events without contributing
+//! mass or exerting forces, so a bullet can detect which zone it struck and reduce
+//! `Failure::remaining` accordingly. This hit-detection layer is **game code** —
+//! `avian_fdm` only defines `Failure` as the damage target; how damage is delivered
+//! is outside the library's scope.
 //!
 //! ### How zone contributions compose
 //!
