@@ -572,7 +572,6 @@ pub fn compute_aero_forces(
 mod tests {
     use super::*;
     use crate::components::aero_coeff::AeroCoeff;
-    use std::f64::consts::FRAC_PI_6;
 
     /// Build a minimal AeroZone with the given CL/CD scalars and no control role.
     fn simple_zone(cl: f64, cd: f64) -> AeroZone {

@@ -115,7 +115,6 @@ use crate::components::{
 };
 #[cfg(feature = "propulsion")]
 use crate::components::{EngineZone, PropwashState};
-use crate::sourced;
 
 // ── Aircraft reference constants ─────────────────────────────────────────────
 
