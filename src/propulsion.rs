@@ -69,8 +69,8 @@ pub fn compute_engine_zone_forces(
         let density_ratio = (rho / RHO_0).max(0.0);
 
         // 3. Speed-dependent thrust decay for fixed-pitch propellers.
-        let speed_factor = if engine.zero_thrust_speed_ms > 0.0 {
-            let ratio = flight.airspeed_ms / engine.zero_thrust_speed_ms;
+        let speed_factor = if let Some(v_zero) = engine.zero_thrust_speed_ms {
+            let ratio = flight.airspeed_ms / v_zero;
             (1.0 - ratio * ratio).max(0.0)
         } else {
             1.0

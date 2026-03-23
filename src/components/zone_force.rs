@@ -14,7 +14,8 @@ use bevy::prelude::*;
 /// fully failed (`Failure.remaining == 0.0`) or otherwise inactive.
 ///
 /// **Do not read or write this component from game code.**
-#[derive(Component, Default, Clone, Copy, Debug)]
+#[derive(Component, Reflect, Default, Clone, Copy, Debug)]
+#[reflect(Component)]
 pub struct ZoneForce {
     /// World-space force contribution (N) — from CL, CD, CY coefficients.
     pub force: Vec3,

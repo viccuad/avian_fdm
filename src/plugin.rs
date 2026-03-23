@@ -27,6 +27,7 @@ impl Plugin for AircraftFdmPlugin {
            .register_type::<FlightState>()
            .register_type::<AtmosphereState>()
            .register_type::<AeroZone>()
+           .register_type::<ZoneForce>()
            .register_type::<GizmoShape>()
            .register_type::<GizmoContours>();
 
@@ -42,9 +43,6 @@ impl Plugin for AircraftFdmPlugin {
             app.register_type::<EngineZone>()
                .register_type::<PropwashState>();
         }
-
-        // ZoneForce is internal — register for inspector access but not public API.
-        let _ = std::any::TypeId::of::<ZoneForce>(); // suppress unused-import lint
 
         crate::systems::register_fdm_systems(app);
     }

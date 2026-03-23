@@ -64,14 +64,20 @@ pub struct AeroZone {
     /// If `Some`, this zone acts as a control surface. Its coefficients are
     /// additionally scaled by the matching [`super::ControlInputs`] value.
     pub control_role: Option<ControlSurfaceRole>,
-    /// Drag pressure (Pa) added when the zone is partially failed but still
-    /// attached (`remaining > 0`). Represents structural drag from deformation.
+    /// Extra drag added when the zone is partially failed but still attached
+    /// (`remaining > 0`). Represents structural drag from deformation.
+    ///
+    /// `None` (the default) means this zone has no damage-drag model — the
+    /// common case for most zones. `Some(coeff)` enables the calculation:
     ///
     /// ```text
-    /// struct_drag = damage_drag_coeff × (1 − remaining)   when remaining > 0
-    ///             = 0                                      when remaining == 0 (detached)
+    /// CD_extra = coeff × (1 − remaining) / q̄   when remaining > 0
+    ///          = 0                              when remaining == 0 (detached)
     /// ```
-    pub damage_drag_coeff: f64,
+    ///
+    /// Only set this on zones where partial failure causes visible structural
+    /// deformation that increases drag (e.g. a bent wing panel, torn fabric).
+    pub damage_drag_coeff: Option<f64>,
 }
 
 /// Which flight control function this zone performs, if any.
@@ -158,7 +164,7 @@ impl Default for AeroZone {
             cn: AeroCoeff::Scalar(0.0),
             ac_offset: Vec3::ZERO,
             control_role: None,
-            damage_drag_coeff: 0.0,
+            damage_drag_coeff: None,
         }
     }
 }

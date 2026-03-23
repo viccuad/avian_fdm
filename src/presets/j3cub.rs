@@ -841,7 +841,7 @@ pub fn engine_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
             thrust_axis_body: DVec3::X, // +X = forward
             // McCauley CM7445, fixed-pitch 22°. At ~2800 RPM the zero-thrust
             // advance ratio J≈0.95 → V_zero = J × n × D ≈ 80 m/s (155 kts).
-            zero_thrust_speed_ms: sourced!(80.0, "Estimate:McCauley CM7445 — fixed-pitch 22° blade; J_zero ≈ 0.95 at 2800 RPM → V = J × (2800/60) × 1.905 ≈ 84 m/s, rounded to 80"),
+            zero_thrust_speed_ms: Some(sourced!(80.0, "Estimate:McCauley CM7445 — fixed-pitch 22° blade; J_zero ≈ 0.95 at 2800 RPM → V = J × (2800/60) × 1.905 ≈ 84 m/s, rounded to 80")),
         },
         PropwashState::default(),
         ZoneForce::default(),

@@ -209,7 +209,10 @@ pub(crate) fn evaluate_zone_coefficients(
     };
 
     // Failure degradation: structural deformation drag grows as remaining → 0.
-    let extra_cd = zone.damage_drag_coeff * (1.0 - remaining) / qbar.max(1e-4);
+    // Only computed when the zone has a damage-drag model (most zones don't).
+    let extra_cd = zone.damage_drag_coeff
+        .map(|coeff| coeff * (1.0 - remaining) / qbar.max(1e-4))
+        .unwrap_or(0.0);
 
     ZoneCoefficients {
         cl: cl_base * scale * remaining,
@@ -607,7 +610,7 @@ mod tests {
     #[test]
     fn damage_drag_peaks_at_intermediate_remaining() {
         let mut zone = simple_zone(0.0, 0.03);
-        zone.damage_drag_coeff = 500.0;
+        zone.damage_drag_coeff = Some(500.0);
         let qbar = 1000.0;
 
         let full = evaluate_zone_coefficients(&zone, &neutral_controls(), 0.0, 0.0, 1e6, qbar, 1.0);
