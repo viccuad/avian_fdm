@@ -10,8 +10,8 @@
 //!
 //! Mass, centre of gravity, and the full inertia tensor are computed
 //! automatically by Avian from the [`avian3d::prelude::ColliderDensity`] on
-//! each child collider. Failing or destroying a zone (setting
-//! [`components::Failure::remaining`] to 0) instantly updates the physics
+//! each child collider. Performance reductions from damage in zones (setting
+//! [`components::Failure::remaining`]) instantly updates the physics
 //! without any bookkeeping on the game's part.
 //!
 //! ---
@@ -113,13 +113,13 @@
 //! `avian_fdm` uses the **small-perturbation stability-derivative method**
 //! (sometimes called the *linear aerodynamic model*). Aerodynamic coefficients
 //! C_L, C_D, C_Y are expressed as tabulated functions of angle of attack α
-//! and Reynolds number Re, then multiplied by dynamic pressure q̄ and
+//! and Reynolds number Re, then multiplied by dynamic pressure q̄  and
 //! reference area S. **Aerodynamic force = coefficient × dynamic pressure × wing area:**
 //!
 //! ```text
-//! Lift  = C_L(α, Re) · q̄ · S
-//! Drag  = C_D(α, Re) · q̄ · S
-//! Side  = C_Y(α, Re) · q̄ · S
+//! Lift  = C_L(α, Re) · q̄  · S
+//! Drag  = C_D(α, Re) · q̄  · S
+//! Side  = C_Y(α, Re) · q̄  · S
 //! ```
 //!
 //! This is the same method used by [JSBSim], [FlightGear], and most
@@ -212,13 +212,13 @@
 //! ### Rotational dynamics (Euler's equations)
 //!
 //! In **body frame**, with principal axes close to body X/Y/Z, Euler's
-//! equations of motion are. **Rolling, pitching, and yawing moments equal
-//! inertia times angular acceleration plus gyroscopic cross-coupling terms:**
+//! equations of motion are **Rolling, pitching, and yawing moments equal
+//! inertia times angular acceleration plus gyroscopic cross-coupling terms**:
 //!
 //! ```text
-//! L = I_xx · ṗ + (I_zz − I_yy) · q · r   (roll  equation)
-//! M = I_yy · q̇ + (I_xx − I_zz) · p · r   (pitch equation)
-//! N = I_zz · ṙ + (I_yy − I_xx) · p · q   (yaw   equation)
+//! L = I_xx · ṗ  + (I_zz − I_yy) · q · r   (roll  equation)
+//! M = I_yy · q̇  + (I_xx − I_zz) · p · r   (pitch equation)
+//! N = I_zz · ṙ  + (I_yy − I_xx) · p · q   (yaw   equation)
 //! ```
 //!
 //! where (p, q, r) are body-frame roll/pitch/yaw rates, and (L, M, N) are the
@@ -252,10 +252,11 @@
 //! ### Why density drives everything
 //!
 //! Every aerodynamic force scales with **dynamic pressure**, the kinetic energy
-//! of the airflow per unit volume. **Dynamic pressure q-bar = half × air density (kg/m³) × airspeed² (m/s):**
+//! of the airflow per unit volume,
+//! **Dynamic pressure q-bar = half × air density (kg/m³) × airspeed² (m/s)**:
 //!
 //! ```text
-//! q̄ = ½ · ρ · V²
+//! q̄  = ½ · ρ · V²
 //! ```
 //!
 //! where ρ is air density (kg/m³) and V is true airspeed (m/s). At sea level
@@ -268,10 +269,10 @@
 //! of inertial to viscous forces that determines whether airflow is smooth or turbulent:**
 //!
 //! ```text
-//! Re = ρ · V · c̄ / μ
+//! Re = ρ · V · c̄  / μ
 //! ```
 //!
-//! where c̄ is mean aerodynamic chord and μ is dynamic viscosity. Reynolds
+//! where c̄  is mean aerodynamic chord and μ is dynamic viscosity. Reynolds
 //! number governs boundary-layer behaviour: at low Re the flow separates
 //! earlier (sharper stall, higher C_D₀), so the FDM uses Re as the second
 //! dimension of its C_L/C_D lookup tables.
@@ -338,22 +339,22 @@
 //! | `Table1D` | C_L(α) for simple surfaces |
 //! | `Table2D` | C_L(α, Re) for wings where boundary-layer state matters |
 //!
-//! The J3Cub preset uses `Table2D` for wing C_L and C_D, with α breakpoints
-//! from −20° to +20° and two Re columns (1.7 × 10⁶ and 3.7 × 10⁶) derived
-//! from JSBSim's J3Cub.xml and USA-35B airfoil measurements.
+//! For example, the J3Cub preset uses `Table2D` for wing C_L and C_D, with
+//! α breakpoints from −20° to +20° and two Re columns (1.7 × 10⁶ and 3.7 × 10⁶)
+//! derived from JSBSim's J3Cub.xml and USA-35B airfoil measurements.
 //!
 //! ### Force construction pipeline
 //!
 //! For each [`components::AeroZone`] child:
 //!
-//! 1. Read α, q̄, Re from [`components::FlightState`] on the root entity.
+//! 1. Read α, q̄  , Re from [`components::FlightState`] on the root entity.
 //! 2. Evaluate C_L(α, Re), C_D(α, Re), C_Y(α, Re) via bilinear interpolation.
 //! 3. Multiply by the zone's share of reference area (`fraction × S_ref`).
-//! 4. Scale by `Failure.remaining` ∈ [0, 1]: zones at zero remaining contribute nothing.
-//! 5. Construct the force vector in **stability axes**. **Force along each axis
-//!    = aerodynamic coefficient × dynamic pressure × wing area:**
+//! 4. Scale by `Failure.remaining` ∈ [0, 1] (zones at zero remaining contribute nothing).
+//! 5. Construct the force vector in **stability axes**:
+//!    **Force along each axis = aerodynamic coefficient × dynamic pressure × wing area:**
 //!    ```text
-//!    F_stab = (−C_D · q̄ · S,  C_Y · q̄ · S,  −C_L · q̄ · S)
+//!    F_stab = (−C_D · q̄  · S,  C_Y · q̄  · S,  −C_L · q̄  · S)
 //!    ```
 //! 6. Rotate to world: `F_world = q_root · R_y(−α) · F_stab`
 //! 7. Write to [`components::ZoneForce`] on the zone entity.
@@ -373,9 +374,9 @@
 //! and divided by airspeed:**
 //!
 //! ```text
-//! ΔM = C_Mq · (q · c̄/2V) · q̄ · S · c̄   (pitch damping,  C_Mq = −12)
-//! ΔL = C_lp · (p · b/2V) · q̄ · S · b    (roll  damping,  C_lp = −0.45)
-//! ΔN = C_nr · (r · b/2V) · q̄ · S · b    (yaw   damping,  C_nr = −0.12)
+//! ΔM = C_Mq · (q · c̄/2V) · q̄  · S · c̄    (pitch damping,  C_Mq = −12)
+//! ΔL = C_lp · (p · b/2V) · q̄  · S · b    (roll  damping,  C_lp = −0.45)
+//! ΔN = C_nr · (r · b/2V) · q̄  · S · b    (yaw   damping,  C_nr = −0.12)
 //! ```
 //!
 //! These provide the rate-dependent restoring moments that prevent unrealistic
@@ -749,15 +750,15 @@ macro_rules! sourced {
 /// All crate-internal modules import from here instead of the `bevy` meta-crate.
 pub(crate) mod _bevy {
     pub(crate) use bevy_app::prelude::*;
-    pub(crate) use bevy_ecs::prelude::*;
-    pub(crate) use bevy_math::prelude::*;
-    pub(crate) use bevy_transform::prelude::*;
-    pub(crate) use bevy_reflect::prelude::*;
-    pub(crate) use bevy_log::{warn, warn_once};
     #[cfg(feature = "debug-plugin")]
     pub(crate) use bevy_color::prelude::*;
+    pub(crate) use bevy_ecs::prelude::*;
     #[cfg(feature = "debug-plugin")]
     pub(crate) use bevy_gizmos::prelude::*;
+    pub(crate) use bevy_log::{warn, warn_once};
+    pub(crate) use bevy_math::prelude::*;
+    pub(crate) use bevy_reflect::prelude::*;
+    pub(crate) use bevy_transform::prelude::*;
 }
 
 pub mod aerodynamics;
@@ -788,7 +789,9 @@ pub mod prelude {
     pub use crate::systems::AircraftFdmSystem;
 
     #[cfg(feature = "debug-plugin")]
-    pub use crate::debug_render::{AircraftFdmDebugPlugin, FdmDebugRender, FdmGizmos, ShowColliders};
+    pub use crate::debug_render::{
+        AircraftFdmDebugPlugin, FdmDebugRender, FdmGizmos, ShowColliders,
+    };
 
     #[cfg(feature = "propulsion")]
     pub use crate::components::{EngineZone, PropwashState};
