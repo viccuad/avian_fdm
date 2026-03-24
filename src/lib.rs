@@ -788,7 +788,7 @@ pub mod prelude {
     pub use crate::systems::AircraftFdmSystem;
 
     #[cfg(feature = "debug-plugin")]
-    pub use crate::debug_render::{AircraftFdmDebugPlugin, FdmDebugRender, FdmGizmos};
+    pub use crate::debug_render::{AircraftFdmDebugPlugin, FdmDebugRender, FdmGizmos, ShowColliders};
 
     #[cfg(feature = "propulsion")]
     pub use crate::components::{EngineZone, PropwashState};

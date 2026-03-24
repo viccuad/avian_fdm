@@ -7,12 +7,16 @@ license = "LGPL-2.1-or-later"
 exclude = ["/assets/", "/docs/", "/.github/"]
 
 [features]
-# Delegate f32/parry precision to the user, matching avian_pickup convention.
-# Use `default-features = false` + enable avian3d/f64 + avian3d/parry-f64 to switch.
-default = ["propulsion", "avian3d/f32", "avian3d/parry-f32"]
+# `avian3d/f32` and `avian3d/parry-f32` are NOT listed here by default.
+# They are pulled in transitively when `presets` is enabled (via `avian3d/default-collider`).
+# Users who write their own aircraft without presets must enable precision on their
+# avian3d dependency directly. To switch to f64, add avian_fdm with
+# `default-features = false` and enable `avian3d/f64` + `avian3d/parry-f64`.
+default = ["propulsion"]
 propulsion = []
-debug-plugin = ["dep:bevy_color", "dep:bevy_gizmos"]
-presets = []
+debug-plugin = ["dep:bevy_color", "dep:bevy_gizmos", "avian3d/f32", "avian3d/parry-f32"]
+# presets enables default-collider which transitively enables parry-f32.
+presets = ["avian3d/default-collider", "avian3d/f32", "avian3d/parry-f32"]
 
 [dependencies]
 # collider-from-mesh is excluded: avian_fdm uses only analytic shapes (boxes, spheres,
@@ -20,7 +24,6 @@ presets = []
 # MeshPlugin in headless apps, and are never needed for a flight dynamics library.
 avian3d = { version = "0.6", default-features = false, features = [
     "3d",
-    "default-collider",
 ] }
 bevy_app     = { version = "0.18", default-features = false }
 bevy_ecs     = { version = "0.18", default-features = false }
@@ -39,7 +42,6 @@ bevy = { version = "0.18", features = [
     "bevy_gizmos",
 ] }
 criterion = { version = "0.8", features = ["html_reports"] }
-parry3d = "0.26"
 
 [[bench]]
 name = "fdm_hot_path"

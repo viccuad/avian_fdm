@@ -281,40 +281,40 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
         .with_children(|parent| {
             // ── Left wing ────────────────────────────────────────────────────
             // Thin collider (z=0.02 m). See module docs on hybrid approach.
-            parent.spawn(wing_zone(
+            parent.spawn((wing_zone(
                 "L-root", WING_AC_X, -0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; root panel 20% span")),
-            ));
-            parent.spawn(wing_zone(
+            ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
+            parent.spawn((wing_zone(
                 "L-mid", WING_AC_X, -2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; mid panel 20% span")),
-            ));
+            ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             // Tip front (LE half of chord, inboard of aileron spanwise).
             // x = WING_AC_X + (full_chord - tip_chord) / 2 = -0.10 + 0.175 = 0.075
-            parent.spawn(wing_zone(
+            parent.spawn((wing_zone(
                 "L-tip", 0.075, -4.19, 0.150,
                 Collider::cuboid(0.45, 0.86, 0.02),
                 ColliderDensity(sourced!(517.0, "Calibration: tip panel smaller volume; density raised to keep tip-panel mass ≈ root")),
-            ));
+            ), GizmoShape::Box { x: 0.45, y: 0.86, z: 0.02 }));
 
             // ── Right wing ───────────────────────────────────────────────────
-            parent.spawn(wing_zone(
+            parent.spawn((wing_zone(
                 "R-root", WING_AC_X, 0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; root panel 20% span")),
-            ));
-            parent.spawn(wing_zone(
+            ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
+            parent.spawn((wing_zone(
                 "R-mid", WING_AC_X, 2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; mid panel 20% span")),
-            ));
-            parent.spawn(wing_zone(
+            ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
+            parent.spawn((wing_zone(
                 "R-tip", 0.075, 4.19, 0.150,
                 Collider::cuboid(0.45, 0.86, 0.02),
                 ColliderDensity(sourced!(517.0, "Calibration: tip panel smaller volume; density raised to keep tip-panel mass ≈ root")),
-            ));
+            ), GizmoShape::Box { x: 0.45, y: 0.86, z: 0.02 }));
 
             // ── Ailerons ─────────────────────────────────────────────────────
             // Trailing-edge strip, outboard: tiled behind tip front and
@@ -327,18 +327,18 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // outboard region: tip is the LE strip, aileron is the TE strip,
             // both at the SAME Y range.
             // Center Y = same as tip = 4.19.
-            parent.spawn(aileron_zone(
+            parent.spawn((aileron_zone(
                 "L-aileron", -4.19,
                 ControlSurfaceRole::AileronLeft,
                 Collider::cuboid(0.35, 0.86, 0.02),
                 ColliderDensity(sourced!(381.0, "Calibration: aileron smaller chord; density set for ~8 kg per aileron")),
-            ));
-            parent.spawn(aileron_zone(
+            ), GizmoShape::Box { x: 0.35, y: 0.86, z: 0.02 }));
+            parent.spawn((aileron_zone(
                 "R-aileron", 4.19,
                 ControlSurfaceRole::AileronRight,
                 Collider::cuboid(0.35, 0.86, 0.02),
                 ColliderDensity(sourced!(381.0, "Calibration: aileron smaller chord; density set for ~8 kg per aileron")),
-            ));
+            ), GizmoShape::Box { x: 0.35, y: 0.86, z: 0.02 }));
 
             // ── Fuselage forward (firewall to rear seat) ─────────────────────
             // Main structural mass, includes pilot, fuel tank, instruments.

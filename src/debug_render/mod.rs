@@ -31,9 +31,11 @@
 //!
 //! Override per zone entity with [`FdmDebugRender`].
 
+mod colliders;
 mod configuration;
 mod gizmos;
 
+pub use colliders::ShowColliders;
 pub use configuration::{FdmDebugRender, FdmGizmos};
 
 use crate::_bevy::*;
@@ -52,6 +54,8 @@ pub struct AircraftFdmDebugPlugin;
 
 impl Plugin for AircraftFdmDebugPlugin {
     fn build(&self, app: &mut App) {
+        colliders::plugin(app);
+
         app.init_gizmo_group::<FdmGizmos>();
         app.register_type::<FdmDebugRender>();
 
