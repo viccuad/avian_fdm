@@ -12,7 +12,7 @@
 //! use bevy::prelude::*;
 //!
 //! App::new()
-//!     .add_plugins((AircraftFdmPlugin, AircraftFdmDebugPlugin))
+//!     .add_plugins((AircraftFdmPlugin::default(), AircraftFdmDebugPlugin))
 //!     .run();
 //! ```
 //!
@@ -36,8 +36,8 @@ mod gizmos;
 
 pub use configuration::{FdmDebugRender, FdmGizmos};
 
-use bevy::prelude::*;
-use bevy::transform::TransformSystems;
+use crate::_bevy::*;
+use bevy_transform::TransformSystems;
 use gizmos::*;
 
 /// Plugin that adds all FDM debug gizmo overlays.

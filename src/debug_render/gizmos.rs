@@ -7,7 +7,7 @@
 //! [`AircraftFdmDebugPlugin`]: super::AircraftFdmDebugPlugin
 
 use avian3d::prelude::{ComputedCenterOfMass, Rotation};
-use bevy::prelude::*;
+use crate::_bevy::*;
 
 use crate::components::{AeroZone, AircraftGeometry};
 use super::configuration::FdmGizmos;

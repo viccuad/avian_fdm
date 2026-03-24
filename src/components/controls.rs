@@ -1,6 +1,6 @@
 //! Control input component. Written each frame by the game's input system.
 
-use bevy::prelude::*;
+use crate::_bevy::*;
 use serde::{Deserialize, Serialize};
 
 /// Pilot or autopilot control surface positions.

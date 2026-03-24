@@ -1,7 +1,7 @@
 //! [`FdmGizmos`] configuration group and per-entity [`FdmDebugRender`] component.
 
-use bevy::color::palettes::css::*;
-use bevy::prelude::*;
+use bevy_color::palettes::css::*;
+use crate::_bevy::*;
 
 /// Gizmo configuration group for FDM debug rendering. See [`AircraftFdmDebugPlugin`].
 ///

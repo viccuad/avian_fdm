@@ -3,7 +3,7 @@
 use crate::components::aero_coeff::AeroCoeff;
 use crate::components::zone_force::ZoneForce;
 use avian3d::prelude::Collider;
-use bevy::prelude::*;
+use crate::_bevy::*;
 use serde::{Deserialize, Serialize};
 
 /// Per-zone aerodynamic coefficient contributions.

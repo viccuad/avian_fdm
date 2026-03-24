@@ -26,8 +26,8 @@
 //! Only compiled with `features = ["propulsion"]`.
 
 use std::f64::consts::PI;
-use bevy::prelude::*;
-use bevy::math::DQuat;
+use crate::_bevy::*;
+use bevy_math::DQuat;
 use avian3d::prelude::ColliderOf;
 
 use crate::components::{

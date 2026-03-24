@@ -45,7 +45,7 @@
 //! μ_ref = 1.716×10⁻⁵ kg/(m·s),  T_ref = 273.15 K,  S = 110.4 K
 //! ```
 
-use bevy::prelude::*;
+use crate::_bevy::*;
 use crate::components::{AtmosphereState, FlightState, WindResource};
 
 // ── ISA constants ─────────────────────────────────────────────────────────────
@@ -155,7 +155,7 @@ pub fn update_flight_state(
     )>,
     wind: Option<Res<WindResource>>,
 ) {
-    use bevy::math::{DVec3, DQuat};
+    use bevy_math::{DVec3, DQuat};
     use crate::math::{world_to_body, to_dvec3};
 
     let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(DVec3::ZERO);

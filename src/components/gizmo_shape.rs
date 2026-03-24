@@ -28,7 +28,7 @@
 //! zone-aware: they inherit damage colouring and disappear when the zone is
 //! destroyed.
 
-use bevy::prelude::*;
+use crate::_bevy::*;
 use serde::{Deserialize, Serialize};
 
 fn default_cylinder_axis() -> Vec3 {

@@ -103,11 +103,11 @@
 //!
 //! All zones are tiled without collider overlap. No double-counted mass.
 
-use bevy::prelude::*;
+use crate::_bevy::*;
 use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
 
 #[cfg(feature = "propulsion")]
-use bevy::math::DVec3;
+use bevy_math::DVec3;
 
 use crate::components::{
     AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
@@ -349,7 +349,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     zone: AeroZone {
                         cl: AeroCoeff::Scalar(0.0),
                         cd: AeroCoeff::Scalar(0.0),
-                        ..default()
+                        ..Default::default()
                     },
                     zone_force: ZoneForce::default(),
                     collider: Collider::cuboid(2.00, 0.60, 0.70),
@@ -369,7 +369,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     zone: AeroZone {
                         cl: AeroCoeff::Scalar(0.0),
                         cd: AeroCoeff::Scalar(0.0),
-                        ..default()
+                        ..Default::default()
                     },
                     zone_force: ZoneForce::default(),
                     collider: Collider::cuboid(2.70, 0.40, 0.35),
@@ -388,7 +388,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     zone: AeroZone {
                         cl: AeroCoeff::Scalar(0.0),
                         cd: AeroCoeff::Scalar(0.0),
-                        ..default()
+                        ..Default::default()
                     },
                     zone_force: ZoneForce::default(),
                     collider: Collider::cuboid(1.20, 0.68, 0.50),
@@ -415,7 +415,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         zone: AeroZone {
                             cl: AeroCoeff::Scalar(0.0),
                             cd: AeroCoeff::Scalar(0.0),
-                            ..default()
+                            ..Default::default()
                         },
                         zone_force: ZoneForce::default(),
                         collider: Collider::cuboid(length, 0.04, 0.04),
@@ -444,7 +444,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         zone: AeroZone {
                             cl: AeroCoeff::Scalar(0.0),
                             cd: AeroCoeff::Scalar(sourced!(0.001, "JSBSim:J3Cub.xml: Drag_gear residual per landing-gear leg; exposed axle + bungee")),
-                            ..default()
+                            ..Default::default()
                         },
                         zone_force: ZoneForce::default(),
                         collider: Collider::cuboid(length, 0.04, 0.04),
@@ -466,7 +466,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         zone: AeroZone {
                             cl: AeroCoeff::Scalar(0.0),
                             cd: AeroCoeff::Scalar(sourced!(0.001, "JSBSim:J3Cub.xml: Drag_gear residual per wheel; tyre frontal area")),
-                            ..default()
+                            ..Default::default()
                         },
                         zone_force: ZoneForce::default(),
                         collider: Collider::cuboid(0.30, 0.10, 0.30),
@@ -485,7 +485,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     zone: AeroZone {
                         cl: AeroCoeff::Scalar(0.0),
                         cd: AeroCoeff::Scalar(0.0),
-                        ..default()
+                        ..Default::default()
                     },
                     zone_force: ZoneForce::default(),
                     collider: Collider::cuboid(0.12, 0.06, 0.12),
@@ -582,7 +582,7 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
             },
             rigid_body: RigidBody::Dynamic,
             transform,
-            ..default()
+            ..Default::default()
         },
     )
 }
@@ -608,7 +608,7 @@ pub fn wing_zone(
             zone: AeroZone {
                 cl: cl_zone(fraction),
                 cd: cd_zone(fraction),
-                ..default()
+                ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,
@@ -650,7 +650,7 @@ pub fn aileron_zone(
                 )),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 control_role: Some(role),
-                ..default()
+                ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,
@@ -678,7 +678,7 @@ pub fn fuselage_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
                 cd: AeroCoeff::Scalar(0.0),
-                ..default()
+                ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,
@@ -712,7 +712,7 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                     data: HTAIL_CL_DATA.to_vec(),
                 },
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
-                ..default()
+                ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,
@@ -750,7 +750,7 @@ pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
                 )),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 control_role: Some(ControlSurfaceRole::Elevator),
-                ..default()
+                ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,
@@ -772,7 +772,7 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                 cl: AeroCoeff::Scalar(0.0),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 cy: AeroCoeff::Absent, // TODO v2: beta-dependent CY_beta
-                ..default()
+                ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,
@@ -808,7 +808,7 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
                     "JSBSim:J3Cub.xml: Yaw_rudder CN_dr = −0.0565/rad; CY_rud = CN_dr × b/x_arm = 0.0565 × 10.742/4.0, negated for −Y force convention"
                 )),
                 control_role: Some(ControlSurfaceRole::Rudder),
-                ..default()
+                ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,

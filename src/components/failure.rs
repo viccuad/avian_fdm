@@ -1,7 +1,7 @@
 //! [`Failure`] component, fraction of a zone's capability that remains after damage.
 //! Written by the game's hit/damage system; read by domain systems independently.
 
-use bevy::prelude::*;
+use crate::_bevy::*;
 use serde::{Deserialize, Serialize};
 
 /// Fraction of a zone's nominal capability that remains after damage or failure.

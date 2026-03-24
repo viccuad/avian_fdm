@@ -40,8 +40,8 @@
 //! converts aerodynamic data into Avian forces.
 
 use avian3d::prelude::{ComputedCenterOfMass, ConstantForce, ConstantTorque, Position, Rotation};
-use bevy::math::{DQuat, DVec3};
-use bevy::prelude::*;
+use bevy_math::{DQuat, DVec3};
+use crate::_bevy::*;
 
 #[cfg(feature = "propulsion")]
 use crate::components::EngineZone;

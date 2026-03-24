@@ -164,7 +164,7 @@ fn run_avian_fdm() -> Vec<Sample> {
         .add_plugins(bevy::transform::TransformPlugin)
         .add_plugins(bevy::asset::AssetPlugin::default())
         .add_plugins(PhysicsPlugins::default())
-        .add_plugins(AircraftFdmPlugin);
+        .add_plugins(AircraftFdmPlugin::default());
 
     app.insert_resource(TimeUpdateStrategy::ManualDuration(
         Duration::from_secs_f64(PHYSICS_DT),
@@ -285,7 +285,7 @@ fn run_avian_fdm_glide() -> Vec<Sample> {
         .add_plugins(bevy::transform::TransformPlugin)
         .add_plugins(bevy::asset::AssetPlugin::default())
         .add_plugins(PhysicsPlugins::default())
-        .add_plugins(AircraftFdmPlugin);
+        .add_plugins(AircraftFdmPlugin::default());
 
     app.insert_resource(TimeUpdateStrategy::ManualDuration(
         Duration::from_secs_f64(PHYSICS_DT),

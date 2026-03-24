@@ -1,8 +1,10 @@
 //! Plugin registration.
 
-use bevy::prelude::*;
+use crate::_bevy::*;
 
 /// Adds all FDM subsystems enabled by the active feature flags.
+///
+/// Add `PhysicsPlugins` before this plugin.
 ///
 /// # Example
 /// ```rust,no_run
@@ -10,13 +12,23 @@ use bevy::prelude::*;
 /// use bevy::prelude::*;
 ///
 /// App::new()
-///     .add_plugins(AircraftFdmPlugin)
+///     .add_plugins(AircraftFdmPlugin::default())
 ///     .run();
 /// ```
+#[derive(Default)]
+#[non_exhaustive]
 pub struct AircraftFdmPlugin;
 
 impl Plugin for AircraftFdmPlugin {
     fn build(&self, app: &mut App) {
+        if app.get_schedule(avian3d::prelude::PhysicsSchedule).is_none() {
+            panic!(
+                "Failed to build `AircraftFdmPlugin`: \
+                Avian's `PhysicsSchedule` was not found. \
+                Add `PhysicsPlugins` before `AircraftFdmPlugin`."
+            );
+        }
+
         use crate::components::{
             AeroZone, AircraftGeometry, AtmosphereState, ControlInputs,
             Failure, FlightState, GizmoShape, GizmoContours, ZoneForce,

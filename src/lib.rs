@@ -56,7 +56,7 @@
 //!     App::new()
 //!         .add_plugins(DefaultPlugins)
 //!         .add_plugins(PhysicsPlugins::default())
-//!         .add_plugins(AircraftFdmPlugin)
+//!         .add_plugins(AircraftFdmPlugin::default())
 //!         .add_systems(Startup, spawn)
 //!         .run();
 //! }
@@ -745,6 +745,21 @@ macro_rules! sourced {
     };
 }
 
+/// Internal re-exports of bevy sub-crates.
+/// All crate-internal modules import from here instead of the `bevy` meta-crate.
+pub(crate) mod _bevy {
+    pub(crate) use bevy_app::prelude::*;
+    pub(crate) use bevy_ecs::prelude::*;
+    pub(crate) use bevy_math::prelude::*;
+    pub(crate) use bevy_transform::prelude::*;
+    pub(crate) use bevy_reflect::prelude::*;
+    pub(crate) use bevy_log::{warn, warn_once};
+    #[cfg(feature = "debug-plugin")]
+    pub(crate) use bevy_color::prelude::*;
+    #[cfg(feature = "debug-plugin")]
+    pub(crate) use bevy_gizmos::prelude::*;
+}
+
 pub mod aerodynamics;
 pub mod atmosphere;
 pub mod components;
@@ -770,6 +785,7 @@ pub mod prelude {
     };
     pub use crate::plugin::AircraftFdmPlugin;
     pub use crate::sourced;
+    pub use crate::systems::AircraftFdmSystem;
 
     #[cfg(feature = "debug-plugin")]
     pub use crate::debug_render::{AircraftFdmDebugPlugin, FdmDebugRender, FdmGizmos};

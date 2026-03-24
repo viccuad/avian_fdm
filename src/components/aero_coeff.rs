@@ -33,7 +33,7 @@
 //! A `Vec<Vec<f64>>` (jagged array) would require one allocation per row
 //! and has poor cache behaviour, it is intentionally avoided.
 
-use bevy::prelude::*;
+use crate::_bevy::*;
 use serde::{Deserialize, Serialize};
 
 /// An aerodynamic coefficient value: constant, 1-D table, or 2-D table.

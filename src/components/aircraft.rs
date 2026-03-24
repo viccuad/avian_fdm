@@ -1,6 +1,6 @@
 //! Aircraft-level components: geometry and the core spawn bundle.
 
-use bevy::prelude::*;
+use crate::_bevy::*;
 use serde::{Deserialize, Serialize};
 use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 

@@ -27,7 +27,7 @@ fn main() {
         .add_plugins(MinimalPlugins)
         .add_plugins(bevy::transform::TransformPlugin)
         .add_plugins(PhysicsPlugins::default())
-        .add_plugins(AircraftFdmPlugin)
+        .add_plugins(AircraftFdmPlugin::default())
         .add_systems(Startup, spawn_aircraft)
         .add_systems(Update, (ramp_throttle, print_state, check_done))
         .run();

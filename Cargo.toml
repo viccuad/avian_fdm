@@ -7,9 +7,11 @@ license = "LGPL-2.1-or-later"
 exclude = ["/assets/", "/docs/", "/.github/"]
 
 [features]
-default = ["propulsion"]
+# Delegate f32/parry precision to the user, matching avian_pickup convention.
+# Use `default-features = false` + enable avian3d/f64 + avian3d/parry-f64 to switch.
+default = ["propulsion", "avian3d/f32", "avian3d/parry-f32"]
 propulsion = []
-debug-plugin = ["bevy/bevy_gizmos", "bevy/bevy_render"]
+debug-plugin = ["dep:bevy_color", "dep:bevy_gizmos"]
 presets = []
 
 [dependencies]
@@ -18,17 +20,16 @@ presets = []
 # MeshPlugin in headless apps, and are never needed for a flight dynamics library.
 avian3d = { version = "0.6", default-features = false, features = [
     "3d",
-    "f32",
-    "parry-f32",
     "default-collider",
-    "xpbd_joints",
-    "parallel",
 ] }
-bevy = { version = "0.18", default-features = false, features = [
-    "bevy_scene",
-    "bevy_asset",
-    "bevy_render",
-] }
+bevy_app     = { version = "0.18", default-features = false }
+bevy_ecs     = { version = "0.18", default-features = false }
+bevy_math    = { version = "0.18", default-features = false }
+bevy_transform = { version = "0.18", default-features = false }
+bevy_reflect = { version = "0.18", default-features = false }
+bevy_color   = { version = "0.18", default-features = false, optional = true }
+bevy_gizmos  = { version = "0.18", default-features = false, optional = true }
+bevy_log     = { version = "0.18", default-features = false }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]

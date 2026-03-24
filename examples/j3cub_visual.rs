@@ -41,7 +41,7 @@ fn main() {
             ..default()
         }))
         .add_plugins(PhysicsPlugins::default())
-        .add_plugins(AircraftFdmPlugin)
+        .add_plugins(AircraftFdmPlugin::default())
         .add_plugins(AircraftFdmDebugPlugin)
         // At cruise (~4300 N lift), the total-force arrow will be ~7 m long —
         // comparable to the aircraft fuselage, so it's easy to read.

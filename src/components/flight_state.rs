@@ -1,8 +1,8 @@
 //! Derived flight state and atmosphere state components, plus the optional
 //! [`WindResource`].
 
-use bevy::prelude::*;
-use bevy::math::DVec3;
+use crate::_bevy::*;
+use bevy_math::DVec3;
 use serde::{Deserialize, Serialize};
 
 /// Derived aerodynamic state quantities. Written each frame by

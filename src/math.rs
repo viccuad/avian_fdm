@@ -4,8 +4,7 @@
 //! All functions operate in `f64` (`DVec3`, `DQuat`). The `f64`-to-`f32`
 //! conversion to Avian components is performed in [`crate::systems`].
 
-use bevy::math::{DQuat, DVec3};
-use bevy::prelude::Vec3;
+use bevy_math::{DQuat, DVec3, Vec3};
 
 /// Convert a Bevy `Vec3` (f32) to a `DVec3` (f64) for FDM calculations.
 ///

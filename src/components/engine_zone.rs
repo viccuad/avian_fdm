@@ -2,8 +2,8 @@
 //!
 //! Only compiled with `features = ["propulsion"]`.
 
-use bevy::prelude::*;
-use bevy::math::DVec3;
+use crate::_bevy::*;
+use bevy_math::DVec3;
 use serde::{Deserialize, Serialize};
 
 /// Piston engine configuration. Attach to the engine child entity alongside

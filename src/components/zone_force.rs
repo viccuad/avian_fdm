@@ -2,7 +2,7 @@
 //! `compute_aero_forces` system (and `compute_engine_zone_forces` for thrust).
 //! Also read by the debug visualisation for per-zone force arrows.
 
-use bevy::prelude::*;
+use crate::_bevy::*;
 
 /// World-space force, pure torque, and application point for one zone.
 ///
