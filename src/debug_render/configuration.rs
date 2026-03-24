@@ -34,7 +34,11 @@ pub struct FdmGizmos {
     pub side_force_color: Option<Color>,
     /// Color for thrust arrows (engine zones). `None` = disabled.
     pub thrust_color: Option<Color>,
-    /// Color for the resultant aerodynamic force arrow on the aircraft root. `None` = disabled.
+    /// Color for the total accumulated aero+thrust force arrow on the root. `None` = disabled.
+    pub total_force_color: Option<Color>,
+    /// Color for the weight (gravity) arrow on the root. `None` = disabled.
+    pub weight_color: Option<Color>,
+    /// Color for the net-force arrow (aero+thrust+weight) on the root. `None` = disabled.
     pub resultant_color: Option<Color>,
     /// Color for pitching-moment arcs. `None` = disabled.
     pub pitch_moment_color: Option<Color>,
@@ -66,6 +70,8 @@ impl Default for FdmGizmos {
             drag_color: Some(RED.into()),
             side_force_color: Some(YELLOW.into()),
             thrust_color: Some(AQUA.into()),
+            total_force_color: Some(YELLOW.into()),
+            weight_color: Some(RED.into()),
             resultant_color: Some(WHITE.into()),
             pitch_moment_color: Some(ORANGE.into()),
             roll_moment_color: Some(PINK.into()),
@@ -93,6 +99,8 @@ impl FdmGizmos {
             drag_color: None,
             side_force_color: None,
             thrust_color: None,
+            total_force_color: None,
+            weight_color: None,
             resultant_color: None,
             pitch_moment_color: None,
             roll_moment_color: None,
@@ -109,11 +117,13 @@ impl FdmGizmos {
     /// Only force arrows (lift, drag, side force, thrust, resultant) enabled.
     pub fn forces() -> Self {
         Self {
-            lift_color:       Some(LIME.into()),
-            drag_color:       Some(RED.into()),
-            side_force_color: Some(YELLOW.into()),
-            thrust_color:     Some(AQUA.into()),
-            resultant_color:  Some(WHITE.into()),
+            lift_color:        Some(LIME.into()),
+            drag_color:        Some(RED.into()),
+            side_force_color:  Some(YELLOW.into()),
+            thrust_color:      Some(AQUA.into()),
+            total_force_color: Some(YELLOW.into()),
+            weight_color:      Some(RED.into()),
+            resultant_color:   Some(WHITE.into()),
             ..Self::none()
         }
     }

@@ -6,10 +6,10 @@
 //!
 //! [`AircraftFdmDebugPlugin`]: super::AircraftFdmDebugPlugin
 
-use avian3d::prelude::{ComputedCenterOfMass, Rotation};
+use avian3d::prelude::{ComputedCenterOfMass, ComputedMass, ConstantForce, Rotation};
 use crate::_bevy::*;
 
-use crate::components::{AeroZone, AircraftGeometry};
+use crate::components::{AeroZone, AircraftGeometry, ZoneForce};
 use super::configuration::FdmGizmos;
 
 // ── Centre of gravity ─────────────────────────────────────────────────────────
@@ -61,29 +61,82 @@ pub(super) fn debug_render_ac(
 
 // ── Force arrows ──────────────────────────────────────────────────────────────
 
-/// Draw per-zone lift, drag, and side-force arrows.
+/// Draw a combined aero force arrow per zone, originating from the zone AC.
+///
+/// Uses [`AeroZone::ac_offset`] and the zone's [`GlobalTransform`] to find the
+/// world-space AC. Running in `PostUpdate` after transform propagation means
+/// there is no one-frame lag.
 pub(super) fn debug_render_zone_forces(
-    mut _gizmos: Gizmos<FdmGizmos>,
-    _store: Res<GizmoConfigStore>,
+    mut gizmos: Gizmos<FdmGizmos>,
+    store: Res<GizmoConfigStore>,
+    query: Query<(&ZoneForce, &GlobalTransform, &AeroZone)>,
 ) {
-    // TODO(debug-plugin): query ZoneForce + GlobalTransform on AeroZone entities;
-    // draw arrows scaled by store.config::<FdmGizmos>().1.force_scale.
+    let config = store.config::<FdmGizmos>().1;
+    let Some(color) = config.lift_color else { return };
+
+    for (zf, zone_gt, zone) in &query {
+        if zf.force.length_squared() < 100.0 {
+            continue;
+        }
+        let start = zone_gt.transform_point(zone.ac_offset);
+        gizmos.arrow(start, start + zf.force * config.force_scale, color);
+    }
 }
 
 /// Draw thrust arrows on engine zones.
 pub(super) fn debug_render_thrust(
-    mut _gizmos: Gizmos<FdmGizmos>,
-    _store: Res<GizmoConfigStore>,
+    mut gizmos: Gizmos<FdmGizmos>,
+    store: Res<GizmoConfigStore>,
+    #[cfg(feature = "propulsion")]
+    query: Query<(&ZoneForce, &GlobalTransform), With<crate::components::EngineZone>>,
 ) {
-    // TODO(debug-plugin): query ZoneForce on EngineZone entities (propulsion feature).
+    let config = store.config::<FdmGizmos>().1;
+    let Some(color) = config.thrust_color else { return };
+
+    #[cfg(feature = "propulsion")]
+    for (zf, zone_gt) in &query {
+        if zf.force.length_squared() < 1.0 {
+            continue;
+        }
+        let start = zone_gt.translation();
+        gizmos.arrow(start, start + zf.force * config.force_scale, color);
+    }
+
+    #[cfg(not(feature = "propulsion"))]
+    let _ = (gizmos, color);
 }
 
-/// Draw the resultant aerodynamic + thrust force arrow on the aircraft root.
+/// Draw the total aero+thrust force, weight, and net-force arrows from the CG.
 pub(super) fn debug_render_resultant(
-    mut _gizmos: Gizmos<FdmGizmos>,
-    _store: Res<GizmoConfigStore>,
+    mut gizmos: Gizmos<FdmGizmos>,
+    store: Res<GizmoConfigStore>,
+    query: Query<
+        (&Transform, &Rotation, &ConstantForce, &ComputedMass, &ComputedCenterOfMass),
+        With<AircraftGeometry>,
+    >,
 ) {
-    // TODO(debug-plugin): query accumulated ExternalForce on aircraft root entities.
+    let config = store.config::<FdmGizmos>().1;
+
+    for (tf, rot, cf, mass, com) in &query {
+        let cg = tf.translation + rot.0 * com.0;
+        let scale = config.force_scale;
+
+        if let Some(color) = config.total_force_color {
+            gizmos.arrow(cg, cg + cf.0 * scale, color);
+        }
+
+        if let Some(color) = config.weight_color {
+            let weight = Vec3::new(0.0, -mass.value() * 9.806_65, 0.0);
+            gizmos.arrow(cg, cg + weight * scale, color);
+
+            if let Some(net_color) = config.resultant_color {
+                let net = cf.0 + weight;
+                if net.length_squared() > 1.0 {
+                    gizmos.arrow(cg, cg + net * scale, net_color);
+                }
+            }
+        }
+    }
 }
 
 // ── Moment arcs ───────────────────────────────────────────────────────────────

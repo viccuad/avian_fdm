@@ -1,13 +1,15 @@
 //! J-3 Cub simulation with real-time force visualisation.
 //!
-//! Opens a 3D window showing the aircraft outline and aerodynamic force arrows:
+//! Opens a 3D window showing the aircraft outline and aerodynamic force arrows.
+//! Arrow colours are driven by [`FdmGizmos`] config (defaults shown):
 //!
-//! | Arrow colour | Meaning                                                   |
-//! |--------------|-----------------------------------------------------------|
-//! | **Cyan**     | Per-zone aero + engine force (`ZoneForce`)                |
-//! | **Yellow**   | Total accumulated force from CG (`ConstantForce`)         |
-//! | **Red**      | Weight (m × g downward from CG)                           |
-//! | **White**    | Net force = aero − weight (shows trim quality)            |
+//! | Arrow colour | Meaning                                                         |
+//! |--------------|-----------------------------------------------------------------|
+//! | Lime         | Per-zone combined aero force (`ZoneForce`, from `lift_color`)   |
+//! | Aqua         | Engine thrust per zone (`thrust_color`)                         |
+//! | Yellow       | Total accumulated aero+thrust force (`total_force_color`)       |
+//! | Red          | Weight (m x g downward from CG) (`weight_color`)                |
+//! | White        | Net force = aero+thrust+weight (`resultant_color`)              |
 //!
 //! **Run with:**
 //! ```sh
@@ -20,9 +22,7 @@
 //!
 //! The simulation runs on its own. Press **Escape** to quit.
 
-use avian3d::prelude::{
-    ComputedCenterOfMass, ComputedMass, ConstantForce, LinearVelocity, PhysicsPlugins, Rotation,
-};
+use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
 use avian_fdm::prelude::*;
 use avian_fdm::presets::j3cub;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
@@ -60,7 +60,6 @@ fn main() {
                 orbit_camera,
                 toggle_colliders,
                 draw_aircraft_outline,
-                draw_forces,
                 update_hud,
             ),
         )
@@ -360,69 +359,6 @@ fn draw_aircraft_outline(
         }
 
         // (contour zones handled above with `continue`)
-    }
-}
-
-/// Draws per-zone forces (cyan/green) plus total-force, weight and net-force arrows.
-fn draw_forces(
-    mut gizmos: Gizmos<FdmGizmos>,
-    store: Res<GizmoConfigStore>,
-    zone_query: Query<(&ZoneForce, &Transform, &AeroZone, Has<EngineZone>)>,
-    root_query: Query<
-        (
-            &Transform,
-            &Rotation,
-            &ConstantForce,
-            &ComputedMass,
-            &ComputedCenterOfMass,
-        ),
-        With<AircraftGeometry>,
-    >,
-) {
-    let Ok((root_tf, rot, cf, mass, com)) = root_query.single() else {
-        return;
-    };
-    let force_scale = store.config::<FdmGizmos>().1.force_scale;
-
-    // ── Per-zone force arrows ─────────────────────────────────────────────────
-    for (zf, zone_local_tf, zone, is_engine) in &zone_query {
-        if zf.force.length_squared() < 100.0 {
-            continue; // skip tiny / inactive zones (< 10 N)
-        }
-        // ac_offset is in zone local space (zones have no local rotation, so
-        // adding it to the local translation gives the AC in aircraft-root frame).
-        // We then use root_tf (current frame) to avoid the one-frame GlobalTransform lag.
-        let ac_local = zone_local_tf.translation + zone.ac_offset;
-        let start = root_tf.transform_point(ac_local);
-        if is_engine {
-            gizmos.arrow(
-                start,
-                start + zf.force * force_scale,
-                Color::srgb(0.1, 1.0, 0.1),
-            );
-        } else {
-            gizmos.arrow(
-                start,
-                start + zf.force * force_scale,
-                Color::srgb(0.0, 0.9, 0.9),
-            );
-        }
-    }
-
-    // ── Per-aircraft arrows from CG ───────────────────────────────────────────
-    let cg = root_tf.translation + rot.0 * com.0;
-
-    // Total aerodynamic + propulsive force (yellow).
-    gizmos.arrow(cg, cg + cf.0 * force_scale, Color::srgb(1.0, 1.0, 0.0));
-
-    // Weight (red, downward).
-    let weight = Vec3::new(0.0, -mass.value() * 9.806_65, 0.0);
-    gizmos.arrow(cg, cg + weight * force_scale, Color::srgb(1.0, 0.2, 0.2));
-
-    // Net force = aero + weight (white) — near-zero at trim.
-    let net = cf.0 + weight;
-    if net.length_squared() > 1.0 {
-        gizmos.arrow(cg, cg + net * force_scale, Color::WHITE);
     }
 }
 
