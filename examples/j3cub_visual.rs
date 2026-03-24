@@ -11,7 +11,7 @@
 //!
 //! **Run with:**
 //! ```sh
-//! cargo run --example j3cub_visual --features presets,debug-plugin
+//! cargo run --example j3cub_visual --features presets,debug-plugin --release
 //! ```
 //!
 //! **Camera controls:**
@@ -97,7 +97,7 @@ impl Default for OrbitCamera {
         Self {
             // Isometric view from port
             yaw: -std::f32::consts::PI / 3.0,
-            pitch: 0.30,
+            pitch: 0.60,
             radius: 15.0,
         }
     }
