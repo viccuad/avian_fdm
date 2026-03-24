@@ -25,7 +25,8 @@
 //! 5. [The Atmosphere](#the-atmosphere)
 //! 6. [Aerodynamic Forces and Moments](#aerodynamic-forces-and-moments)
 //! 7. [Propulsion Coupling](#propulsion-coupling)
-//! 8. [Zone Decomposition and Damage](#zone-decomposition-and-damage)
+//! 8. [Emergent Behavior](#emergent-behavior)
+//! 9. [Zone Decomposition and Damage](#zone-decomposition-and-damage)
 //!    - [Collider strategy](#collider-strategy)
 //! 9. [Reading Simulation Output](#reading-simulation-output)
 //! 10. [Data Flow](#data-flow)
@@ -511,6 +512,241 @@
 //! `DVec3::X` (forward); for a pusher or a tilted engine it can point elsewhere.
 //! The body-frame axis is rotated to world space by the root quaternion before
 //! writing to [`components::ZoneForce`].
+//!
+//! ---
+//!
+//! ## Emergent Behavior
+//!
+//! The zone-based architecture produces a large set of physically correct
+//! behaviors without any explicit global coefficient for them. They arise
+//! because forces are computed per zone at each zone's aerodynamic centre, the
+//! moment arm (AC - CG) x force is computed automatically each step, and Avian
+//! recomputes mass, CG, and inertia tensor from surviving colliders.
+//!
+//! The key mechanism is the per-zone local-angle correction. Before evaluating
+//! coefficients, each zone gets its own effective angle of attack:
+//!
+//! ```text
+//! alpha_local = alpha + (p*y + q*x) / V    (roll and pitch rate)
+//! beta_local  = beta  + (r*y)       / V    (yaw rate)
+//! ```
+//!
+//! where x and y are the zone's position relative to CG in body frame, and p,
+//! q, r are body angular rates. This single formula drives most of the
+//! emergent behaviors listed below.
+//!
+//! ### Stability and damping
+//!
+//! **Static longitudinal stability (Cm_alpha):**
+//! The h-stab is aft of the CG. When alpha increases, the h-stab produces
+//! more lift, creating a nose-down moment. The tail volume (area x arm) sets
+//! the restoring stiffness. No Cm_alpha coefficient is specified.
+//!
+//! **Pitch damping (Cm_q):**
+//! Under pitch rate q, the h-stab sees alpha_local += q * x_tail / V.
+//! The extra lift opposes the pitch rate. Naturally weakens if the tail is
+//! damaged.
+//!
+//! **Roll damping (Cl_p):**
+//! Under roll rate p, the advancing wing sees alpha_local += p * y / V (more
+//! lift) and the retreating wing sees less. The differential lift opposes the
+//! roll. Naturally weaker after losing a wing panel.
+//!
+//! **Yaw damping (Cn_r):**
+//! Under yaw rate r, the fin sees beta_local += r * y_fin / V, producing a
+//! side force that opposes the yaw. Naturally zero after total fin loss.
+//!
+//! **Dihedral stability (Cl_beta):**
+//! A wing mounted above the CG (positive dihedral) rolls away from sideslip
+//! because the lower wing is more exposed to freestream. The fin positioned
+//! above the CG also contributes: its side force has a moment arm in z that
+//! rolls the aircraft away from sideslip. Both effects emerge from geometry.
+//!
+//! ### Stall and high angle-of-attack behavior
+//!
+//! **Stall:**
+//! When alpha exceeds the CL table's stall angle, CL drops. If the tables
+//! cover the post-stall regime, the wing zones produce less lift, the aircraft
+//! pitches down or departs, and recovery follows normal stall physics.
+//!
+//! **Wing drop at stall:**
+//! Under any roll rate at near-stall alpha, one wing tip sees higher local
+//! alpha than the other (alpha_local += p*y/V). The higher-alpha tip stalls
+//! first while the other keeps flying, driving an uncommanded roll. This is the
+//! physical cause of wing drop.
+//!
+//! **Snap roll:**
+//! An abrupt aileron input at near-stall alpha instantly pushes one wing zone
+//! over the stall angle via the local-angle correction. That zone loses lift,
+//! the other side keeps flying, and the aircraft rolls rapidly and
+//! uncontrollably.
+//!
+//! **High-AoA damping reversal:**
+//! Beyond the stall angle, the CL table slope becomes negative (dCL/dalpha < 0).
+//! The per-zone local-angle correction now produces a force increment that
+//! aids the angular rate rather than opposing it - damping reverses sign. This
+//! is what drives spin autorotation. No separate damping-reversal model needed.
+//!
+//! **Deep stall:**
+//! If wing zones stall but the tail is still flying (tail has a lower alpha
+//! due to its longitudinal position and the pitch-rate correction), the tail
+//! keeps generating lift. Because the tail is aft, this creates a nose-up
+//! moment that sustains the high alpha and prevents recovery. Emerges directly
+//! from the tables if they include the deep-stall regime.
+//!
+//! **Spin dynamics:**
+//! In a spin, the descending wing has higher local alpha (from the roll rate)
+//! and is stalled, while the rising wing has lower alpha and is still producing
+//! lift. The differential lift drives autorotation. The yaw rate correction
+//! adds a beta shift across the span. Together they produce a steady spin
+//! state with correct rotation rates and altitude loss without any spin model.
+//!
+//! ### Cross-coupling
+//!
+//! **Adverse yaw (Cnp - yaw from roll rate):**
+//! Under roll rate p, the descending wing produces more lift and more induced
+//! drag than the rising wing. The induced-drag asymmetry yaws the nose toward
+//! the descending wing. This emerges from per-zone drag tables evaluated at
+//! different local angles. The angle correction drives part of it; adding
+//! per-zone qbar scaling (see below) would complete it.
+//!
+//! **Proverse yaw from yaw damping (Clr - roll from yaw rate):**
+//! Under yaw rate r, the advancing wing moves faster and produces more lift.
+//! The differential lift rolls the aircraft toward the advancing wing. The
+//! angle correction captures this partially; the full effect requires per-zone
+//! qbar scaling.
+//!
+//! **Dutch roll:**
+//! Yaw and roll couple through Clr and Cnp. The fin's yaw restoring moment
+//! combined with the wing's differential lift produces the oscillatory yaw-roll
+//! coupling that characterizes Dutch roll. The character of the mode (damped,
+//! neutral, divergent) depends on the fin volume and wing dihedral.
+//!
+//! **Pitch-roll-yaw departure at high AoA:**
+//! When wing zones begin to stall unevenly in a combined maneuver, all three
+//! axes couple simultaneously. The asymmetric stall across the span drives
+//! roll; the drag asymmetry drives yaw; the tail's reduced effectiveness drives
+//! pitch up. These reinforce each other without any special departure model.
+//!
+//! ### Control authority
+//!
+//! **Roll authority (Cl_da):**
+//! Ailerons are at large spanwise offsets. Their lift (scaled by aileron input)
+//! x the moment arm to CG produces roll torque. Cl_da is never specified.
+//!
+//! **Pitch authority (Cm_de):**
+//! The elevator is aft. Its lift x tail arm produces pitch torque.
+//!
+//! **Yaw authority (Cn_dr):**
+//! The rudder produces side force at the fin. The moment arm to CG gives yaw.
+//!
+//! **Thrust pitching, rolling, and yawing moments:**
+//! An engine zone offset from the aircraft centerline (y, z, or x from CG)
+//! creates pitching and yawing moments automatically. A tilted thrust axis
+//! (pusher, tilt-rotor) produces the correct coupled moments.
+//!
+//! **Propulsion torque reaction:**
+//! A rotating propeller or engine imparts angular momentum to the airframe in
+//! the opposite direction. Model this by adding a pure torque on the engine
+//! zone in the axis opposite to prop rotation. The moment propagates to the
+//! root via Avian's constraint solver.
+//!
+//! ### Aerodynamic configuration effects
+//!
+//! **Flaps and slats:**
+//! Add a flap zone at the wing trailing edge (or use a control surface role).
+//! Give it a CL table that represents the cambered section at flap deflection,
+//! scaled by the flap's share of wing area. Deploying flaps (setting the zone's
+//! deflection input to 1) applies the cambered CL and the higher CD. No
+//! dedicated flap model. Slats work the same way on the leading edge.
+//!
+//! **External stores and fuel tanks:**
+//! Add an AeroZone with CL = 0 and a CD representing the store's drag area.
+//! Place it at the store's position. The drag force applied at that position
+//! creates a moment arm to the CG, affecting trim. Dropping stores
+//! (Failure::remaining = 0) removes both their mass and their drag instantly.
+//!
+//! ### Flight dynamics modes
+//!
+//! **Phugoid oscillation:**
+//! The aircraft pitches up, lift increases, it climbs and slows. Reduced speed
+//! reduces lift, it pitches down and descends, accelerates again. This
+//! long-period oscillation emerges from pitch stability and the lift/speed
+//! relationship. No phugoid frequency coefficient exists anywhere.
+//!
+//! **Short-period mode:**
+//! Rapid pitch oscillation emerges from pitch stiffness (tail volume) and pitch
+//! damping (Cm_q). Frequency and damping ratio are set by geometry.
+//!
+//! **Spiral mode:**
+//! When banked, the aircraft yaws toward the low wing (from sideslip). If yaw
+//! stability is weaker than roll stability, the bank increases and the aircraft
+//! spirals. This mode and its stability (damped vs divergent) emerge from the
+//! balance between fin yaw stiffness and wing dihedral effect.
+//!
+//! ### Damage effects
+//!
+//! **CG shift:**
+//! When a zone's Failure::remaining reaches zero, Avian removes its mass from
+//! the compound collider. The CG shifts toward the surviving structure. All
+//! moment arms recompute. Losing a wingtip shifts the CG toward the root.
+//!
+//! **Inertia tensor change:**
+//! Avian recomputes the full tensor from surviving colliders. Losing a wing
+//! panel reduces roll inertia. The aircraft becomes more responsive in roll.
+//!
+//! **Asymmetric roll from one-sided damage:**
+//! The surviving wing's lift has no counterpart on the other side. The
+//! resulting moment arm x lift drives a continuous roll. No "damage roll rate"
+//! parameter exists.
+//!
+//! **Loss of control authority:**
+//! Destroying a control surface zone (aileron, elevator, rudder) removes its
+//! force contribution exactly. Partial damage (Failure::remaining = 0.5)
+//! halves the zone's forces, giving half authority. The other surfaces are
+//! unaffected.
+//!
+//! **Reduced damping from structural damage:**
+//! Losing fin area reduces Cn_r. Losing wing area reduces Cl_p. The aircraft
+//! oscillates more after perturbations. All follow directly from zone survival.
+//!
+//! **Changed departure characteristics after damage:**
+//! After losing a wing panel, the asymmetric roll under roll rate is larger
+//! (less opposing lift on the damaged side), making wing-drop at stall more
+//! aggressive on that side.
+//!
+//! ### What does NOT yet emerge (gaps and planned work)
+//!
+//! The following require either additional per-zone data or structural changes
+//! to the force computation pipeline:
+//!
+//! - **Clr and Cnp fully:** The angle-only correction captures part of these.
+//!   The dominant term is the differential dynamic pressure (V +/- r*y)^2
+//!   per zone. Planned: extend `zone_local_angles` to also scale each zone's
+//!   local qbar. With that change, Clr and Cnp would be fully emergent and
+//!   automatically damage-aware.
+//!
+//! - **Cm_alphadot:** Requires tracking the lag between wing downwash and tail
+//!   response over time. Cannot emerge from instantaneous angle corrections.
+//!   Planned: scale a global coefficient by h-stab Failure::remaining.
+//!
+//! - **Wake turbulence and vortex interaction:** When two aircraft fly close,
+//!   the trailing wingtip vortices from one aircraft add induced velocity to
+//!   the other's wing zones. Planned as a separate VortexWake component per
+//!   aircraft that injects a velocity field into the zone local-angle
+//!   computation.
+//!
+//! - **Propeller slipstream and P-factor:** The asymmetric disk loading at
+//!   high alpha and the accelerated slipstream over the inner wing both require
+//!   modeling the propeller wake as a distributed velocity field, not a point
+//!   force.
+//!
+//! - **Ground effect:** Increased lift and reduced induced drag near the ground
+//!   requires a height-dependent correction to the local qbar or induced angle.
+//!
+//! - **Ice accretion and contamination:** These change the CL/CD tables of
+//!   the affected zones. Planned as a table-modifier applied to zone
+//!   coefficients at runtime.
 //!
 //! ---
 //!
