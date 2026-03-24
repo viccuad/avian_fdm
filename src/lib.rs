@@ -364,24 +364,96 @@
 //! everything into [`avian3d::prelude::ConstantForce`] /
 //! [`avian3d::prelude::ConstantTorque`] on the root.
 //!
-//! ### Dynamic damping
+//! ### Dynamic damping: emergent vs explicit
 //!
-//! Angular-rate damping is applied once per root as whole-aircraft moment
-//! increments (not per zone). The three damping derivatives are from
-//! Nelson (1998), Table B1, for the J3Cub.
-//! **Damping moment = damping derivative × normalised angular rate × dynamic pressure × area × length.
-//! The normalised rate (e.g. p·b/2V) is dimensionless: angular rate scaled by wingspan
-//! and divided by airspeed:**
+//! There are two approaches to modeling angular-rate damping in an FDM. avian_fdm
+//! uses the emergent approach for full aircraft, and falls back to explicit coefficients
+//! for sparse models (missiles, simple drones).
+//!
+//! **Emergent damping (full-zone aircraft, default for J3Cub):**
+//!
+//! The per-zone local-angle correction in `zone_local_angles()` shifts each
+//! zone's effective angle of attack by the local angular-rate contribution:
 //!
 //! ```text
-//! ΔM = C_Mq · (q · c̄/2V) · q̄  · S · c̄    (pitch damping,  C_Mq = −12)
-//! ΔL = C_lp · (p · b/2V) · q̄  · S · b    (roll  damping,  C_lp = −0.45)
-//! ΔN = C_nr · (r · b/2V) · q̄  · S · b    (yaw   damping,  C_nr = −0.12)
+//! alpha_local = alpha + (p·y + q·x) / V    (roll and pitch rate corrections)
+//! beta_local  = beta  + (r·y)       / V    (yaw rate correction)
 //! ```
 //!
-//! These provide the rate-dependent restoring moments that prevent unrealistic
-//! divergent oscillations. Without pitch damping, for example, a phugoid
-//! perturbation would not decay.
+//! This means the h-stab automatically produces more or less lift when the
+//! aircraft pitches (q), giving pitch damping. The wings produce differential
+//! lift under roll rate (p), giving roll damping. The fin produces side force
+//! under yaw rate (r), giving yaw damping. No explicit coefficient is needed -
+//! it emerges from geometry.
+//!
+//! **Explicit damping (LodDamping component, sparse models):**
+//!
+//! When a model has too few zones for damping to emerge correctly, attach
+//! [`components::LodDamping`] to the root. The three main derivatives are:
+//!
+//! ```text
+//! DeltaM = C_Mq * (q * c / 2V) * qbar * S * c    (pitch damping)
+//! DeltaL = C_lp * (p * b / 2V) * qbar * S * b    (roll  damping)
+//! DeltaN = C_nr * (r * b / 2V) * qbar * S * b    (yaw   damping)
+//! ```
+//!
+//! The normalised rate (e.g. p·b/2V) is dimensionless: angular rate scaled by the
+//! reference length and divided by airspeed.
+//!
+//! ### Cross-coupling derivatives and damage correctness
+//!
+//! JSBSim and other FDMs also use three cross-coupling derivatives that are
+//! currently not fully modeled in avian_fdm:
+//!
+//! **Clr - roll moment from yaw rate:**
+//! When the aircraft yaws (r > 0, nose right), the left wing moves forward
+//! and the right wing moves backward. The left wing's local velocity becomes
+//! V + r·y_left and the right's becomes V - r·y_right. Since lift scales with
+//! V², the left wing produces more lift, rolling the aircraft. The physical
+//! source is entirely the wing geometry and spanwise extent.
+//!
+//! **Cnp - yaw moment from roll rate (adverse yaw):**
+//! When the aircraft rolls (p > 0, right wing down), the downgoing right wing
+//! produces more lift and therefore more induced drag. That extra drag on one
+//! side yaws the nose right - adverse yaw. The physical source is the wing's
+//! spanwise induced-drag distribution.
+//!
+//! **Cm_alphadot - pitch moment from rate of change of alpha:**
+//! When the wing's angle of attack increases, there is a lag before the
+//! downwash from the wing reaches the horizontal tail. The tail momentarily
+//! sees less downwash than steady state, producing more lift, pitching the
+//! nose down. The physical source is the coupling between wing downwash and
+//! tail, spanning the distance between them.
+//!
+//! **Why global coefficients are wrong for damaged aircraft:**
+//!
+//! If these derivatives are stored as whole-aircraft constants on the root
+//! entity (as in [`components::LodDamping`] or as JSBSim tables), they remain
+//! at their intact-aircraft values even after wing or tail damage. A pilot
+//! losing a wingtip would still see full Dutch-roll coupling. This is
+//! physically wrong.
+//!
+//! The correct approach for a damage-aware simulator:
+//!
+//! - Clr and Cnp should emerge from per-zone dynamic-pressure scaling. When a
+//!   wing zone is failed (Failure::remaining goes to zero), its contribution to
+//!   the velocity differential vanishes automatically, reducing Clr and Cnp
+//!   without any special bookkeeping. This requires extending `zone_local_angles`
+//!   to also scale each zone's local qbar by (V +/- r·y)^2 / V^2 - currently
+//!   only the angle is corrected, not the dynamic pressure.
+//!
+//! - Cm_alphadot depends on the wing-to-tail downwash coupling and cannot emerge
+//!   from instant angle corrections alone. A reasonable approximation is to scale
+//!   a global coefficient by the h-stab Failure::remaining, so destroying the
+//!   tail correctly drives it to zero.
+//!
+//! JSBSim J3Cub values (from J3Cub.xml) for reference:
+//!
+//! ```text
+//! Clr          =  table(alpha, Re)     range: -0.035 to +8.42
+//! Cnp          =  table(Re)            range: -2.15  to -0.0006
+//! Cm_alphadot  =  -7.5904
+//! ```
 //!
 //! ### Control surfaces
 //!
@@ -425,12 +497,12 @@
 //! square root of (thrust ÷ (2 × air density × disk area)), where disk area = π × radius²:**
 //!
 //! ```text
-//! V_ind = √(T / (2 · ρ · A_disk))    A_disk = π · (d/2)²
+//! V_ind = √(T / (2 · ρ · A_disk))  ,  A_disk = π · (d/2)²
 //! ```
 //!
 //! This is stored in [`components::PropwashState`] on the root entity. Future
-//! work (Group B, v2) will use V_ind to augment the lift of zones in the
-//! propwash stream (elevator and horizontal stabiliser on a tractor aircraft).
+//! work will use V_ind to augment the lift of zones in the propwash stream (elevator and
+//! horizontal stabiliser on a tractor aircraft).
 //!
 //! ### Thrust axis
 //!
