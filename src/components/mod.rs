@@ -4,20 +4,20 @@ pub mod aero_coeff;
 pub mod aero_zone;
 pub mod aircraft;
 pub mod controls;
-pub mod failure;
 pub mod engine_zone;
+pub mod failure;
 pub mod flight_state;
 pub mod zone_force;
 
 pub mod gizmo_shape;
 
 pub use aero_coeff::AeroCoeff;
-pub use aero_zone::{AeroZone, AeroZoneBundle, ControlSurfaceRole, materials};
-pub use aircraft::{AircraftGeometry, AircraftCoreBundle, LodDamping, InducedDrag};
+pub use aero_zone::{AeroZone, AeroZoneBundle, ControlSurfaceRole};
+pub use aircraft::{AircraftCoreBundle, AircraftGeometry, InducedDrag, LodDamping};
 pub use controls::ControlInputs;
-pub use failure::{Failure, get_remaining};
-pub use flight_state::{FlightState, AtmosphereState, WindResource};
-pub use gizmo_shape::{GizmoShape, GizmoContours};
+pub use failure::{get_remaining, Failure};
+pub use flight_state::{AtmosphereState, FlightState, WindResource};
+pub use gizmo_shape::{GizmoContours, GizmoShape};
 pub use zone_force::ZoneForce;
 
 #[cfg(feature = "propulsion")]

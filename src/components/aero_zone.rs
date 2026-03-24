@@ -1,10 +1,10 @@
 //! [`AeroZone`] and related types for the per-zone aerodynamic model.
 
-use bevy::prelude::*;
-use avian3d::prelude::Collider;
-use serde::{Deserialize, Serialize};
 use crate::components::aero_coeff::AeroCoeff;
 use crate::components::zone_force::ZoneForce;
+use avian3d::prelude::Collider;
+use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 /// Per-zone aerodynamic coefficient contributions.
 ///
@@ -77,22 +77,22 @@ pub struct AeroZone {
     /// Defaults to [`AeroCoeff::Absent`]. Yaw is often handled emergently by zone geometry.
     /// Set to [`AeroCoeff::Placeholder`] if this zone should contribute Cn but data is pending.
     pub cn: AeroCoeff,
-    /// Offset from the zone entity's local origin to the aerodynamic centre,
+    /// Offset from the zone entity's local origin to the Aerodynamic Centre,
     /// in the zone's local coordinate frame (metres).
     ///
     /// When `Vec3::ZERO` (default), the entity origin *is* the AC, i.e. the
     /// zone's [`Transform`] position is both mesh centre and force application
-    /// point (the legacy behaviour).
+    /// point.
     ///
-    /// For a wing panel whose mesh is centred at mid-chord, a typical value
+    /// For a wing panel whose mesh is centered at mid-chord, a typical value
     /// is `Vec3::new(0.25 * chord, 0.0, 0.0)` to place the AC at the
     /// quarter-chord point (body-frame X = forward).
     pub ac_offset: Vec3,
     /// If `Some`, this zone acts as a control surface. Its coefficients are
     /// additionally scaled by the matching [`super::ControlInputs`] value.
     pub control_role: Option<ControlSurfaceRole>,
-    /// Extra drag added when the zone is partially failed but still attached
-    /// (`remaining > 0`). Represents structural drag from deformation.
+    /// Extra drag added when the zone is partially failed. Represents structural drag from
+    /// deformation.
     ///
     /// `None` (the default) means this zone has no damage-drag model. This is
     /// the common case for most zones. `Some(coeff)` enables the calculation.
@@ -123,38 +123,6 @@ pub enum ControlSurfaceRole {
     Rudder,
 }
 
-/// Common structural material densities (kg/m³) for use with Avian's
-/// [`avian3d::prelude::ColliderDensity`].
-///
-/// # Example
-/// ```rust
-/// use avian_fdm::components::materials;
-/// // entity.insert(ColliderDensity(materials::ALUMINIUM as f32));
-/// let _ = materials::ALUMINIUM;
-/// ```
-pub mod materials {
-    /// Aluminium alloy (6061-T6).
-    pub const ALUMINIUM: f64 = 2_700.0;
-    /// Structural steel.
-    pub const STEEL: f64 = 7_800.0;
-    /// Titanium alloy (Ti-6Al-4V).
-    pub const TITANIUM: f64 = 4_500.0;
-    /// Carbon fibre reinforced polymer (CFRP).
-    pub const CARBON_FIBRE: f64 = 1_600.0;
-    /// Glass fibre reinforced polymer (GFRP).
-    pub const GLASS_FIBRE: f64 = 1_800.0;
-    /// Balsa wood, used in RC aircraft ribs and formers.
-    pub const BALSA: f64 = 150.0;
-    /// Aircraft-grade plywood.
-    pub const PLYWOOD: f64 = 600.0;
-    /// Expanded polystyrene (EPS) foam.
-    pub const FOAM: f64 = 30.0;
-    /// Rubber (tyres, seals).
-    pub const RUBBER: f64 = 1_200.0;
-    /// Perspex / acrylic (canopy glazing).
-    pub const PERSPEX: f64 = 1_190.0;
-}
-
 /// Bundle for one aerodynamic zone child entity.
 ///
 /// Spawn as a child of the aircraft root entity.
@@ -172,9 +140,11 @@ pub struct AeroZoneBundle {
     pub zone: AeroZone,
     /// Per-frame force output (written by FDM, read by accumulation system).
     pub zone_force: ZoneForce,
-    /// Avian collider, required for hit detection and for Avian to include
-    /// this zone's mass (via [`avian3d::prelude::ColliderDensity`]) in the
-    /// parent rigid body's [`avian3d::prelude::ComputedMass`].
+    /// Avian collider, required for Avian to include this zone's mass (via
+    /// [`avian3d::prelude::ColliderDensity`]) in the parent rigid body's
+    /// [`avian3d::prelude::ComputedMass`].
+    /// One can use it also for hit detection, but it's better to use a Sensor over a real model
+    /// part.
     pub collider: Collider,
     /// Position/orientation relative to the aircraft root.
     pub transform: Transform,

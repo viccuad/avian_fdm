@@ -764,9 +764,9 @@ pub mod presets;
 /// Re-exports for convenient glob import: `use avian_fdm::prelude::*;`
 pub mod prelude {
     pub use crate::components::{
-        aero_coeff::AeroCoeff, materials, AeroZone, AeroZoneBundle, AircraftCoreBundle,
-        AircraftGeometry, AtmosphereState, ControlInputs, ControlSurfaceRole, Failure, FlightState,
-        GizmoContours, GizmoShape, ZoneForce,
+        aero_coeff::AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
+        AtmosphereState, ControlInputs, ControlSurfaceRole, Failure, FlightState, GizmoContours,
+        GizmoShape, ZoneForce,
     };
     pub use crate::plugin::AircraftFdmPlugin;
     pub use crate::sourced;
