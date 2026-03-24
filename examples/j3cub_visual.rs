@@ -26,7 +26,7 @@ use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
 use avian_fdm::prelude::*;
 use avian_fdm::presets::j3cub;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
-use bevy::math::{Isometry3d, Quat};
+use bevy::math::Quat;
 use bevy::prelude::*;
 
 fn main() {
@@ -59,7 +59,6 @@ fn main() {
                 ramp_throttle,
                 orbit_camera,
                 toggle_colliders,
-                draw_aircraft_outline,
                 update_hud,
             ),
         )
@@ -227,138 +226,6 @@ fn orbit_camera(
 fn toggle_colliders(keys: Res<ButtonInput<KeyCode>>, mut show: ResMut<ShowColliders>) {
     if keys.just_pressed(KeyCode::KeyC) {
         show.0 = !show.0;
-    }
-}
-
-/// Draws all zone entities using their [`GizmoShape`] and [`GizmoContours`] components.
-fn draw_zone_shape(
-    gizmos: &mut Gizmos<FdmGizmos>,
-    shape: &GizmoShape,
-    zone_tf: &Transform,
-    iso_at: &impl Fn(&Transform, Quat) -> Isometry3d,
-    zone_to_world: &impl Fn(&Transform, Vec3) -> Vec3,
-    color: Color,
-) {
-    match shape {
-        GizmoShape::Box { x, y, z } => {
-            gizmos.primitive_3d(&Cuboid::new(*x, *y, *z), iso_at(zone_tf, Quat::IDENTITY), color);
-        }
-        GizmoShape::Cylinder { radius, length, axis } => {
-            gizmos
-                .primitive_3d(
-                    &Cylinder::new(*radius, *length),
-                    iso_at(zone_tf, Quat::from_rotation_arc(Vec3::Y, *axis)),
-                    color,
-                )
-                .resolution(32);
-        }
-        GizmoShape::Cone { radius, length } => {
-            gizmos.primitive_3d(
-                &Cone { radius: *radius, height: *length },
-                iso_at(zone_tf, Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)),
-                color,
-            );
-        }
-        GizmoShape::Sphere { radius } => {
-            gizmos
-                .primitive_3d(
-                    &bevy::math::primitives::Sphere::new(*radius),
-                    iso_at(zone_tf, Quat::IDENTITY),
-                    color,
-                )
-                .resolution(32);
-        }
-        GizmoShape::Quad { corners } => {
-            let pts: Vec<Vec3> = corners
-                .iter()
-                .chain(std::iter::once(&corners[0]))
-                .map(|c| zone_to_world(zone_tf, *c))
-                .collect();
-            gizmos.linestrip(pts, color);
-        }
-        GizmoShape::Strut { start, end } => {
-            gizmos.line(zone_to_world(zone_tf, *start), zone_to_world(zone_tf, *end), color);
-        }
-    }
-}
-
-/// Draws all zone entities using their [`GizmoShape`] and [`GizmoContours`] components.
-///
-/// Press **C** to toggle the collider wireframe overlay provided by
-/// [`AircraftFdmDebugPlugin`] (via [`ShowColliders`]).
-///
-///
-/// | Colour      | Meaning                                      |
-/// |-------------|----------------------------------------------|
-/// | Cyan        | Lifting surface (wing, h-stab)               |
-/// | Green       | Control surface (aileron/elevator/rudder)     |
-/// | Orange      | Engine zone                                  |
-/// | Grey        | Non-lifting / structural (fuselage, struts)  |
-fn draw_aircraft_outline(
-    mut gizmos: Gizmos<FdmGizmos>,
-    root_query: Query<&Transform, With<AircraftGeometry>>,
-    zone_query: Query<
-        (
-            &Transform,
-            Option<&AeroZone>,
-            Option<&GizmoContours>,
-            Option<&GizmoShape>,
-            Option<&EngineZone>,
-        ),
-        Or<(With<AeroZone>, With<EngineZone>)>,
-    >,
-) {
-    let Ok(ac) = root_query.single() else { return };
-    let t = ac.translation;
-    let r = ac.rotation;
-
-    let to_world = |body: Vec3| t + r * body;
-    // Zone-local point to world, respecting zone rotation.
-    let zone_to_world =
-        |zone_tf: &Transform, local: Vec3| to_world(zone_tf.translation + zone_tf.rotation * local);
-    let iso_at = |zone_tf: &Transform, extra_rot: Quat| {
-        Isometry3d::new(
-            t + r * zone_tf.translation,
-            Quat::from_array(r.to_array())
-                * Quat::from_array(zone_tf.rotation.to_array())
-                * extra_rot,
-        )
-    };
-
-    for (zone_tf, aero, contours, shape, engine) in &zone_query {
-        // Pick colour by zone type.
-        let color = if engine.is_some() {
-            Color::srgba(0.95, 0.65, 0.15, 0.9) // orange
-        } else if aero.is_some_and(|a| a.control_role.is_some()) {
-            Color::srgba(0.3, 1.0, 0.5, 0.7) // green
-        } else if aero.is_some_and(|a| a.cl.evaluate(0.1, 2e6).abs() > 0.01) {
-            Color::srgba(0.4, 0.85, 1.0, 0.7) // cyan — lifting surface
-        } else {
-            Color::srgba(0.6, 0.6, 0.6, 0.6) // grey — structural / drag-only
-        };
-
-        // Draw contour linestrips when present.
-        if let Some(contour_data) = contours {
-            for line in &contour_data.lines {
-                if line.len() < 2 {
-                    continue;
-                }
-                let world_pts: Vec<Vec3> =
-                    line.iter().map(|p| zone_to_world(zone_tf, *p)).collect();
-                gizmos.linestrip(world_pts, color);
-            }
-            // If there's no GizmoShape, contours are the only visual.
-            if shape.is_none() {
-                continue;
-            }
-        }
-
-        // Draw GizmoShape.
-        if let Some(gs) = shape {
-            draw_zone_shape(&mut gizmos, gs, zone_tf, &iso_at, &zone_to_world, color);
-        }
-
-        // (contour zones handled above with `continue`)
     }
 }
 

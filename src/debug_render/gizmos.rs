@@ -9,8 +9,8 @@
 use avian3d::prelude::{ComputedCenterOfMass, ComputedMass, ConstantForce, Rotation};
 use crate::_bevy::*;
 
-use crate::components::{AeroZone, AircraftGeometry, ZoneForce};
-use super::configuration::FdmGizmos;
+use crate::components::{AeroZone, AircraftGeometry, GizmoContours, GizmoShape, ZoneForce};
+use super::configuration::{FdmDebugRender, FdmGizmos};
 
 // ── Centre of gravity ─────────────────────────────────────────────────────────
 
@@ -152,13 +152,122 @@ pub(super) fn debug_render_moments(
 
 // ── Zone health wireframes ────────────────────────────────────────────────────
 
-/// Draw zone collider wireframes, tinted green to red by Failure::remaining.
+/// Draw zone outline wireframes using [`GizmoShape`] and [`GizmoContours`].
+///
+/// Color is chosen by zone type unless overridden by [`FdmDebugRender`]:
+/// - Green: control surface (non-zero `control_role`)
+/// - Cyan: lifting surface (non-zero CL at a sample alpha)
+/// - Orange: non-aero zone (e.g. engine)
+/// - Grey: structural / drag-only
+///
+/// The global [`FdmGizmos::zone_color`] acts as an on/off gate; set to `None`
+/// to disable. Per-entity [`FdmDebugRender::zone_color`] overrides the color.
 pub(super) fn debug_render_zones(
-    mut _gizmos: Gizmos<FdmGizmos>,
-    _store: Res<GizmoConfigStore>,
+    mut gizmos: Gizmos<FdmGizmos>,
+    store: Res<GizmoConfigStore>,
+    query: Query<(
+        &GlobalTransform,
+        Option<&AeroZone>,
+        Option<&GizmoContours>,
+        Option<&GizmoShape>,
+        Option<&FdmDebugRender>,
+    ), Or<(With<GizmoShape>, With<GizmoContours>)>>,
 ) {
-    // TODO(debug-plugin): query AeroZone + Collider + GlobalTransform + Option<Failure>
-    // + Option<FdmDebugRender>; lerp zone_color from green (remaining=1) to red (0).
+    let config = store.config::<FdmGizmos>().1;
+    if config.zone_color.is_none() {
+        return;
+    }
+
+    for (zone_gt, aero, contours, shape, dbg_render) in &query {
+        let color = dbg_render
+            .and_then(|d| d.zone_color)
+            .unwrap_or_else(|| zone_type_color(aero));
+
+        let wt = zone_gt.compute_transform();
+        let zone_to_world = |local: Vec3| wt.translation + wt.rotation * local;
+        let iso_at = |extra_rot: Quat| {
+            Isometry3d::new(wt.translation, wt.rotation * extra_rot)
+        };
+
+        if let Some(contour_data) = contours {
+            for line in &contour_data.lines {
+                if line.len() < 2 {
+                    continue;
+                }
+                let pts: Vec<Vec3> = line.iter().map(|p| zone_to_world(*p)).collect();
+                gizmos.linestrip(pts, color);
+            }
+            if shape.is_none() {
+                continue;
+            }
+        }
+
+        if let Some(gs) = shape {
+            draw_zone_shape(&mut gizmos, gs, &iso_at, &zone_to_world, color);
+        }
+    }
+}
+
+fn zone_type_color(aero: Option<&AeroZone>) -> Color {
+    if aero.is_none() {
+        Color::srgba(0.95, 0.65, 0.15, 0.9) // orange - engine / non-aero
+    } else if aero.is_some_and(|a| a.control_role.is_some()) {
+        Color::srgba(0.3, 1.0, 0.5, 0.7) // green - control surface
+    } else if aero.is_some_and(|a| a.cl.evaluate(0.1, 2e6).abs() > 0.01) {
+        Color::srgba(0.4, 0.85, 1.0, 0.7) // cyan - lifting surface
+    } else {
+        Color::srgba(0.6, 0.6, 0.6, 0.6) // grey - structural / drag-only
+    }
+}
+
+fn draw_zone_shape(
+    gizmos: &mut Gizmos<FdmGizmos>,
+    shape: &GizmoShape,
+    iso_at: &impl Fn(Quat) -> Isometry3d,
+    zone_to_world: &impl Fn(Vec3) -> Vec3,
+    color: Color,
+) {
+    match shape {
+        GizmoShape::Box { x, y, z } => {
+            gizmos.primitive_3d(&Cuboid::new(*x, *y, *z), iso_at(Quat::IDENTITY), color);
+        }
+        GizmoShape::Cylinder { radius, length, axis } => {
+            gizmos
+                .primitive_3d(
+                    &Cylinder::new(*radius, *length),
+                    iso_at(Quat::from_rotation_arc(Vec3::Y, *axis)),
+                    color,
+                )
+                .resolution(32);
+        }
+        GizmoShape::Cone { radius, length } => {
+            gizmos.primitive_3d(
+                &Cone { radius: *radius, height: *length },
+                iso_at(Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)),
+                color,
+            );
+        }
+        GizmoShape::Sphere { radius } => {
+            gizmos
+                .primitive_3d(
+                    &bevy_math::primitives::Sphere::new(*radius),
+                    iso_at(Quat::IDENTITY),
+                    color,
+                )
+                .resolution(32);
+        }
+        GizmoShape::Quad { corners } => {
+            let pts: Vec<Vec3> = corners
+                .iter()
+                .chain(std::iter::once(&corners[0]))
+                .map(|c| zone_to_world(*c))
+                .collect();
+            gizmos.linestrip(pts, color);
+        }
+        GizmoShape::Strut { start, end } => {
+            gizmos.line(zone_to_world(*start), zone_to_world(*end), color);
+        }
+    }
 }
 
 // ── Angle-of-attack / wind indicator ─────────────────────────────────────────
