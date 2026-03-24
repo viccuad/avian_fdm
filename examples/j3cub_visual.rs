@@ -367,10 +367,7 @@ fn draw_aircraft_outline(
 fn draw_forces(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
-    // No ColliderOf — Avian adds it lazily and it may be absent on the engine
-    // zone, causing a silent query miss. With one aircraft, root_query.single()
-    // gives us the root Transform for all world-position calculations.
-    zone_query: Query<(&ZoneForce, &Transform, Has<EngineZone>)>,
+    zone_query: Query<(&ZoneForce, &Transform, &AeroZone, Has<EngineZone>)>,
     root_query: Query<
         (
             &Transform,
@@ -388,12 +385,15 @@ fn draw_forces(
     let force_scale = store.config::<FdmGizmos>().1.force_scale;
 
     // ── Per-zone force arrows ─────────────────────────────────────────────────
-    for (zf, zone_local_tf, is_engine) in &zone_query {
+    for (zf, zone_local_tf, zone, is_engine) in &zone_query {
         if zf.force.length_squared() < 100.0 {
             continue; // skip tiny / inactive zones (< 10 N)
         }
-        // Compute world position from root's current Transform (no GlobalTransform lag).
-        let start = root_tf.transform_point(zone_local_tf.translation);
+        // ac_offset is in zone local space (zones have no local rotation, so
+        // adding it to the local translation gives the AC in aircraft-root frame).
+        // We then use root_tf (current frame) to avoid the one-frame GlobalTransform lag.
+        let ac_local = zone_local_tf.translation + zone.ac_offset;
+        let start = root_tf.transform_point(ac_local);
         if is_engine {
             gizmos.arrow(
                 start,

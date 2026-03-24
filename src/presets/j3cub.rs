@@ -282,36 +282,38 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // ── Left wing ────────────────────────────────────────────────────
             // Thin collider (z=0.02 m). See module docs on hybrid approach.
             parent.spawn((wing_zone(
-                "L-root", WING_AC_X, -0.94, 0.175,
+                "L-root", WING_AC_X, WING_AC_X, -0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; root panel 20% span")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             parent.spawn((wing_zone(
-                "L-mid", WING_AC_X, -2.82, 0.175,
+                "L-mid", WING_AC_X, WING_AC_X, -2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; mid panel 20% span")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
-            // Tip front (LE half of chord, inboard of aileron spanwise).
-            // x = WING_AC_X + (full_chord - tip_chord) / 2 = -0.10 + 0.175 = 0.075
+            // Tip strip (LE portion of chord, outboard alongside the aileron).
+            // Entity at geometric center of the strip (0.075) for correct
+            // collider position; ac_offset inside AeroZone shifts the force
+            // application point to WING_AC_X (25% of the full wing chord).
             parent.spawn((wing_zone(
-                "L-tip", 0.075, -4.19, 0.150,
+                "L-tip", 0.075, WING_AC_X, -4.19, 0.150,
                 Collider::cuboid(0.45, 0.86, 0.02),
                 ColliderDensity(sourced!(517.0, "Calibration: tip panel smaller volume; density raised to keep tip-panel mass ≈ root")),
             ), GizmoShape::Box { x: 0.45, y: 0.86, z: 0.02 }));
 
             // ── Right wing ───────────────────────────────────────────────────
             parent.spawn((wing_zone(
-                "R-root", WING_AC_X, 0.94, 0.175,
+                "R-root", WING_AC_X, WING_AC_X, 0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; root panel 20% span")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             parent.spawn((wing_zone(
-                "R-mid", WING_AC_X, 2.82, 0.175,
+                "R-mid", WING_AC_X, WING_AC_X, 2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; mid panel 20% span")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             parent.spawn((wing_zone(
-                "R-tip", 0.075, 4.19, 0.150,
+                "R-tip", 0.075, WING_AC_X, 4.19, 0.150,
                 Collider::cuboid(0.45, 0.86, 0.02),
                 ColliderDensity(sourced!(517.0, "Calibration: tip panel smaller volume; density raised to keep tip-panel mass ≈ root")),
             ), GizmoShape::Box { x: 0.45, y: 0.86, z: 0.02 }));
@@ -591,23 +593,27 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
 
 /// One wing panel zone at position (`x_m`, `y_m`, `WING_Z`).
 ///
-/// `fraction` is this panel's share of the whole-aircraft CL and CD tables
-/// (e.g. 0.175 for a 17.5 % panel). `x_m` is the chordwise centre; for
-/// full-chord panels use [`WING_AC_X`], for partial-chord panels (e.g. the
-/// tip front strip) offset accordingly.
+/// `x_m` is the entity and collider center along the chord axis (physical
+/// position, used for mass distribution). `ac_x_m` is the aerodynamic center
+/// where lift forces are applied; for all wing panels this should be
+/// [`WING_AC_X`] regardless of how the chord is partitioned. When
+/// `ac_x_m == x_m` the `ac_offset` inside [`AeroZone`] is zero.
 pub fn wing_zone(
     _name: &str,
     x_m: f64,
+    ac_x_m: f64,
     y_m: f64,
     fraction: f64,
     collider: Collider,
     density: ColliderDensity,
 ) -> impl Bundle {
+    let ac_offset = Vec3::new((ac_x_m - x_m) as f32, 0.0, 0.0);
     (
         AeroZoneBundle {
             zone: AeroZone {
                 cl: cl_zone(fraction),
                 cd: cd_zone(fraction),
+                ac_offset,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),
