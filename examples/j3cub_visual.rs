@@ -43,7 +43,7 @@ fn main() {
         .add_plugins(PhysicsPlugins::default())
         .add_plugins(AircraftFdmPlugin)
         .add_plugins(AircraftFdmDebugPlugin)
-        // At cruise (~4300 N lift), the yellow total-force arrow will be ~7 m long —
+        // At cruise (~4300 N lift), the total-force arrow will be ~7 m long —
         // comparable to the aircraft fuselage, so it's easy to read.
         .insert_gizmo_config(
             FdmGizmos {
@@ -95,10 +95,10 @@ struct OrbitCamera {
 impl Default for OrbitCamera {
     fn default() -> Self {
         Self {
-            // Start roughly behind the aircraft (flies in +X) and above.
-            yaw: std::f32::consts::PI,
-            pitch: 0.25,
-            radius: 35.0,
+            // Isometric view from port
+            yaw: -std::f32::consts::PI / 3.0,
+            pitch: 0.30,
+            radius: 15.0,
         }
     }
 }
@@ -295,18 +295,22 @@ fn draw_aircraft_outline(
                         );
                     }
                     TypedShape::Ball(b) => {
-                        gizmos.primitive_3d(
-                            &bevy::math::primitives::Sphere::new(b.radius as f32),
-                            iso_at(zone_tf, Quat::IDENTITY),
-                            collider_color,
-                        ).resolution(32);
+                        gizmos
+                            .primitive_3d(
+                                &bevy::math::primitives::Sphere::new(b.radius as f32),
+                                iso_at(zone_tf, Quat::IDENTITY),
+                                collider_color,
+                            )
+                            .resolution(32);
                     }
                     TypedShape::Cylinder(c) => {
-                        gizmos.primitive_3d(
-                            &Cylinder::new(c.radius as f32, c.half_height as f32 * 2.0),
-                            iso_at(zone_tf, Quat::IDENTITY),
-                            collider_color,
-                        ).resolution(32);
+                        gizmos
+                            .primitive_3d(
+                                &Cylinder::new(c.radius as f32, c.half_height as f32 * 2.0),
+                                iso_at(zone_tf, Quat::IDENTITY),
+                                collider_color,
+                            )
+                            .resolution(32);
                     }
                     TypedShape::Capsule(c) => {
                         gizmos.primitive_3d(
@@ -360,12 +364,18 @@ fn draw_aircraft_outline(
                         color,
                     );
                 }
-                GizmoShape::Cylinder { radius, length, axis } => {
-                    gizmos.primitive_3d(
-                        &Cylinder::new(*radius, *length),
-                        iso_at(zone_tf, Quat::from_rotation_arc(Vec3::Y, *axis)),
-                        color,
-                    ).resolution(32);
+                GizmoShape::Cylinder {
+                    radius,
+                    length,
+                    axis,
+                } => {
+                    gizmos
+                        .primitive_3d(
+                            &Cylinder::new(*radius, *length),
+                            iso_at(zone_tf, Quat::from_rotation_arc(Vec3::Y, *axis)),
+                            color,
+                        )
+                        .resolution(32);
                 }
                 GizmoShape::Cone { radius, length } => {
                     gizmos.primitive_3d(
@@ -413,18 +423,22 @@ fn draw_aircraft_outline(
                     );
                 }
                 TypedShape::Ball(b) => {
-                    gizmos.primitive_3d(
-                        &bevy::math::primitives::Sphere::new(b.radius as f32),
-                        iso_at(zone_tf, Quat::IDENTITY),
-                        color,
-                    ).resolution(32);
+                    gizmos
+                        .primitive_3d(
+                            &bevy::math::primitives::Sphere::new(b.radius as f32),
+                            iso_at(zone_tf, Quat::IDENTITY),
+                            color,
+                        )
+                        .resolution(32);
                 }
                 TypedShape::Cylinder(c) => {
-                    gizmos.primitive_3d(
-                        &Cylinder::new(c.radius as f32, c.half_height as f32 * 2.0),
-                        iso_at(zone_tf, Quat::IDENTITY),
-                        color,
-                    ).resolution(32);
+                    gizmos
+                        .primitive_3d(
+                            &Cylinder::new(c.radius as f32, c.half_height as f32 * 2.0),
+                            iso_at(zone_tf, Quat::IDENTITY),
+                            color,
+                        )
+                        .resolution(32);
                 }
                 TypedShape::Capsule(c) => {
                     gizmos.primitive_3d(
