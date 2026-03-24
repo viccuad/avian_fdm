@@ -6,7 +6,8 @@
 /// Benchmarks target the tight inner loop that executes every physics frame
 /// per zone. Even at 200 Hz physics with 100 aircraft × 15 zones = 300 000
 /// zone evaluations per second, each benchmark should complete in < 500 ns.
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 
 use avian_fdm::components::aero_coeff::AeroCoeff;
 use avian_fdm::atmosphere::{atmosphere_at, isa_density, isa_temperature};
