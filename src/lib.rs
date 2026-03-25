@@ -929,20 +929,19 @@
 //!
 //! ### Inserting a custom system (e.g. autopilot)
 //!
-//! Place it between `update_flight_state` and `compute_aero_forces`:
+//! Place it after `AircraftFdmSystem::FlightState` and before
+//! `AircraftFdmSystem::Forces` using the named system sets:
 //!
 //! ```rust,no_run
 //! # use bevy::prelude::*;
 //! # use avian3d::prelude::{PhysicsSchedule, PhysicsStepSystems};
 //! # use avian_fdm::prelude::*;
-//! # use avian_fdm::atmosphere::update_flight_state;
-//! # use avian_fdm::aerodynamics::compute_aero_forces;
 //! # fn my_autopilot() {}
 //! // app.add_systems(
 //! //     PhysicsSchedule,
 //! //     my_autopilot
-//! //         .after(update_flight_state)
-//! //         .before(compute_aero_forces)
+//! //         .after(AircraftFdmSystem::FlightState)
+//! //         .before(AircraftFdmSystem::Forces)
 //! //         .in_set(PhysicsStepSystems::BroadPhase),
 //! // );
 //! ```
@@ -1078,10 +1077,10 @@ pub(crate) mod _bevy {
     pub(crate) use bevy_transform::prelude::*;
 }
 
-pub mod aerodynamics;
-pub mod atmosphere;
+pub(crate) mod aerodynamics;
+pub(crate) mod atmosphere;
 pub mod components;
-pub mod math;
+pub(crate) mod math;
 pub mod plugin;
 pub mod systems;
 

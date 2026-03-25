@@ -21,17 +21,19 @@ pub fn to_dvec3(v: Vec3) -> DVec3 {
 /// from the `f32` [`bevy::transform::components::Transform::rotation`] to
 /// `f64` before calling this function.
 ///
+/// Rotate a vector from the aircraft body frame into the Bevy world frame.
+///
 /// # Body frame convention
 /// X = forward (nose), Y = right wing, Z = down (belly).
 /// At identity rotation, body X maps to world −Z.
-#[inline]
-pub fn body_to_world(rotation: DQuat, v_body: DVec3) -> DVec3 {
+#[cfg(test)]
+pub(crate) fn body_to_world(rotation: DQuat, v_body: DVec3) -> DVec3 {
     rotation * v_body
 }
 
 /// Rotate a vector from the Bevy world frame into the aircraft body frame.
 #[inline]
-pub fn world_to_body(rotation: DQuat, v_world: DVec3) -> DVec3 {
+pub(crate) fn world_to_body(rotation: DQuat, v_world: DVec3) -> DVec3 {
     rotation.inverse() * v_world
 }
 

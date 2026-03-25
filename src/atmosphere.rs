@@ -101,7 +101,8 @@ pub fn isa_pressure(h: f64) -> f64 {
 }
 
 /// Compute ISA air density (kg/m³) at geometric altitude `h` (m).
-pub fn isa_density(h: f64) -> f64 {
+#[cfg(test)]
+pub(crate) fn isa_density(h: f64) -> f64 {
     let t = isa_temperature(h);
     let p = isa_pressure(h);
     p / (R_AIR * t)
