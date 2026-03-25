@@ -498,3 +498,4 @@ fn jsbsim_regenerate_reference() {
 
     println!("  ✓ Committed reference CSV matches fresh JSBSim run.");
 }
+
