@@ -19,6 +19,10 @@
 //!
 //! ## Regenerating reference data
 //!
+//! The scripts use the J3Cub FlightGear aircraft repo (Datcom aero, rev 1.26).
+//! `J3CUB_AIRCRAFT_PATH` defaults to `dirname(JSBSIM_DATA_PATH)`, which works
+//! when the `jsbsim` and `J3Cub` repos are siblings (e.g. both under `openskies/`).
+//!
 //! ```sh
 //! # 1. Install JSBSim in a venv (one-time setup)
 //! python3 -m venv .venv && .venv/bin/pip install jsbsim
@@ -402,6 +406,7 @@ fn jsbsim_regenerate_glide_reference() {
     let output = std::process::Command::new(&python)
         .arg(&script)
         .env("JSBSIM_DATA_PATH", &data_path)
+        .envs(std::env::var("J3CUB_AIRCRAFT_PATH").ok().map(|v| ("J3CUB_AIRCRAFT_PATH", v)))
         .output();
 
     let Ok(output) = output else {
@@ -462,6 +467,7 @@ fn jsbsim_regenerate_reference() {
     let output = std::process::Command::new(&python)
         .arg(&script)
         .env("JSBSIM_DATA_PATH", &data_path)
+        .envs(std::env::var("J3CUB_AIRCRAFT_PATH").ok().map(|v| ("J3CUB_AIRCRAFT_PATH", v)))
         .output();
 
     let Ok(output) = output else {

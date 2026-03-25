@@ -3,12 +3,10 @@
 
 Outputs CSV to stdout: time_s,altitude_m,airspeed_ms,alpha_deg
 
-Same initial conditions as run_jsbsim.py, but the engine is never started and
+Same initial conditions as run_jsbsim.py, but no engine is started and
 throttle stays at 0. Used to generate tests/fixtures/jsbsim_j3cub_glide_60s.csv.
 
-Environment:
-    JSBSIM_DATA_PATH  Root directory for JSBSim data (must contain
-                      aircraft/J3Cub/J3Cub.xml, engine/, systems/).
+See run_jsbsim.py for path setup (JSBSIM_DATA_PATH, J3CUB_AIRCRAFT_PATH).
 """
 
 import math
@@ -36,6 +34,21 @@ def main():
     if not data_path:
         print("ERROR: JSBSIM_DATA_PATH not set.", file=sys.stderr)
         sys.exit(1)
+    data_path = os.path.abspath(data_path)
+
+    aircraft_path = os.environ.get(
+        "J3CUB_AIRCRAFT_PATH", os.path.dirname(data_path)
+    )
+    aircraft_path = os.path.abspath(aircraft_path)
+
+    j3cub_dir = os.path.join(aircraft_path, "J3Cub")
+    if not os.path.isdir(j3cub_dir):
+        print(
+            f"ERROR: J3Cub aircraft directory not found at {j3cub_dir}.\n"
+            "Set J3CUB_AIRCRAFT_PATH to the directory containing the J3Cub folder.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     saved_fd = os.dup(1)
     devnull_fd = os.open(os.devnull, os.O_WRONLY)
@@ -44,13 +57,18 @@ def main():
 
     fdm = jsbsim.FGFDMExec(data_path, None)
     fdm.set_debug_level(0)
+    fdm.set_aircraft_path(aircraft_path)
 
     os.dup2(saved_fd, 1)
     os.close(saved_fd)
 
     if not fdm.load_model("J3Cub"):
-        print("ERROR: Failed to load J3Cub model from " + data_path,
-              file=sys.stderr)
+        print(
+            f"ERROR: Failed to load J3Cub model.\n"
+            f"  JSBSIM_DATA_PATH    = {data_path}\n"
+            f"  J3CUB_AIRCRAFT_PATH = {aircraft_path}",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # ── Initial conditions ───────────────────────────────────────────────
@@ -63,9 +81,9 @@ def main():
 
     fdm.run_ic()
 
-    # Engine is left off - no propulsion/set-running call, throttle stays 0.
-    fdm["fcs/throttle-cmd-norm"] = 0.0
-    fdm["fcs/mixture-cmd-norm"] = 0.0
+    # Engine is left off - no set-running call, throttle and mixture stay at 0.
+    fdm["fcs/throttle-cmd-norm[0]"] = 0.0
+    fdm["fcs/mixture-cmd-norm[0]"] = 0.0
 
     # ── Simulation loop ──────────────────────────────────────────────────
     print("time_s,altitude_m,airspeed_ms,alpha_deg")

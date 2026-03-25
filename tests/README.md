@@ -83,6 +83,14 @@ JSBSIM_DATA_PATH=../jsbsim cargo test --features "presets,propulsion" \
     -- jsbsim_regenerate_glide_reference --nocapture
 ```
 
+`J3CUB_AIRCRAFT_PATH` defaults to `dirname(JSBSIM_DATA_PATH)`, so with
+`JSBSIM_DATA_PATH=../jsbsim` it looks for `../J3Cub/J3Cub.xml` (the
+checked-out J3Cub FlightGear repo). Set it explicitly if your layout differs:
+
+```sh
+JSBSIM_DATA_PATH=/path/to/jsbsim J3CUB_AIRCRAFT_PATH=/path/to cargo test ...
+```
+
 ### Regenerating the reference CSVs
 
 If you change initial conditions, the throttle schedule, or the JSBSim
@@ -98,6 +106,9 @@ JSBSIM_DATA_PATH=../jsbsim .venv/bin/python3 tests/run_jsbsim_glide.py \
     2>/dev/null | grep -E '^[0-9t]' > tests/fixtures/jsbsim_j3cub_glide_60s.csv
 ```
 
+`J3CUB_AIRCRAFT_PATH` defaults to `dirname(JSBSIM_DATA_PATH)`, pointing at
+`../J3Cub`. Set it explicitly if needed.
+
 ### Files
 
 - `jsbsim_comparison.rs` - Rust integration tests; loads CSVs, runs avian_fdm, compares
@@ -112,7 +123,8 @@ The GitHub Actions workflow runs all four tests on pushes to `main`:
 
 ```yaml
 # .github/workflows/ci.yml -- jsbsim-validate job
-JSBSIM_DATA_PATH=./jsbsim cargo test --features "presets,propulsion" -- jsbsim --nocapture
+JSBSIM_DATA_PATH=./jsbsim J3CUB_AIRCRAFT_PATH=. \
+    cargo test --features "presets,propulsion" -- jsbsim --nocapture
 ```
 
 The job has `continue-on-error: true` until precision tolerances are met.
