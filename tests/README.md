@@ -2,18 +2,27 @@
 
 ## Unit tests
 
-Run the standard unit-test suite (45 tests across all modules):
+The `presets` feature enables `avian3d/f32` and `avian3d/parry-f32`, which are
+required for the crate to compile. Always pass at least `--features presets`.
+
+Run the full unit and integration test suite:
+
+```sh
+cargo test --features "presets,propulsion"
+```
+
+The `propulsion` feature is included in the `default` feature set, but since
+the features above are not the defaults, you must list it explicitly if you
+want it. `--all-features` also works and additionally enables `debug-plugin`:
 
 ```sh
 cargo test --all-features
 ```
 
-Feature-gated subsets:
+To run only the library unit tests (no integration tests):
 
 ```sh
-cargo test                              # default features (damage + propulsion)
-cargo test --no-default-features        # core only
-cargo test --features "damage,propulsion"
+cargo test --features "presets,propulsion" --lib
 ```
 
 ## JSBSim comparison fixture
@@ -42,13 +51,13 @@ without Python or JSBSim installed:
 
 ```sh
 # Powered flight
-cargo test --features presets -- jsbsim_j3cub_comparison --nocapture
+cargo test --features "presets,propulsion" -- jsbsim_j3cub_comparison --nocapture
 
 # Glide (engine off)
-cargo test --features presets -- jsbsim_j3cub_glide_comparison --nocapture
+cargo test --features "presets,propulsion" -- jsbsim_j3cub_glide_comparison --nocapture
 
 # Both at once
-cargo test --test jsbsim_comparison --features presets -- --nocapture
+cargo test --test jsbsim_comparison --features "presets,propulsion" -- --nocapture
 ```
 
 Each test runs avian_fdm headlessly for 60 s (about 10 s wall time) and
@@ -66,11 +75,11 @@ python3 -m venv .venv
 .venv/bin/pip install jsbsim
 
 # Powered flight freshness check
-JSBSIM_DATA_PATH=../jsbsim cargo test --features presets \
+JSBSIM_DATA_PATH=../jsbsim cargo test --features "presets,propulsion" \
     -- jsbsim_regenerate_reference --nocapture
 
 # Glide freshness check
-JSBSIM_DATA_PATH=../jsbsim cargo test --features presets \
+JSBSIM_DATA_PATH=../jsbsim cargo test --features "presets,propulsion" \
     -- jsbsim_regenerate_glide_reference --nocapture
 ```
 
@@ -103,7 +112,7 @@ The GitHub Actions workflow runs all four tests on pushes to `main`:
 
 ```yaml
 # .github/workflows/ci.yml -- jsbsim-validate job
-JSBSIM_DATA_PATH=./jsbsim cargo test --features presets -- jsbsim --nocapture
+JSBSIM_DATA_PATH=./jsbsim cargo test --features "presets,propulsion" -- jsbsim --nocapture
 ```
 
 The job has `continue-on-error: true` until precision tolerances are met.
