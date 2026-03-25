@@ -358,7 +358,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     transform: Transform::from_xyz(0.00, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(sourced!(154.0, "Calibration: pilot+fuel+instruments+structure. Reduced from 188 to shift CG aft: with engine at x=+1.65 (69 kg) and cabin at x=+0.20 (53 kg), fuse_fwd must be lighter to keep CG at -0.172 m. See mass budget in presets/j3cub.rs.")),
+                ColliderDensity(sourced!(154.0, "Calibration: pilot+fuel+instruments+structure. Reduced from 188 to shift CG aft to -0.172 m so the wing AC at -0.10 m is forward of the CG, producing nose-up pitch stability. See mass budget in j3cub.rs.")),
                 fuse_fwd_contours(),
             ));
 
@@ -378,7 +378,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     transform: Transform::from_xyz(-2.35, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(sourced!(196.0, "Calibration: tail boom, control runs, tail structure. Increased from 119 to shift CG aft to -0.172 m body-X. Compensates for heavy engine (69 kg at x=+1.65) pulling CG forward. See mass budget in presets/j3cub.rs.")),
+                ColliderDensity(sourced!(196.0, "Calibration: tail boom, control runs, tail structure. Increased from 119 to shift CG aft to -0.172 m. Compensates for heavy engine (69 kg at x=+1.65) pulling CG forward.")),
                 fuse_aft_contours(),
             ));
 

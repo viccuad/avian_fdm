@@ -377,8 +377,8 @@
 //! zone's effective angle of attack by the local angular-rate contribution:
 //!
 //! ```text
-//! alpha_local = alpha + (p·y + q·x) / V    (roll and pitch rate corrections)
-//! beta_local  = beta  + (r·y)       / V    (yaw rate correction)
+//! alpha_local = alpha + (p·y - q·x) / V    (roll and pitch rate corrections)
+//! beta_local  = beta  + (r·x)       / V    (yaw rate correction)
 //! ```
 //!
 //! This means the h-stab automatically produces more or less lift when the
@@ -527,8 +527,8 @@
 //! coefficients, each zone gets its own effective angle of attack:
 //!
 //! ```text
-//! alpha_local = alpha + (p*y + q*x) / V    (roll and pitch rate)
-//! beta_local  = beta  + (r*y)       / V    (yaw rate)
+//! alpha_local = alpha + (p*y - q*x) / V    (roll and pitch rate)
+//! beta_local  = beta  + (r*x)       / V    (yaw rate)
 //! ```
 //!
 //! where x and y are the zone's position relative to CG in body frame, and p,

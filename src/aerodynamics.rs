@@ -74,36 +74,42 @@ use crate::math::to_dvec3;
 /// When the aircraft is near stall, the descending tip stalls while the rising
 /// tip keeps flying, producing uncommanded roll that can steepen into a spin.
 ///
-/// **Layer 2. Pitch-rate Δα (tail authority limits, CG sensitivity)**
+/// **Layer 2. Pitch-rate Δα (pitch damping, tail effectiveness)**
 ///
 /// A zone at longitudinal station `x` (metres, positive forward from CG) sees
-/// a body-Z velocity increment from pitch rate `q` (rad/s):
-/// **Local angle-of-attack change from pitch = pitch rate (rad/s) × longitudinal
-/// distance from CG (m) ÷ airspeed (m/s). Positive forward, so the tail
-/// (negative x) sees reduced AoA during a pull.**
+/// a body-Z velocity increment from pitch rate `q` (rad/s). The cross product
+/// `ω × r` gives z-component `p·y − q·x`, so the pitch contribution is
+/// `−q·x`. For the aft tail (x < 0), this is positive when q > 0 - the tail
+/// rotates INTO the airstream during a pull, increasing its AoA and generating
+/// more restoring lift. This is the physical mechanism behind pitch damping
+/// (Cm_q). For a forward canard (x > 0) the effect is reversed.
+///
+/// The formula below follows directly from body-frame kinematics (ω × r):
 ///
 /// ```text
-/// Δα_pitch = q · x / V
+/// Δα_pitch = −q · x / V
 /// ```
 ///
-/// The horizontal stabiliser at x ≈ −4 m sees *reduced* AoA during a pull
-/// (q > 0), limiting tail authority at high pitch rates and reproducing the
-/// pitch-up departure tendency naturally.
+/// At q = 1 rad/s, V = 50 m/s, x = −4 m (aft tail): Δα ≈ +0.08 rad.
+/// The tail sees more AoA, generates more lift at its negative arm, and
+/// produces a nose-down restoring moment - pitch damping emerges naturally.
 ///
-/// **Layer 3. Yaw-rate Δβ (adverse yaw, Dutch roll)**
+/// **Layer 3. Yaw-rate Δβ (yaw damping, Dutch roll)**
 ///
-/// A zone at spanwise station `y` sees a body-Y velocity increment from yaw
-/// rate `r` (rad/s):
-/// **Local sideslip change from yaw = yaw rate (rad/s) × spanwise distance
-/// from yaw axis (m) ÷ airspeed (m/s). Produces asymmetric drag (adverse yaw)
-/// and drives Dutch-roll dynamics.**
+/// A zone at longitudinal station `x` sees a body-Y velocity increment from
+/// yaw rate `r` (rad/s). The cross product `ω × r` gives y-component `r·x`
+/// (for a zone on the aircraft centerline, z ≈ 0). For the vertical tail
+/// (x < 0, aft), a right yaw (r > 0) produces a leftward lateral velocity at
+/// the tail, reducing β_local. The resulting side force at the aft position
+/// opposes the yaw, providing yaw damping.
 ///
 /// ```text
-/// Δβ_yaw = r · y / V
+/// Δβ_yaw = r · x / V
 /// ```
 ///
-/// Creates asymmetric drag across the span (adverse yaw from differential
-/// profile drag) and is the primary driver of Dutch-roll dynamics.
+/// Note: spanwise wing zones (y ≠ 0, x ≈ 0) see near-zero sideslip change
+/// from yaw rate because the yaw-induced lateral velocity is proportional to
+/// the longitudinal station x, not the spanwise station y.
 ///
 /// # Arguments
 ///
@@ -127,8 +133,8 @@ pub fn zone_local_angles(
     y: f64,
     v: f64,
 ) -> (f64, f64) {
-    let alpha_local = alpha + (p * y + q * x) / v;
-    let beta_local = beta + (r * y) / v;
+    let alpha_local = alpha + (p * y - q * x) / v;
+    let beta_local = beta + (r * x) / v;
     (alpha_local, beta_local)
 }
 
@@ -460,7 +466,7 @@ pub fn compute_aero_forces(
     )>,
     mut zone_query: Query<(
         &AeroZone,
-        &GlobalTransform,
+        &Transform,
         &mut ZoneForce,
         Option<&Failure>,
     )>,
@@ -495,8 +501,6 @@ pub fn compute_aero_forces(
         // Global stab_to_body (at whole-aircraft α), used for induced drag and LOD mode.
         let stab_to_body_global = DQuat::from_rotation_y(-alpha);
         let com_world: Vec3 = pos.0 + rot.0 * com.0;
-        // CG in world space as DVec3, used to measure zone moment arms.
-        let cg_world = to_dvec3(com_world);
 
         // LOD mode: when the `LodDamping` component is present, zones evaluate
         // at the global α/β (no per-zone corrections) and `damping_torque` owns
@@ -508,7 +512,7 @@ pub fn compute_aero_forces(
         let mut total_cl = 0.0_f64; // sum of zone CL contributions (for induced drag)
 
         for child in children.iter() {
-            if let Ok((zone, zone_gt, mut zone_force, opt_failure)) = zone_query.get_mut(child) {
+            if let Ok((zone, zone_transform, mut zone_force, opt_failure)) = zone_query.get_mut(child) {
                 *zone_force = ZoneForce::default();
 
                 let remaining = get_remaining(opt_failure);
@@ -516,17 +520,25 @@ pub fn compute_aero_forces(
                     continue;
                 }
 
+                // Zone body position relative to CG, computed directly from the
+                // zone's local Transform (body-frame) and the CG offset.
+                // Using the zone's local Transform instead of GlobalTransform
+                // avoids the one-frame transform propagation lag that arises
+                // because Bevy's PostUpdate propagation runs after the physics
+                // schedule, making GlobalTransform stale by one physics step.
+                let zone_body_from_cg: DVec3 =
+                    to_dvec3(zone_transform.translation) - to_dvec3(com.0);
+
                 // Step 0: per-zone local α/β, skipped in LOD mode.
                 // In full-fidelity mode, measure the zone's body-frame position
                 // relative to the CG and apply roll/pitch/yaw-rate corrections.
                 let (alpha_local, beta_local, stab_to_body_local) = if use_lod {
                     (alpha, beta, stab_to_body_global)
                 } else {
-                    let zone_world_pos = zone_gt.translation();
-                    let zone_rel_world = to_dvec3(zone_world_pos) - cg_world;
-                    let zone_body = body_to_world.inverse() * zone_rel_world;
-                    let (al, bl) =
-                        zone_local_angles(alpha, beta, p, q, r, zone_body.x, zone_body.y, v);
+                    let (al, bl) = zone_local_angles(
+                        alpha, beta, p, q, r,
+                        zone_body_from_cg.x, zone_body_from_cg.y, v,
+                    );
                     (al, bl, DQuat::from_rotation_y(-al))
                 };
 
@@ -554,10 +566,15 @@ pub fn compute_aero_forces(
                 let force_world = wf.force.as_vec3();
                 let torque_world = wf.torque.as_vec3();
 
+                // Aerodynamic centre in world space: computed from the root
+                // entity's current Position/Rotation to stay in sync with the
+                // moment arm used above.
+                let ac_world = pos.0
+                    + rot.0 * (zone_transform.translation + zone.ac_offset);
+
                 // Write per-zone output for debug visualisation.
                 zone_force.force = force_world;
                 zone_force.torque = torque_world;
-                let ac_world = zone_gt.transform_point(zone.ac_offset);
                 zone_force.world_point = ac_world;
 
                 // Accumulate onto root: force + moment-arm torque + pure torque.
@@ -927,43 +944,59 @@ mod tests {
         );
     }
 
-    /// Layer 2: positive pitch rate + negative longitudinal station (tail), producing decreased α.
-    /// This reproduces tail authority limits: pulling hard reduces tail restoring moment.
+    /// Layer 2: positive pitch rate + negative longitudinal station (tail), producing increased α.
+    /// During a pull (q > 0), the tail (x < 0) rotates INTO the airstream, seeing more AoA.
+    /// This is the pitch-damping mechanism: more tail lift opposes the pull.
     #[test]
-    fn pitch_rate_decreases_alpha_at_tail() {
-        // q = 1 rad/s, x = -4 m (aft of CG), V = 50 m/s: Δα = -0.08 rad
+    fn pitch_rate_increases_alpha_at_tail() {
+        // q = 1 rad/s, x = -4 m (aft of CG), V = 50 m/s: Δα = -(-4)/50 = +0.08 rad
         let (alpha_l, _) = zone_local_angles(0.1, 0.0, 0.0, 1.0, 0.0, -4.0, 0.0, 50.0);
-        let expected = 0.1 - 4.0 / 50.0;
-        assert!(
-            (alpha_l - expected).abs() < 1e-12,
-            "tail should see reduced α during pull (q > 0), got {alpha_l}"
-        );
-    }
-
-    /// Layer 2: positive pitch rate + positive longitudinal station (nose), producing increased α.
-    #[test]
-    fn pitch_rate_increases_alpha_at_nose() {
-        let (alpha_l, _) = zone_local_angles(0.1, 0.0, 0.0, 1.0, 0.0, 4.0, 0.0, 50.0);
         let expected = 0.1 + 4.0 / 50.0;
         assert!(
             (alpha_l - expected).abs() < 1e-12,
-            "nose should see increased α during pull (q > 0), got {alpha_l}"
+            "tail should see increased α during pull (q > 0) — pitch damping, got {alpha_l}"
         );
     }
 
-    /// Layer 3: yaw rate shifts sideslip proportional to spanwise station.
+    /// Layer 2: positive pitch rate + positive longitudinal station (nose), producing decreased α.
+    /// A forward canard (x > 0) rotates AWAY from the airstream during a pull.
     #[test]
-    fn yaw_rate_shifts_beta_at_spanwise_station() {
-        // r = 1 rad/s, y = 3 m, V = 50 m/s: Δβ = +0.06 rad
-        let (alpha_l, beta_l) = zone_local_angles(0.0, 0.05, 0.0, 0.0, 1.0, 0.0, 3.0, 50.0);
-        let expected_beta = 0.05 + 3.0 / 50.0;
+    fn pitch_rate_decreases_alpha_at_nose() {
+        let (alpha_l, _) = zone_local_angles(0.1, 0.0, 0.0, 1.0, 0.0, 4.0, 0.0, 50.0);
+        let expected = 0.1 - 4.0 / 50.0;
+        assert!(
+            (alpha_l - expected).abs() < 1e-12,
+            "nose should see reduced α during pull (q > 0), got {alpha_l}"
+        );
+    }
+
+    /// Layer 3: yaw rate shifts sideslip proportional to longitudinal station.
+    /// An aft zone (x < 0) sees reduced sideslip when yawing right (r > 0),
+    /// which generates a side force opposing the yaw — yaw damping.
+    #[test]
+    fn yaw_rate_shifts_beta_at_longitudinal_station() {
+        // r = 1 rad/s, x = -3 m (aft zone), V = 50 m/s: Δβ = -3/50 = -0.06 rad
+        let (alpha_l, beta_l) = zone_local_angles(0.0, 0.05, 0.0, 0.0, 1.0, -3.0, 0.0, 50.0);
+        let expected_beta = 0.05 + (-3.0) / 50.0;
         assert!(
             (beta_l - expected_beta).abs() < 1e-12,
-            "Δβ_yaw should be r · y/V, got {beta_l}"
+            "Δβ_yaw should be r · x/V, got {beta_l}"
         );
         assert!(
             (alpha_l - 0.0).abs() < 1e-12,
             "yaw rate should not affect α"
+        );
+    }
+
+    /// Layer 3 symmetry: a spanwise wing zone (x ≈ 0) sees near-zero sideslip
+    /// change from yaw rate because Δβ = r · x / V and x ≈ 0 for the wing.
+    #[test]
+    fn yaw_rate_does_not_shift_beta_at_spanwise_zone() {
+        // r = 1 rad/s, x = 0 (purely spanwise zone), V = 50 m/s: Δβ = 0
+        let (_, beta_l) = zone_local_angles(0.0, 0.05, 0.0, 0.0, 1.0, 0.0, 3.0, 50.0);
+        assert!(
+            (beta_l - 0.05).abs() < 1e-12,
+            "purely spanwise zone should see no β change from yaw rate, got {beta_l}"
         );
     }
 
@@ -979,11 +1012,11 @@ mod tests {
     #[test]
     fn all_layers_combine_additively() {
         // p=1, q=1, r=1; x=2, y=3; V=10
-        // α_local = α + (p · y + q · x)/V = 0.1 + (3+2)/10 = 0.6
-        // β_local = β + r · y/V = 0.05 + 3/10 = 0.35
+        // α_local = α + (p · y - q · x)/V = 0.1 + (1·3 - 1·2)/10 = 0.1 + 0.1 = 0.2
+        // β_local = β + r · x/V = 0.05 + 1·2/10 = 0.05 + 0.2 = 0.25
         let (a, b) = zone_local_angles(0.1, 0.05, 1.0, 1.0, 1.0, 2.0, 3.0, 10.0);
-        assert!((a - 0.6).abs() < 1e-12, "combined α layers, got {a}");
-        assert!((b - 0.35).abs() < 1e-12, "combined β layers, got {b}");
+        assert!((a - 0.2).abs() < 1e-12, "combined α layers, got {a}");
+        assert!((b - 0.25).abs() < 1e-12, "combined β layers, got {b}");
     }
 
     /// Emergent roll damping: symmetric zones at ±y with a linear-CL table

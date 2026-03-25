@@ -118,10 +118,13 @@ impl Default for SampleCollector {
 }
 
 fn spawn_aircraft(mut commands: Commands) {
-    let level = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
+    // Match JSBSim initial conditions: ic/theta-rad = 0.0 (level), vt = 27 m/s.
+    // JSBSim does not pre-pitch - it starts level and converges to trim AoA within
+    // the first few steps. See tests/run_jsbsim.py for the reference conditions.
+    let initial_rot = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
     let root = j3cub::spawn(
         &mut commands,
-        Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(level),
+        Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(initial_rot),
     );
     commands
         .entity(root)
@@ -498,4 +501,6 @@ fn jsbsim_regenerate_reference() {
 
     println!("  ✓ Committed reference CSV matches fresh JSBSim run.");
 }
+
+
 
