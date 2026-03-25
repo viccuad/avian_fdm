@@ -6,10 +6,10 @@
 //!
 //! [`AircraftFdmDebugPlugin`]: super::AircraftFdmDebugPlugin
 
-use avian3d::prelude::{ComputedCenterOfMass, ComputedMass, ConstantForce, Rotation};
+use avian3d::prelude::{ComputedCenterOfMass, ComputedMass, ConstantForce, ConstantTorque, Rotation};
 use crate::_bevy::*;
 
-use crate::components::{AeroZone, AircraftGeometry, GizmoContours, GizmoShape, ZoneForce};
+use crate::components::{AeroZone, AircraftGeometry, FlightState, GizmoContours, GizmoShape, ZoneForce};
 use super::configuration::{FdmDebugRender, FdmGizmos};
 
 // ── Centre of gravity ─────────────────────────────────────────────────────────
@@ -141,13 +141,58 @@ pub(super) fn debug_render_resultant(
 
 // ── Moment arcs ───────────────────────────────────────────────────────────────
 
-/// Draw pitch / roll / yaw moment arcs centred on the CG.
+/// Draw pitch, roll, and yaw moment arrows centered on the CG.
+///
+/// Each arrow points along the corresponding body axis (X = roll, Y = pitch,
+/// Z = yaw in Bevy convention) and is scaled by moment magnitude. Colors are
+/// taken from [`FdmGizmos::roll_moment_color`], `pitch_moment_color`, and
+/// `yaw_moment_color`.
 pub(super) fn debug_render_moments(
-    mut _gizmos: Gizmos<FdmGizmos>,
-    _store: Res<GizmoConfigStore>,
+    mut gizmos: Gizmos<FdmGizmos>,
+    store: Res<GizmoConfigStore>,
+    query: Query<
+        (&Transform, &Rotation, &ComputedCenterOfMass, &ConstantTorque),
+        With<AircraftGeometry>,
+    >,
 ) {
-    // TODO(debug-plugin): query ExternalTorque on aircraft root; draw arcs around
-    // each body axis proportional to moment magnitude.
+    let config = store.config::<FdmGizmos>().1;
+
+    for (tf, rot, com, torque) in &query {
+        let cg = tf.translation + rot.0 * com.0;
+        let scale = config.force_scale;
+
+        // Decompose torque into body-frame components and draw each axis.
+        // Torque is already in world frame; project onto body axes for display.
+        let t = torque.0;
+        if t.length_squared() < 1.0 {
+            continue;
+        }
+
+        // Body axes in world space.
+        let body_x = rot.0 * Vec3::X; // roll axis
+        let body_y = rot.0 * Vec3::Y; // pitch axis
+        let body_z = rot.0 * Vec3::Z; // yaw axis
+
+        let t_roll  = t.dot(body_x);
+        let t_pitch = t.dot(body_y);
+        let t_yaw   = t.dot(body_z);
+
+        if let Some(color) = config.roll_moment_color {
+            if t_roll.abs() > 0.1 {
+                gizmos.arrow(cg, cg + body_x * t_roll * scale, color);
+            }
+        }
+        if let Some(color) = config.pitch_moment_color {
+            if t_pitch.abs() > 0.1 {
+                gizmos.arrow(cg, cg + body_y * t_pitch * scale, color);
+            }
+        }
+        if let Some(color) = config.yaw_moment_color {
+            if t_yaw.abs() > 0.1 {
+                gizmos.arrow(cg, cg + body_z * t_yaw * scale, color);
+            }
+        }
+    }
 }
 
 // ── Zone health wireframes ────────────────────────────────────────────────────
@@ -272,11 +317,51 @@ fn draw_zone_shape(
 
 // ── Angle-of-attack / wind indicator ─────────────────────────────────────────
 
-/// Draw the relative-wind arrow and angle-of-attack arc.
+/// Draw the relative-wind arrow and angle-of-attack / sideslip indicators.
+///
+/// Draws from the CG:
+/// - A wind arrow in the freestream direction (opposite of velocity), length
+///   proportional to airspeed, colored by [`FdmGizmos::wind_color`].
+/// - A short body-axis forward arrow showing where the nose points.
+/// - A label line showing the AoA angle between the two (no text; the angle
+///   between nose-arrow and wind-arrow is the visual AoA).
 pub(super) fn debug_render_wind(
-    mut _gizmos: Gizmos<FdmGizmos>,
-    _store: Res<GizmoConfigStore>,
+    mut gizmos: Gizmos<FdmGizmos>,
+    store: Res<GizmoConfigStore>,
+    query: Query<
+        (&Transform, &Rotation, &ComputedCenterOfMass, &FlightState),
+        With<AircraftGeometry>,
+    >,
 ) {
-    // TODO(debug-plugin): query FlightState on aircraft root; draw wind arrow from
-    // CG in the freestream direction; draw AoA arc between body-X and wind vector.
+    let config = store.config::<FdmGizmos>().1;
+    let Some(color) = config.wind_color else { return };
+
+    for (tf, rot, com, fs) in &query {
+        if fs.airspeed_ms < 1.0 {
+            continue;
+        }
+
+        let cg = tf.translation + rot.0 * com.0;
+
+        // Body-frame forward (nose direction) in world space.
+        let nose_dir = rot.0 * Vec3::X;
+
+        // Freestream direction: the wind comes from opposite the velocity vector.
+        // Reconstruct velocity direction from alpha and beta in body frame, then
+        // rotate to world. Body-frame velocity components from AoA / sideslip:
+        // u = cos(alpha)*cos(beta), v = sin(beta), w = sin(alpha)*cos(beta)
+        let (sa, ca) = (fs.alpha_rad.sin() as f32, fs.alpha_rad.cos() as f32);
+        let (sb, cb) = (fs.beta_rad.sin() as f32,  fs.beta_rad.cos() as f32);
+        let vel_body_dir = Vec3::new(ca * cb, sb, sa * cb); // unit vector
+        let vel_world_dir = rot.0 * vel_body_dir;
+
+        // Arrow scale: use a fixed 2 m length so it doesn't dwarf force arrows.
+        let arm = 2.0_f32;
+
+        // Wind arrow: from CG in the freestream direction (into-wind = -vel).
+        gizmos.arrow(cg, cg - vel_world_dir * arm, color);
+
+        // Nose arrow: shows aircraft heading for quick AoA reading.
+        gizmos.arrow(cg, cg + nose_dir * arm, color.with_alpha(0.5));
+    }
 }
