@@ -744,6 +744,15 @@
 //! - **Ground effect:** Increased lift and reduced induced drag near the ground
 //!   requires a height-dependent correction to the local qbar or induced angle.
 //!
+//! - **Wing-fuselage interference:** At the wing root junction, the fuselage
+//!   boundary layer and the wing's leading-edge pressure gradient form a
+//!   horseshoe vortex that induces a local downwash on the inboard panels,
+//!   reducing their effective angle of attack. Inboard panels produce less lift
+//!   than the same section would in free air. Currently all panels use the same
+//!   CL table. To model this, give root panels a slightly degraded CL table
+//!   derived from wind tunnel or CFD data, or apply a scalar interference factor
+//!   to the root panel's lift.
+//!
 //! - **Ice accretion and contamination:** These change the CL/CD tables of
 //!   the affected zones. Planned as a table-modifier applied to zone
 //!   coefficients at runtime.
