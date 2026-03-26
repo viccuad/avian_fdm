@@ -12,7 +12,7 @@
 //! +X  forward (nose)     +Y  right wing (starboard)     +Z  belly (down)
 //! ```
 //!
-//! Wing zones sit at z = −0.58 m (wings are 22.8 in above the CG in the J3Cub).
+//! Wing zones sit at z = −0.590 m (wings are 23.2 in above the CG in the J3Cub).
 //! Tail zones sit at x ≈ −4 m (aft of CG).
 //!
 //! ## Zone decomposition
@@ -43,13 +43,13 @@
 //! `Cl_da = 0.3498/rad`. For each aileron zone at y_arm = 4.05 m from CL:
 //! `CL_ail = Cl_da × b / (2 × y_arm) = 0.3498 × 10.742 / 8.10 ≈ 0.464`
 //!
-//! **H-stab CL:** Derived from `CM_α` via tail arm `l_t = 3.96 m` and chord:
-//! `CL_α_tail = −CM_α × c̄ / l_t = −(−2.033) × 1.6 / 3.96 ≈ +0.821/rad`
+//! **H-stab CL:** Derived from `CM_α` via tail arm `l_t = 4.023 m` and chord:
+//! `CL_α_tail = −CM_α × c̄ / l_t = −(−2.033) × 1.6 / 4.023 ≈ +0.808/rad`
 //! The sign is correct: positive α means negative tail CL means nose-down restoring moment.
 //! The table stores `CL_α(Re) × α` so `AeroCoeff::evaluate(alpha, re)` returns
 //! the complete coefficient directly.
 //!
-//! **Elevator CL:** `CL_elev = −|CM_de| × c̄ / l_t = −1.2004 × 1.6 / 3.96 ≈ −0.485`.
+//! **Elevator CL:** `CL_elev = −|CM_de| × c̄ / l_t = −1.2004 × 1.6 / 4.023 ≈ −0.477`.
 //! Negative sign: positive elevator (nose-up input) creates downward tail force
 //! (negative CL), which via the tail arm produces a nose-up pitch moment.
 //!
@@ -87,8 +87,8 @@
 //! | Wing root/mid| 4 × (0.80 × 1.88 × 0.02)  | 232.5     | 28          | Collider     |
 //! | Wing tip     | 2 × (0.45 × 0.86 × 0.02)  | 517       | 8           | Collider     |
 //! | Aileron      | 2 × (0.35 × 0.75 × 0.02)  | 381       | 4           | Collider     |
-//! | Fuse forward | (2.00 × 0.60 × 0.70)       | 188       | 158         | Collider     |
-//! | Fuse aft     | (2.70 × 0.40 × 0.35)       | 119       | 45          | Collider     |
+//! | Fuse forward | (2.00 × 0.60 × 0.70)       | 177       | 149         | Collider     |
+//! | Fuse aft     | (2.70 × 0.40 × 0.35)       | 144       | 54          | Collider     |
 //! | Cabin        | (1.20 × 0.68 × 0.50)       | 130       | 53          | Collider     |
 //! | Wing struts  | 2 × (2.60 × 0.04 × 0.04)  | 2700      | 22          | GizmoShape   |
 //! | Gear legs    | 2 × (0.65 × 0.04 × 0.04)  | 7800      | 16          | GizmoShape   |
@@ -127,8 +127,8 @@ pub const WING_SPAN_M: f64 = sourced!(10.742, "JSBSim:J3Cub.xml: wingspan 35.25 
 /// JSBSim J3Cub mean aerodynamic chord (m): 5.25 ft × 0.3048.
 pub const CHORD_M: f64 = sourced!(1.600, "JSBSim:J3Cub.xml: chord 5.25 ft × 0.3048 m/ft");
 
-/// Horizontal tail moment arm (m): ≈ 13 ft estimated from vtailarm in J3Cub.xml.
-const H_TAIL_ARM_M: f64 = sourced!(3.96, "JSBSim:J3Cub.xml: vtailarm ≈ 13 ft × 0.3048");
+/// Horizontal tail moment arm (m): 13.20 ft from J3Cub FlightGear repo (rev 1.26).
+const H_TAIL_ARM_M: f64 = sourced!(4.023, "JSBSim:J3Cub_FlightGear.xml: htailarm = 13.20 ft × 0.3048 m/ft");
 
 /// Wing aerodynamic-centre x-offset from entity root (m).
 /// The Avian-computed CG lands at ≈ −0.172 m (fuselage centroid at −0.45 m),
@@ -137,8 +137,8 @@ const H_TAIL_ARM_M: f64 = sourced!(3.96, "JSBSim:J3Cub.xml: vtailarm ≈ 13 ft �
 const WING_AC_X: f64 = sourced!(-0.10, "Geometry: AC at 25% MAC; tuned so Avian CG sits 4.5% MAC forward of AC");
 
 /// Wing height above CG in body frame (m, negative = up since +Z = down).
-/// JSBSim: CG at z = −22.83 in, wing datum at z = 0 in: 22.83 in = 0.580 m above CG.
-const WING_Z: f64 = sourced!(-0.580, "JSBSim:J3Cub.xml: CG z = −22.83 in; wing datum z = 0 -> 22.83 in = 0.580 m");
+/// JSBSim: CG at z = −23.23 in, wing datum at z = 0 in: 23.23 in = 0.590 m above CG.
+const WING_Z: f64 = sourced!(-0.590, "JSBSim:J3Cub_FlightGear.xml: CG z = −23.23 in; wing datum z = 0 -> 23.23 in = 0.590 m");
 
 // ── Shared alpha / Re breakpoints for Table2D ────────────────────────────────
 
@@ -207,8 +207,8 @@ const CD_DATA: [f64; 28] = sourced!(
 // ── H-tail CL table data (6 alpha rows × 2 Re columns) ───────────────────────
 //
 // Represents CL_tail(α, Re) = CM_α(Re) × c̄ / l_t × (−α), where:
-//   CM_α(Re=1.7M) = −2.0327/rad: CL_α_tail = +0.821/rad
-//   CM_α(Re=3.7M) = −1.3432/rad: CL_α_tail = +0.543/rad
+//   CM_α(Re=1.7M) = −2.0327/rad: CL_α_tail = +0.808/rad
+//   CM_α(Re=3.7M) = −1.3432/rad: CL_α_tail = +0.534/rad
 // Entry [i,j] = alpha_rows[i] × CL_alpha[j]  (CL_alpha is positive, α sign is preserved)
 const HTAIL_ALPHA_BP: [f64; 6] = sourced!(
     [-0.3491, -0.1745, 0.0000, 0.0873, 0.1745, 0.3491],
@@ -216,14 +216,14 @@ const HTAIL_ALPHA_BP: [f64; 6] = sourced!(
 );
 const HTAIL_CL_DATA: [f64; 12] = sourced!(
     [
-        -0.2866, -0.1892,   // alpha = −0.3491
-        -0.1433, -0.0947,   // alpha = −0.1745
+        -0.2821, -0.1862,   // alpha = −0.3491
+        -0.1411, -0.0932,   // alpha = −0.1745
          0.0000,  0.0000,   // alpha =  0.0000
-         0.0717,  0.0474,   // alpha =  0.0873
-         0.1433,  0.0947,   // alpha =  0.1745
-         0.2866,  0.1892,   // alpha =  0.3491
+         0.0706,  0.0467,   // alpha =  0.0873
+         0.1411,  0.0932,   // alpha =  0.1745
+         0.2821,  0.1862,   // alpha =  0.3491
     ],
-    "JSBSim:J3Cub.xml: derived from CM_alpha: CL_alpha_tail = CM_alpha × c̄/l_t; Re=1.7M->0.821/rad, Re=3.7M->0.543/rad"
+    "JSBSim:J3Cub_FlightGear.xml: derived from CM_alpha: CL_alpha_tail = CM_alpha × c̄/l_t (l_t=4.023 m); Re=1.7M->0.808/rad, Re=3.7M->0.534/rad"
 );
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -358,7 +358,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     transform: Transform::from_xyz(0.00, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(sourced!(154.0, "Calibration: pilot+fuel+instruments+structure. Reduced from 188 to shift CG aft to -0.172 m so the wing AC at -0.10 m is forward of the CG, producing nose-up pitch stability. See mass budget in j3cub.rs.")),
+                ColliderDensity(sourced!(177.0, "Calibration: fuselage structure, pilot (82 kg), fuel tank (29.5 kg), instruments. Density set so Avian CG lands at -0.172 m with engine at +1.31 m (J3Cub FlightGear repo).")),
                 fuse_fwd_contours(),
             ));
 
@@ -378,7 +378,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     transform: Transform::from_xyz(-2.35, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(sourced!(196.0, "Calibration: tail boom, control runs, tail structure. Increased from 119 to shift CG aft to -0.172 m. Compensates for heavy engine (69 kg at x=+1.65) pulling CG forward.")),
+                ColliderDensity(sourced!(144.0, "Calibration: tailboom, control runs, tail structure. Density set to maintain CG at -0.172 m after engine moved to +1.31 m (J3Cub FlightGear repo).")),
                 fuse_aft_contours(),
             ));
 
@@ -406,7 +406,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // Colliders are rotated to align with the strut direction.
             for (sign, _name) in [(-1.0_f32, "L-strut"), (1.0, "R-strut")] {
                 let fuse_attach = Vec3::new(0.20, 0.25 * sign, 0.30);
-                let wing_attach = Vec3::new(-0.10 + 0.35, 2.5 * sign, -0.58);
+                let wing_attach = Vec3::new(-0.10 + 0.35, 2.5 * sign, WING_Z as f32);
                 let mid = (fuse_attach + wing_attach) * 0.5;
                 let dir = wing_attach - fuse_attach;
                 let length = dir.length();
@@ -701,7 +701,7 @@ pub fn fuselage_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
 ///
 /// JSBSim stores CM_α as **negative** (stable aircraft): −2.03/rad at Re=1.7M,
 /// −1.34/rad at Re=3.7M. Negating gives a **positive** CL at positive α:
-///   CL = −(−2.03) × 1.6/3.96 × α = +0.821 × α   (Re=1.7M)
+///   CL = −(−2.03) × 1.6/4.023 × α = +0.808 × α   (Re=1.7M)
 ///
 /// At α > 0 (nose up), CL > 0: **upward** tail force, pitch-down restoring moment.
 /// At α < 0 (nose down), CL < 0: **downward** tail force, pitch-up restoring moment.
@@ -737,22 +737,22 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
 
 /// Elevator zone: pitch control surface.
 ///
-/// `CL_elev = −|CM_de| × c̄ / l_t = −1.2004 × 1.6 / 3.96 ≈ −0.485`
+/// `CL_elev = −|CM_de| × c̄ / l_t = −1.2004 × 1.6 / 4.023 ≈ −0.477`
 ///
 /// Negative CL means: positive elevator (nose-up stick input) produces downward force
 /// at the tail, producing nose-up pitch moment. Tiled aft of the h-stab: elevator LE
-/// touches h-stab TE at x = −4.26 m, so elevator center is at x = −4.435 m.
+/// touches h-stab TE at x = −4.323 m, so elevator center is at x = −4.498 m.
 pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
-    // Elevator LE = h-stab TE = -(H_TAIL_ARM + hstab_chord/2) = -(3.96 + 0.30) = -4.26
-    // Elevator center = -4.26 - elevator_chord/2 = -4.26 - 0.175 = -4.435
-    let x = -4.435_f32;
+    // Elevator LE = h-stab TE = -(H_TAIL_ARM_M + hstab_chord/2) = -(4.023 + 0.30) = -4.323
+    // Elevator center = -4.323 - elevator_chord/2 = -4.323 - 0.175 = -4.498
+    let x = -4.498_f32;
     (
         AeroZoneBundle {
             zone: AeroZone {
                 // Negative: positive elevator (nose-up): downward tail force.
                 cl: AeroCoeff::Scalar(sourced!(
-                    -0.485,
-                    "JSBSim:J3Cub.xml: Pitch_elevator CM_de = −1.2004/rad; CL_elev = |CM_de| × c̄/l_t = 1.2004 × 1.6/3.96, negated for nose-up convention"
+                    -0.477,
+                    "JSBSim:J3Cub_FlightGear.xml: Pitch_elevator CM_de = −1.2004/rad; CL_elev = |CM_de| × c̄/l_t = 1.2004 × 1.6/4.023, negated for nose-up convention"
                 )),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 control_role: Some(ControlSurfaceRole::Elevator),
@@ -819,9 +819,9 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
             zone_force: ZoneForce::default(),
             collider,
             // Rudder center sits just aft of vtail, same height range.
-            // x = −3.95 so LE (+0.20) lands at x = −3.75 = vtail TE.
+            // x = −3.99 so LE (+0.175) lands at x = −3.813 = vtail TE.
             transform: Transform::from_xyz(
-                -3.95,
+                -3.99,
                 0.0,
                 -0.45,
             ),
@@ -831,13 +831,15 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
     )
 }
 
-/// Engine zone: Continental A-65 piston engine with McCauley fixed-pitch propeller.
+/// Engine zone: Continental A-65 piston engine with fixed-pitch propeller.
 ///
-/// Max thrust ≈ 1 200 N (65 hp engine at sea level, actuator-disk estimate).
-/// Propeller diameter: 75 in = 1.905 m. Throttle curve is linear 0 to 1.
+/// Max thrust ≈ 990 N (65 hp engine at sea level, actuator-disk estimate).
+/// Propeller diameter: 74 in = 1.880 m (J3Cub FlightGear repo: prop_74in_2f_NACA).
+/// Throttle curve is nonlinear to match JSBSim thrust response.
 ///
-/// Position: 1.65 m forward, 0.04 m below CG (propeller shaft is slightly below
-/// the aircraft reference datum in the J3Cub).
+/// Position: 1.31 m forward of CG (J3Cub FlightGear repo: engine at JSBSim x = −37.52 in,
+/// CG at x = 13.80 in → body x = (13.80 − (−37.52)) × 0.0254 = +1.306 m ≈ 1.31 m).
+/// 0.04 m below CG: propeller shaft is slightly below the aircraft reference datum.
 #[cfg(feature = "propulsion")]
 pub fn engine_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
     (
@@ -847,17 +849,17 @@ pub fn engine_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
                 vec![[0.0, 0.0], [0.5, 0.42], [0.75, 0.64], [1.0, 1.0]],
                 "Calibration:JSBSim: nonlinear throttle response matching JSBSim thrust vs throttle setting (prop efficiency drop at low opening)"
             ),
-            prop_diameter_m: sourced!(1.905, "JSBSim:J3Cub.xml: McCauley CM7445 propeller, 75 in × 0.0254 m/in = 1.905 m"),
+            prop_diameter_m: sourced!(1.880, "JSBSim:J3Cub_FlightGear.xml: prop_74in_2f_NACA; 74 in × 0.0254 m/in = 1.880 m"),
             thrust_axis_body: DVec3::X, // +X = forward
-            // McCauley CM7445, fixed-pitch 22°. At ~2800 RPM the zero-thrust
-            // advance ratio J≈0.95: V_zero = J × n × D ≈ 80 m/s (155 kts).
-            zero_thrust_speed_ms: Some(sourced!(80.0, "Estimate:McCauley CM7445: fixed-pitch 22° blade; J_zero ≈ 0.95 at 2800 RPM -> V = J × (2800/60) × 1.905 ≈ 84 m/s, rounded to 80")),
+            // prop_74in_2f_NACA, fixed-pitch ~22° cruise setting, maxrpm 2300.
+            // J_zero ≈ 1.1 at 22° pitch: V_zero = J × n × D ≈ 1.1 × (2300/60) × 1.880 ≈ 79 m/s.
+            zero_thrust_speed_ms: Some(sourced!(80.0, "Estimate:J3Cub FlightGear: prop_74in_2f_NACA; J_zero ≈ 1.1 at 22° pitch, maxrpm 2300 -> V = 1.1 × (2300/60) × 1.880 ≈ 79 m/s, rounded to 80")),
         },
         PropwashState::default(),
         ZoneForce::default(),
         collider,
         density,
-        Transform::from_xyz(1.65, 0.0, 0.04),
+        Transform::from_xyz(1.31, 0.0, 0.04),
         GlobalTransform::default(),
     )
 }
@@ -1115,11 +1117,11 @@ mod tests {
     ///
     /// Moment = CL_elev × q·S × tail_arm (via cross-product in accumulate).
     /// JSBSim: M_pitch = CM_de × q·S·c̄ = −1.2004 × q·S·1.6 = −1.9206·q·S
-    /// Our model: −0.485 × tail_arm = −0.485 × 3.96 = −1.9206·q·S ✓
+    /// Our model: −0.477 × tail_arm = −0.477 × 4.023 = −1.919·q·S ≈ −1.921·q·S ✓
     #[test]
     fn elevator_pitch_moment_matches_jsbsim() {
-        let cl_elev = -0.485_f64;
-        let our_moment_coeff = cl_elev * H_TAIL_ARM_M; // = −1.921
+        let cl_elev = -0.477_f64;
+        let our_moment_coeff = cl_elev * H_TAIL_ARM_M; // = −1.919
 
         let cm_de = -1.2004_f64;
         let jsbsim_moment_coeff = cm_de * CHORD_M; // = −1.921
