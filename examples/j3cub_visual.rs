@@ -1,15 +1,9 @@
 //! J-3 Cub simulation with real-time force visualisation.
 //!
 //! Opens a 3D window showing the aircraft outline and aerodynamic force arrows.
-//! Arrow colours are driven by [`FdmGizmos`] config (defaults shown):
-//!
-//! | Arrow colour | Meaning                                                         |
-//! |--------------|-----------------------------------------------------------------|
-//! | Lime         | Per-zone combined aero force (`ZoneForce`, from `lift_color`)   |
-//! | Aqua         | Engine thrust per zone (`thrust_color`)                         |
-//! | Yellow       | Total accumulated aero+thrust force (`total_force_color`)       |
-//! | Red          | Weight (m x g downward from CG) (`weight_color`)                |
-//! | White        | Net force = aero+thrust+weight (`resultant_color`)              |
+//! The in-app legend is generated at startup from the live [`FdmGizmos`] config,
+//! so each label is rendered in its actual gizmo colour. Disabled channels (`None`)
+//! are automatically omitted from the legend.
 //!
 //! **Run with:**
 //! ```sh
@@ -52,7 +46,7 @@ fn main() {
             GizmoConfig::default(),
         )
         .init_resource::<OrbitCamera>()
-        .add_systems(Startup, (spawn_aircraft, spawn_scene))
+        .add_systems(Startup, (spawn_aircraft, spawn_scene, spawn_legend))
         .add_systems(
             Update,
             (
@@ -146,36 +140,56 @@ fn spawn_scene(mut commands: Commands) {
         },
         HudText,
     ));
+}
 
-    // ── Legend ────────────────────────────────────────────────────────────────
+/// Build the legend overlay from the live [`FdmGizmos`] config.
+///
+/// Each row is a [`TextSpan`] child rendered in the gizmo's actual colour —
+/// no colour names are hardcoded. Rows whose channel is disabled (`None`) are
+/// omitted automatically, so the legend always matches the active config.
+fn spawn_legend(mut commands: Commands, store: Res<GizmoConfigStore>) {
+    let config = store.config::<FdmGizmos>().1;
+    let dim = Color::srgba(0.7, 0.7, 0.7, 0.85);
+
+    // (prefix, description, channel colour)
+    let rows: &[(&str, &str, Option<Color>)] = &[
+        ("→ ", "per-zone aero force",  config.lift_color),
+        ("→ ", "engine thrust",        config.thrust_color),
+        ("→ ", "total aero+thrust",    config.total_force_color),
+        ("→ ", "weight",               config.weight_color),
+        ("→ ", "net force (~0 at trim)",config.resultant_color),
+        ("~ ", "pitch moment",         config.pitch_moment_color),
+        ("~ ", "roll moment",          config.roll_moment_color),
+        ("~ ", "yaw moment",           config.yaw_moment_color),
+        ("— ", "relative wind / AoA",  config.wind_color),
+        ("○ ", "CG",                   config.cg_color),
+        ("○ ", "zone AC",              config.ac_color),
+    ];
+
     commands.spawn((
-        Text::new(
-            "-> Cyan   per-zone aero forces\n\
-             -> Green  thrust\n\
-             -> Yellow total aero+thrust (from CG)\n\
-             -> Red    weight\n\
-             -> White  net force (~0 at trim)\n\
-              o Grey   centre of gravity (CG)\n\
-              + Cyan   aerodynamic centre (AC)\n\
-             \n\
-             LMB drag  orbit\n\
-             Scroll    zoom",
-        ),
-        TextFont {
-            font_size: 15.0,
-            ..default()
-        },
-        TextColor(Color::srgba(0.9, 0.9, 0.9, 0.85)),
+        Text::default(),
+        TextFont { font_size: 15.0, ..default() },
         Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(12.0),
             left: Val::Px(12.0),
             ..default()
         },
-    ));
+    ))
+    .with_children(|p| {
+        for (prefix, label, color_opt) in rows {
+            if let Some(color) = *color_opt {
+                p.spawn((TextSpan::new(format!("{prefix}{label}\n")), TextColor(color)));
+            }
+        }
+        p.spawn((
+            TextSpan::new("\nLMB drag  orbit\nScroll    zoom"),
+            TextColor(dim),
+        ));
+    });
 }
 
-// ── Per-frame systems ─────────────────────────────────────────────────────────
+
 
 /// Linearly ramp throttle from 50 % → 75 % over the first 12.5 seconds.
 fn ramp_throttle(mut query: Query<&mut ControlInputs, With<AircraftGeometry>>, time: Res<Time>) {
