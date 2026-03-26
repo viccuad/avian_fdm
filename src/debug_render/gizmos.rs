@@ -9,7 +9,7 @@
 use avian3d::prelude::{ComputedCenterOfMass, ComputedMass, ConstantForce, ConstantTorque, Rotation};
 use crate::_bevy::*;
 
-use crate::components::{AeroZone, AircraftGeometry, FlightState, GizmoContours, GizmoShape, ZoneForce};
+use crate::components::{AeroZone, AircraftGeometry, Failure, FlightState, GizmoContours, GizmoShape, ZoneForce};
 use super::configuration::{FdmDebugRender, FdmGizmos};
 
 // ── Centre of gravity ─────────────────────────────────────────────────────────
@@ -205,8 +205,13 @@ pub(super) fn debug_render_moments(
 /// - Orange: non-aero zone (e.g. engine)
 /// - Grey: structural / drag-only
 ///
+/// Zones with a [`Failure`] component are tinted toward grey as damage
+/// accumulates. A fully failed zone (`remaining = 0.0`) is drawn grey
+/// regardless of its type.
+///
 /// The global [`FdmGizmos::zone_color`] acts as an on/off gate; set to `None`
-/// to disable. Per-entity [`FdmDebugRender::zone_color`] overrides the color.
+/// to disable. Per-entity [`FdmDebugRender::zone_color`] overrides the color
+/// (damage tint still applies on top).
 pub(super) fn debug_render_zones(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
@@ -216,6 +221,7 @@ pub(super) fn debug_render_zones(
         Option<&GizmoContours>,
         Option<&GizmoShape>,
         Option<&FdmDebugRender>,
+        Option<&Failure>,
     ), Or<(With<GizmoShape>, With<GizmoContours>)>>,
 ) {
     let config = store.config::<FdmGizmos>().1;
@@ -223,10 +229,12 @@ pub(super) fn debug_render_zones(
         return;
     }
 
-    for (zone_gt, aero, contours, shape, dbg_render) in &query {
-        let color = dbg_render
+    for (zone_gt, aero, contours, shape, dbg_render, failure) in &query {
+        let base_color = dbg_render
             .and_then(|d| d.zone_color)
             .unwrap_or_else(|| zone_type_color(aero));
+        let remaining = failure.map_or(1.0, |f| f.remaining as f32);
+        let color = damage_tint(base_color, remaining);
 
         let wt = zone_gt.compute_transform();
         let zone_to_world = |local: Vec3| wt.translation + wt.rotation * local;
@@ -263,6 +271,15 @@ fn zone_type_color(aero: Option<&AeroZone>) -> Color {
     } else {
         Color::srgba(0.6, 0.6, 0.6, 0.6) // grey - structural / drag-only
     }
+}
+
+/// Blend `color` toward grey proportional to damage (`remaining` 0 → 1).
+///
+/// At `remaining = 1.0` the color is unchanged. At `remaining = 0.0` the
+/// result is fully grey (`srgba(0.55, 0.55, 0.55, 0.6)`).
+fn damage_tint(color: Color, remaining: f32) -> Color {
+    let grey = Color::srgba(0.55, 0.55, 0.55, 0.6);
+    color.mix(&grey, 1.0 - remaining)
 }
 
 fn draw_zone_shape(
