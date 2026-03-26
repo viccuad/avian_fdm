@@ -11,79 +11,69 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
-  check-test-doc:
-    name: Check / Clippy / Test / Doc
+  check:
+    name: Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/rust-setup
         with:
-          components: clippy
+          cache-key: check
+      - run: make check
 
-      - name: Cache cargo registry
-        uses: actions/cache@v4
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/rust-setup
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          cache-key: clippy
+      - run: make clippy
 
-      - name: Install Linux system deps (bevy)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-key: test
+      - run: make test
 
-      - name: cargo check (all features)
-        run: cargo check --all-features
+  doc:
+    name: Doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-key: doc
+      - run: make doc
 
-      - name: cargo clippy (all features)
-        run: cargo clippy --all-features
+  build:
+    name: Build (release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-key: build
+      - run: make build
 
-      - name: cargo test (default features)
-        run: cargo test
-
-      - name: cargo test (no default features)
-        run: cargo test --no-default-features
-
-      - name: cargo test (damage + propulsion)
-        run: cargo test --features "damage,propulsion"
-
-      - name: cargo doc (all features)
-        run: cargo doc --no-deps --all-features
-        env:
-          RUSTDOCFLAGS: "-D warnings"
-
-      - name: cargo build --release (all features)
-        run: cargo build --release --all-features
-
-  jsbsim-validate:
+  jsbsim:
     name: JSBSim Validation (±1%)
     runs-on: ubuntu-latest
-    # Advisory until jsbsim-fixture todo is complete; flip to false after.
-    continue-on-error: true
-    # Only run on pushes to main to keep PR CI fast.
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-key: jsbsim
       - name: Install Python + JSBSim
-        run: |
-          pip install jsbsim
-
-      - name: Install Linux system deps (bevy)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
-
-      - name: Run JSBSim comparison test
-        run: cargo test --features presets -- jsbsim --nocapture
+        run: pip install jsbsim
+      - name: Run JSBSim comparison
+        run: make jsbsim
         env:
           JSBSIM_DATA_PATH: ${{ github.workspace }}/jsbsim

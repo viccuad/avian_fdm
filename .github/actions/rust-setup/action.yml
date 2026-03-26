@@ -1,0 +1,33 @@
+name: Rust setup
+description: Install Rust toolchain, restore Cargo cache, install Linux system deps for Bevy.
+
+inputs:
+  cache-key:
+    description: Per-job suffix for the Cargo cache key (avoids cross-job cache thrashing).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
+
+    - name: Restore Cargo cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ inputs.cache-key }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-${{ inputs.cache-key }}-
+          ${{ runner.os }}-cargo-
+
+    - name: Install Linux system deps (Bevy)
+      shell: bash
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
