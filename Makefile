@@ -26,5 +26,9 @@ build:
 jsbsim:
 	cargo test --features "presets,propulsion" -- jsbsim --nocapture
 
+.PHONY: bench
+bench:
+	cargo test --features "presets,propulsion" --test perf_limits -- --nocapture
+
 .PHONY: ci
 ci: check clippy test doc build

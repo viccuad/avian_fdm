@@ -62,7 +62,7 @@ jobs:
       - run: make build
 
   jsbsim:
-    name: JSBSim Validation (±1%)
+    name: JSBSim Validation (+-1%)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

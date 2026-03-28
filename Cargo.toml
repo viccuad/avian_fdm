@@ -41,11 +41,10 @@ bevy = { version = "0.18", features = [
     "bevy_pbr",
     "bevy_gizmos",
 ] }
-criterion = { version = "0.8", features = ["html_reports"] }
 
-[[bench]]
-name = "fdm_hot_path"
-harness = false
+[[test]]
+name = "perf_limits"
+required-features = ["presets", "propulsion"]
 
 [[example]]
 name = "j3cub_minimal"
