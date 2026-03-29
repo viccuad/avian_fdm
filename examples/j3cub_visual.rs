@@ -25,9 +25,11 @@
 //! - **Left-drag** — orbit (rotate around the aircraft)
 //! - **Scroll wheel** — zoom in / out
 //!
+//! - **R** — restart (reset position, velocity, controls)
+//!
 //! Press **Escape** to quit.
 
-use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
+use avian3d::prelude::{AngularVelocity, LinearVelocity, PhysicsPlugins};
 use avian_fdm::prelude::*;
 use avian_fdm::presets::j3cub;
 use bevy::input::gamepad::{Gamepad, GamepadAxis};
@@ -63,6 +65,7 @@ fn main() {
             Update,
             (
                 handle_input,
+                restart_aircraft,
                 orbit_camera,
                 toggle_colliders,
                 update_hud,
@@ -196,7 +199,7 @@ fn spawn_legend(mut commands: Commands, store: Res<GizmoConfigStore>) {
             }
         }
         p.spawn((
-            TextSpan::new("\nLMB drag  orbit\nScroll    zoom\nW/S  elevator  A/D  aileron\nQ/E  rudder   Shift/Ctrl  throttle"),
+            TextSpan::new("\nLMB drag  orbit\nScroll    zoom\nW/S  elevator  A/D  aileron\nQ/E  rudder   Shift/Ctrl  throttle\nR  restart"),
             TextColor(dim),
         ));
     });
@@ -204,7 +207,35 @@ fn spawn_legend(mut commands: Commands, store: Res<GizmoConfigStore>) {
 
 
 
-/// Reads keyboard and gamepad input and writes it to [`ControlInputs`].
+/// Resets the aircraft to its initial state when **R** is pressed.
+///
+/// Restores position, orientation, velocity, and control inputs without
+/// despawning — zone child entities and all other components are preserved.
+fn restart_aircraft(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut query: Query<
+        (
+            &mut Transform,
+            &mut LinearVelocity,
+            &mut AngularVelocity,
+            &mut ControlInputs,
+        ),
+        With<AircraftGeometry>,
+    >,
+) {
+    if !keys.just_pressed(KeyCode::KeyR) {
+        return;
+    }
+    let level = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
+    for (mut transform, mut lin_vel, mut ang_vel, mut ctrl) in &mut query {
+        *transform = Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(level);
+        *lin_vel = LinearVelocity(Vec3::new(27.0, 0.0, 0.0));
+        *ang_vel = AngularVelocity::default();
+        *ctrl = ControlInputs { throttle: 0.6, ..default() };
+    }
+}
+
+
 ///
 /// Keyboard deflections are binary (full deflection while key held).
 /// Gamepad axes map directly to the [-1, 1] range via the `Gamepad` component.
