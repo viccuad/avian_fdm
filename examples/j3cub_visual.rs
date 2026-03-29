@@ -10,15 +10,27 @@
 //! cargo run --example j3cub_visual --features presets,debug-plugin --release
 //! ```
 //!
+//! **Flight controls (keyboard):**
+//! - **W / S** — elevator (pitch up / down)
+//! - **A / D** — ailerons (roll left / right)
+//! - **Q / E** — rudder (yaw left / right)
+//! - **Left Shift / Left Ctrl** — throttle up / down
+//!
+//! **Flight controls (gamepad):**
+//! - **Left stick** — elevator (Y) + ailerons (X)
+//! - **Right stick X** — rudder
+//! - **Right trigger** — throttle
+//!
 //! **Camera controls:**
 //! - **Left-drag** — orbit (rotate around the aircraft)
 //! - **Scroll wheel** — zoom in / out
 //!
-//! The simulation runs on its own. Press **Escape** to quit.
+//! Press **Escape** to quit.
 
 use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
 use avian_fdm::prelude::*;
 use avian_fdm::presets::j3cub;
+use bevy::input::gamepad::{Gamepad, GamepadAxis};
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::math::Quat;
 use bevy::prelude::*;
@@ -50,7 +62,7 @@ fn main() {
         .add_systems(
             Update,
             (
-                ramp_throttle,
+                handle_input,
                 orbit_camera,
                 toggle_colliders,
                 update_hud,
@@ -102,9 +114,10 @@ fn spawn_aircraft(mut commands: Commands) {
         &mut commands,
         Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(level),
     );
-    commands
-        .entity(root)
-        .insert(LinearVelocity(Vec3::new(27.0, 0.0, 0.0)));
+    commands.entity(root).insert((
+        LinearVelocity(Vec3::new(27.0, 0.0, 0.0)),
+        ControlInputs { throttle: 0.6, ..default() },
+    ));
 }
 
 fn spawn_scene(mut commands: Commands) {
@@ -183,7 +196,7 @@ fn spawn_legend(mut commands: Commands, store: Res<GizmoConfigStore>) {
             }
         }
         p.spawn((
-            TextSpan::new("\nLMB drag  orbit\nScroll    zoom"),
+            TextSpan::new("\nLMB drag  orbit\nScroll    zoom\nW/S  elevator  A/D  aileron\nQ/E  rudder   Shift/Ctrl  throttle"),
             TextColor(dim),
         ));
     });
@@ -191,14 +204,76 @@ fn spawn_legend(mut commands: Commands, store: Res<GizmoConfigStore>) {
 
 
 
-/// Linearly ramp throttle from 50 % → 75 % over the first 12.5 seconds.
-fn ramp_throttle(mut query: Query<&mut ControlInputs, With<AircraftGeometry>>, time: Res<Time>) {
-    let t = time.elapsed_secs_f64();
-    let throttle = (0.5 + t / 50.0).min(0.75);
+/// Reads keyboard and gamepad input and writes it to [`ControlInputs`].
+///
+/// Keyboard deflections are binary (full deflection while key held).
+/// Gamepad axes map directly to the [-1, 1] range via the `Gamepad` component.
+/// Throttle is rate-based: a held key changes it by 0.5 per second.
+fn handle_input(
+    mut query: Query<&mut ControlInputs, With<AircraftGeometry>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    gamepads: Query<&Gamepad>,
+    time: Res<Time>,
+) {
+    let dt = time.delta_secs_f64();
+
+    // Keyboard: binary deflection while key is held.
+    // W = stick forward = nose down (-1), S = pull back = nose up (+1).
+    let kb_elevator = keys.pressed(KeyCode::KeyS) as i32 - keys.pressed(KeyCode::KeyW) as i32;
+    let kb_aileron = keys.pressed(KeyCode::KeyD) as i32 - keys.pressed(KeyCode::KeyA) as i32;
+    let kb_rudder = keys.pressed(KeyCode::KeyE) as i32 - keys.pressed(KeyCode::KeyQ) as i32;
+    // Shift = throttle up, Ctrl = throttle down.
+    let kb_throttle =
+        keys.pressed(KeyCode::ShiftLeft) as i32 - keys.pressed(KeyCode::ControlLeft) as i32;
+
+    // Gamepad: use first connected pad if any.
+    let (gp_elevator, gp_aileron, gp_rudder, gp_throttle) = gamepads
+        .iter()
+        .next()
+        .map(|pad| {
+            // Left stick: aileron (X) + elevator (Y, push forward = nose up).
+            let aileron = pad.get(GamepadAxis::LeftStickX).unwrap_or(0.0) as f64;
+            let elevator = -pad.get(GamepadAxis::LeftStickY).unwrap_or(0.0) as f64;
+            let rudder = pad.get(GamepadAxis::RightStickX).unwrap_or(0.0) as f64;
+            // Right trigger (RightZ): range [0, 1].
+            let throttle = pad.get(GamepadAxis::RightZ).unwrap_or(-1.0) as f64;
+            (elevator, aileron, rudder, throttle)
+        })
+        .unwrap_or((0.0, 0.0, 0.0, -1.0)); // -1 on throttle = no gamepad connected
+
     for mut ctrl in &mut query {
-        ctrl.throttle = throttle;
+        // Deflection: keyboard overrides gamepad when both active.
+        ctrl.elevator = if kb_elevator != 0 {
+            kb_elevator as f64
+        } else {
+            gp_elevator
+        }
+        .clamp(-1.0, 1.0);
+
+        ctrl.aileron = if kb_aileron != 0 {
+            kb_aileron as f64
+        } else {
+            gp_aileron
+        }
+        .clamp(-1.0, 1.0);
+
+        ctrl.rudder = if kb_rudder != 0 {
+            kb_rudder as f64
+        } else {
+            gp_rudder
+        }
+        .clamp(-1.0, 1.0);
+
+        // Throttle: rate-based from keyboard; direct from gamepad trigger.
+        if kb_throttle != 0 {
+            ctrl.throttle = (ctrl.throttle + kb_throttle as f64 * 0.5 * dt).clamp(0.0, 1.0);
+        } else if gp_throttle >= 0.0 {
+            ctrl.throttle = gp_throttle;
+        }
+        // If neither active, throttle holds its current value.
     }
 }
+
 
 /// Orbit camera: left-drag to rotate, scroll to zoom, always looks at the aircraft.
 fn orbit_camera(
@@ -245,11 +320,11 @@ fn toggle_colliders(keys: Res<ButtonInput<KeyCode>>, mut show: ResMut<ShowCollid
 
 /// Updates the flight-state HUD in the upper-left corner.
 fn update_hud(
-    flight_query: Query<&FlightState, With<AircraftGeometry>>,
+    flight_query: Query<(&FlightState, &ControlInputs), With<AircraftGeometry>>,
     time: Res<Time>,
     mut hud: Query<&mut Text, With<HudText>>,
 ) {
-    let Ok(fs) = flight_query.single() else {
+    let Ok((fs, ctrl)) = flight_query.single() else {
         return;
     };
     let Ok(mut text) = hud.single_mut() else {
@@ -263,11 +338,16 @@ fn update_hud(
          TAS = {tas:.1} m/s\n\
          AoA = {aoa:+.2}°\n\
          q̄   = {q:.0} Pa\n\
-         Re  = {re:.2e}",
+         Re  = {re:.2e}\n\
+         thr = {thr:.0}%  elv = {elv:+.2}  ail = {ail:+.2}  rud = {rud:+.2}",
         alt = fs.altitude_m,
         tas = fs.airspeed_ms,
         aoa = fs.alpha_rad.to_degrees(),
         q = fs.dynamic_pressure_pa,
         re = fs.reynolds_number,
+        thr = ctrl.throttle * 100.0,
+        elv = ctrl.elevator,
+        ail = ctrl.aileron,
+        rud = ctrl.rudder,
     );
 }
