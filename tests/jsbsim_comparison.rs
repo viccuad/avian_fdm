@@ -619,3 +619,98 @@ fn j3cub_inertia_comparison() {
 
     assert!(found, "No aircraft entity found with mass properties");
 }
+
+// ── Emergent pitch-damping measurement ───────────────────────────────────────
+
+/// Measure emergent Cmq by comparing the aero pitch torque at zero vs
+/// non-zero pitch rate. The delta isolates the pitch-rate-dependent
+/// contribution.
+///
+/// The J3 Cub does not use LodDamping. Pitch damping emerges from
+/// per-zone local-angle corrections: `delta_alpha = -q * x / V` at each
+/// zone, which increases h-stab alpha during pitch-up, producing a
+/// nose-down restoring moment.
+///
+/// Datcom target: Cmq = -6/rad.
+/// Expected emergent: Cmq ~ -10/rad (no downwash lag).
+#[test]
+fn j3cub_emergent_cmq() {
+    fn build_app(pitch_rate_world_z: f32) -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(bevy::transform::TransformPlugin)
+            .add_plugins(bevy::asset::AssetPlugin::default())
+            .add_plugins(PhysicsPlugins::default())
+            .add_plugins(AircraftFdmPlugin::default());
+        app.insert_resource(TimeUpdateStrategy::ManualDuration(
+            Duration::from_secs_f64(1.0 / 60.0),
+        ));
+        let q = pitch_rate_world_z;
+        app.add_systems(Startup, move |mut commands: Commands| {
+            let initial_rot = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
+            let root = j3cub::spawn(
+                &mut commands,
+                Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(initial_rot),
+            );
+            commands.entity(root)
+                .insert(LinearVelocity(Vec3::new(27.0, 0.0, 0.0)))
+                // Body pitch rate q maps to world Z due to spawn rotation_x(PI/2).
+                .insert(AngularVelocity(Vec3::new(0.0, 0.0, q)));
+        });
+        app.finish();
+        app
+    }
+
+    let mut baseline = build_app(0.0);
+    let q_rads_f32 = 5.0_f32.to_radians();
+    let mut perturbed = build_app(q_rads_f32);
+
+    // Run 5 frames: Avian init + flight_state update + aero forces.
+    for _ in 0..5 { baseline.update(); }
+    for _ in 0..5 { perturbed.update(); }
+
+    // Read ConstantTorque (total aero torque on the root body, world frame).
+    let read_torque = |app: &mut App| -> Vec3 {
+        let world = app.world_mut();
+        let mut query = world.query::<&ConstantTorque>();
+        query.iter(&world).next().expect("no ConstantTorque found").0
+    };
+
+    let t_base = read_torque(&mut baseline);
+    let t_pert = read_torque(&mut perturbed);
+
+    // Body pitch torque = world Z torque (due to spawn rotation).
+    // Negative means nose-down restoring moment.
+    let delta_mz = (t_pert.z - t_base.z) as f64;
+
+    // Back out Cmq: delta_M = Cmq * (q * c / (2V)) * qbar * S * c
+    let q_rad = q_rads_f32 as f64;
+    let v = 27.0_f64;
+    let rho = 1.19_f64; // ~ISA at 300 m
+    let qbar = 0.5 * rho * v * v;
+    let s = 16.584_f64;
+    let c = 1.6_f64;
+    let norm = (q_rad * c / (2.0 * v)) * qbar * s * c;
+    let cmq_measured = delta_mz / norm;
+
+    let datcom_cmq = -6.0_f64;
+
+    println!("\n-- Emergent Cmq Measurement --------------------------------");
+    println!("  Baseline pitch torque (q=0):     {:.1} N*m", t_base.z);
+    println!("  Perturbed pitch torque (q=5d/s): {:.1} N*m", t_pert.z);
+    println!("  Delta pitch torque:              {:.1} N*m", delta_mz);
+    println!("  Measured Cmq:                    {:.2} /rad", cmq_measured);
+    println!("  Datcom target:                   {:.1} /rad", datcom_cmq);
+    println!("  Ratio (measured/Datcom):          {:.2}", cmq_measured / datcom_cmq);
+    println!("------------------------------------------------------------");
+
+    // Cmq should be negative (restoring).
+    assert!(cmq_measured < 0.0,
+        "Cmq should be negative (restoring), got {cmq_measured:.2}");
+
+    // Should be between 1x and 3x the Datcom value (more negative, no downwash lag).
+    assert!(cmq_measured < datcom_cmq,
+        "Cmq ({cmq_measured:.1}) should be more negative than Datcom ({datcom_cmq})");
+    assert!(cmq_measured > datcom_cmq * 3.0,
+        "Cmq ({cmq_measured:.1}) should not exceed 3x Datcom ({:.0})", datcom_cmq * 3.0);
+}

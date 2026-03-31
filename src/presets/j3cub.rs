@@ -1319,4 +1319,41 @@ mod tests {
         assert!((our_moment - jsbsim_moment).abs() / jsbsim_moment.abs() < 0.01,
             "elevator moment: ours={our_moment:.2}, jsbsim={jsbsim_moment:.2}");
     }
+
+    /// Emergent pitch-damping derivative Cmq from h-stab zone geometry.
+    ///
+    /// The pitch damping arises because `zone_local_angles` adds
+    /// `delta_alpha = -q * x / V` to each zone. For the h-stab at
+    /// x = -l_t, a pitch-up (q > 0) increases tail alpha, producing
+    /// a nose-down restoring moment. The standard form (Nelson 1998,
+    /// eq 4.65) gives the non-dimensional Cmq from the tail:
+    ///
+    /// Cmq_tail = -2 * CL_alpha_tail * (S_tail / S_ref) * (l_t / c_bar)^2
+    ///
+    /// Datcom gives Cmq = -6/rad for the J3 Cub. Our model produces
+    /// about -10/rad because we do not model downwash lag: during a
+    /// pitch transient the wing's downwash field takes time to reach
+    /// the tail, reducing the effective delta-alpha. Without that lag
+    /// factor (typically 1 - d_epsilon/d_alpha ~ 0.6), our tail sees
+    /// the full kinematic alpha increment.
+    #[test]
+    fn emergent_cmq_from_hstab_geometry() {
+        let cmq = -2.0 * HSTAB_CL_ALPHA * (HSTAB_AREA_M2 / WING_AREA_M2)
+            * (H_TAIL_ARM_M / CHORD_M).powi(2);
+
+        let datcom_cmq = -6.0_f64;
+
+        // Our emergent value should be more negative than Datcom (no downwash lag).
+        // Factor of ~1.7 is expected.
+        assert!(cmq < datcom_cmq,
+            "emergent Cmq ({cmq:.1}) should be more negative than Datcom ({datcom_cmq})");
+        assert!(cmq > datcom_cmq * 3.0,
+            "emergent Cmq ({cmq:.1}) should not exceed 3x Datcom ({datcom_cmq})");
+
+        // The ratio tells us what downwash lag factor would reconcile the two.
+        // expected: (1 - d_epsilon/d_alpha) ~ Datcom / emergent ~ 0.6
+        let downwash_factor = datcom_cmq / cmq;
+        assert!(downwash_factor > 0.4 && downwash_factor < 0.8,
+            "implied downwash factor {downwash_factor:.2} outside [0.4, 0.8]");
+    }
 }
