@@ -44,8 +44,8 @@ use bevy_math::{DQuat, DVec3};
 #[cfg(feature = "propulsion")]
 use crate::components::EngineZone;
 use crate::components::{
-    get_remaining, AeroZone, AircraftGeometry, ControlInputs, Failure, FlightState, InducedDrag,
-    LodDamping, ZoneForce,
+    get_remaining, AeroZone, AircraftGeometry, AtmosphereState, ControlInputs, Failure,
+    FlightState, InducedDrag, LodDamping, ZoneForce,
 };
 use crate::math::to_dvec3;
 
@@ -79,6 +79,7 @@ pub fn compute_aero_forces(
         &Rotation,
         &ComputedCenterOfMass,
         &FlightState,
+        &AtmosphereState,
         &AircraftGeometry,
         &ControlInputs,
         &Children,
@@ -91,7 +92,7 @@ pub fn compute_aero_forces(
         (With<EngineZone>, Without<AeroZone>),
     >,
 ) {
-    for (mut cf, mut ct, pos, rot, com, flight, geo, ctrl, children, lod_damping, induced_drag) in
+    for (mut cf, mut ct, pos, rot, com, flight, atm, geo, ctrl, children, lod_damping, induced_drag) in
         root_query.iter_mut()
     {
         cf.0 = Vec3::ZERO;
@@ -103,7 +104,6 @@ pub fn compute_aero_forces(
 
         let alpha = flight.alpha_rad;
         let beta = flight.beta_rad;
-        let re = flight.reynolds_number;
         let qbar = flight.dynamic_pressure_pa;
         let v = flight.airspeed_ms;
         let p = flight.p_rads;
@@ -111,6 +111,10 @@ pub fn compute_aero_forces(
         let r = flight.r_rads;
         let s = geo.wing_area_m2;
         let b = geo.wing_span_m;
+
+        // Pre-compute viscosity once per aircraft for per-zone Reynolds number.
+        let mu = crate::atmosphere::sutherland_viscosity(atm.temperature_k);
+        let rho = atm.density_kgm3;
 
         let body_to_world = DQuat::from_array(rot.0.to_array().map(|x| x as f64));
         // Unit velocity vector in body frame, reconstructed from alpha and beta.
@@ -181,12 +185,20 @@ pub fn compute_aero_forces(
                 };
 
                 // Step 1: coefficient evaluation.
+                // Per-zone Reynolds number: Re = rho * V * chord_zone / mu.
+                // Zones with chord_m = 0 (mass-only) get Re = 0; their
+                // coefficients are Absent so Re is never used.
+                let re_zone = if zone.chord_m > 0.0 {
+                    rho * v * zone.chord_m / mu
+                } else {
+                    0.0
+                };
                 let coeffs = evaluate_zone_coefficients(
                     zone,
                     ctrl,
                     alpha_local,
                     beta_local,
-                    re,
+                    re_zone,
                     qbar,
                     remaining,
                 );
