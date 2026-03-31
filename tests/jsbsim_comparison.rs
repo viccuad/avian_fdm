@@ -714,3 +714,60 @@ fn j3cub_emergent_cmq() {
     assert!(cmq_measured > datcom_cmq * 3.0,
         "Cmq ({cmq_measured:.1}) should not exceed 3x Datcom ({:.0})", datcom_cmq * 3.0);
 }
+
+/// Verify the startup validation system detects a deliberately broken zone.
+/// We spawn an AeroZone with unsorted Table1D breakpoints and confirm the
+/// validation system runs without panicking (it logs warnings).
+#[test]
+fn startup_validation_catches_bad_zone() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins)
+        .add_plugins(bevy::transform::TransformPlugin)
+        .add_plugins(bevy::asset::AssetPlugin::default())
+        .add_plugins(PhysicsPlugins::default())
+        .add_plugins(AircraftFdmPlugin { validate_on_startup: true });
+
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(
+        Duration::from_secs_f64(1.0 / 60.0),
+    ));
+
+    // Spawn an aircraft root with a broken child zone.
+    app.add_systems(Startup, |mut commands: Commands| {
+        commands
+            .spawn(
+                AircraftCoreBundle {
+                    transform: Transform::from_xyz(0.0, 100.0, 0.0),
+                    ..Default::default()
+                },
+            )
+            .with_children(|parent| {
+                parent.spawn(AeroZoneBundle {
+                    zone: AeroZone {
+                        // Deliberately unsorted breakpoints.
+                        cl: AeroCoeff::Table1D {
+                            breakpoints: vec![0.3, 0.0, -0.3],
+                            values: vec![1.0, 0.0, -1.0],
+                        },
+                        cd: AeroCoeff::Scalar(0.01),
+                        area_m2: 2.0,
+                        chord_m: 0.5,
+                        ..Default::default()
+                    },
+                    collider: Collider::cuboid(0.5, 2.0, 0.02),
+                    ..Default::default()
+                });
+            });
+    });
+
+    app.finish();
+
+    // Run a few frames: PostStartup validation runs after Startup.
+    // Should NOT panic, only log warnings.
+    for _ in 0..3 {
+        app.update();
+    }
+
+    // If we got here, validation ran without crashing. The actual warnings
+    // are logged via bevy::log and not captured in the test, but the
+    // unit tests in aero_coeff.rs verify the validation logic itself.
+}

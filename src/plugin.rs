@@ -15,9 +15,27 @@ use crate::_bevy::*;
 ///     .add_plugins(AircraftFdmPlugin::default())
 ///     .run();
 /// ```
-#[derive(Default)]
-#[non_exhaustive]
-pub struct AircraftFdmPlugin;
+///
+/// # Startup validation
+///
+/// In debug builds, a `PostStartup` system runs [`validate_aero_zones`] on
+/// every [`AeroZone`](crate::components::AeroZone) entity, logging warnings
+/// for table structure errors (unsorted breakpoints, dimension mismatches,
+/// NaN/Inf) and placeholder coefficients. Disable by setting
+/// `AircraftFdmPlugin { validate_on_startup: false }`.
+pub struct AircraftFdmPlugin {
+    /// Run [`validate_aero_zones`] in `PostStartup`. Default: `true` in debug
+    /// builds, `false` in release.
+    pub validate_on_startup: bool,
+}
+
+impl Default for AircraftFdmPlugin {
+    fn default() -> Self {
+        Self {
+            validate_on_startup: cfg!(debug_assertions),
+        }
+    }
+}
 
 impl Plugin for AircraftFdmPlugin {
     fn build(&self, app: &mut App) {
@@ -31,7 +49,8 @@ impl Plugin for AircraftFdmPlugin {
 
         use crate::components::{
             AeroZone, AircraftGeometry, AtmosphereState, ControlInputs,
-            Failure, FlightState, GizmoShape, GizmoContours, ZoneForce,
+            Failure, FlightState, GizmoShape, GizmoContours, InducedDrag,
+            LodDamping, ZoneForce,
         };
 
         app.register_type::<AircraftGeometry>()
@@ -42,7 +61,9 @@ impl Plugin for AircraftFdmPlugin {
            .register_type::<ZoneForce>()
            .register_type::<GizmoShape>()
            .register_type::<GizmoContours>()
-           .register_type::<Failure>();
+           .register_type::<Failure>()
+           .register_type::<InducedDrag>()
+           .register_type::<LodDamping>();
 
         #[cfg(feature = "propulsion")]
         {
@@ -52,5 +73,36 @@ impl Plugin for AircraftFdmPlugin {
         }
 
         crate::systems::register_fdm_systems(app);
+
+        if self.validate_on_startup {
+            app.add_systems(PostStartup, validate_aero_zones);
+        }
+    }
+}
+
+/// Startup validation system: checks every [`AeroZone`] for table structure
+/// errors and placeholder coefficients.
+///
+/// Runs in `PostStartup` (after all `Startup` systems have spawned entities).
+/// Logs warnings via [`bevy::log::warn`] for each problem found. Does not
+/// panic; the aircraft will still run, but broken tables will produce garbage.
+///
+/// Registered automatically by [`AircraftFdmPlugin`] when
+/// `validate_on_startup` is `true` (default in debug builds).
+pub fn validate_aero_zones(query: Query<(Entity, &crate::components::AeroZone)>) {
+    let mut total_problems = 0;
+    for (entity, zone) in &query {
+        let label = format!("Entity {entity}");
+        let problems = zone.validate(&label);
+        for p in &problems {
+            warn!("AeroZone validation: {p}");
+        }
+        total_problems += problems.len();
+    }
+    if total_problems > 0 {
+        warn!(
+            "AeroZone validation found {total_problems} problem(s). \
+             Fix these before trusting simulation results."
+        );
     }
 }
