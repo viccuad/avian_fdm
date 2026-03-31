@@ -58,40 +58,41 @@ pub(crate) struct ZoneWorldForce {
 /// # Pure aerodynamic torques
 ///
 /// Moment coefficients (CM, Croll, Cn) represent pure couples expressed in
-/// zone frame. **Roll and yaw use wingspan `b` as the reference length;
-/// pitch uses chord `c̄`:**
+/// zone frame. **Roll and yaw use the aircraft wingspan `b` as the reference
+/// length (always the full span, not a zone span); pitch uses the zone's own
+/// chord `c̄`:**
 ///
 /// ```text
-/// τ_zone = ( Croll · q̄ · S · b,
-///            CM    · q̄ · S · c̄,
-///            Cn    · q̄ · S · b )
+/// τ_zone = ( Croll · q̄ · S_zone · b,
+///            CM    · q̄ · S_zone · c̄_zone,
+///            Cn    · q̄ · S_zone · b )
 /// ```
 pub(crate) fn zone_force_world(
     coeffs: &ZoneCoefficients,
     qbar: f64,
-    s: f64,
-    b: f64,
-    c: f64,
+    zone_area: f64,
+    span_ref: f64,
+    zone_chord: f64,
     alpha: f64,
     vel_zone_unit: DVec3,
     zone_to_world: DQuat,
 ) -> ZoneWorldForce {
     // Drag: opposes the full 3D velocity vector in zone frame.
-    let drag_zone = vel_zone_unit * (-coeffs.cd * qbar * s);
+    let drag_zone = vel_zone_unit * (-coeffs.cd * qbar * zone_area);
 
     // Lift and side force: stability frame (alpha rotation about zone-Y only).
     // CY = stability +Y = zone +Y, so this keeps side force rotating with the
     // aircraft and zone instead of being locked to a world direction.
     let stab_to_zone = DQuat::from_rotation_y(-alpha);
-    let lift_side_stab = DVec3::new(0.0, coeffs.cy * qbar * s, -coeffs.cl * qbar * s);
+    let lift_side_stab = DVec3::new(0.0, coeffs.cy * qbar * zone_area, -coeffs.cl * qbar * zone_area);
     let lift_side_zone = stab_to_zone * lift_side_stab;
 
     let force = zone_to_world * (drag_zone + lift_side_zone);
 
     let torque_zone = DVec3::new(
-        coeffs.croll * qbar * s * b,
-        coeffs.cm    * qbar * s * c,
-        coeffs.cn    * qbar * s * b,
+        coeffs.croll * qbar * zone_area * span_ref,
+        coeffs.cm    * qbar * zone_area * zone_chord,
+        coeffs.cn    * qbar * zone_area * span_ref,
     );
     let torque = zone_to_world * torque_zone;
 

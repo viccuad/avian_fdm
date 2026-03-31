@@ -36,8 +36,11 @@
 //!
 //! ## Coefficient derivation notes
 //!
-//! **Wings (CL, CD):** JSBSim whole-aircraft Table2D values are multiplied by the
-//! spanwise area fraction of each zone.
+//! **Wings (CL, CD):** Each wing zone stores the unscaled USA-35B airfoil
+//! CL/CD Table2D data. The zone's `area_m2` field holds the planform area
+//! fraction (e.g. root panel = 17.5% of S_ref = 2.90 m2). Force is computed
+//! as `CL * q_bar * zone.area_m2`, so the airfoil data is reusable across
+//! any number of wing zones without re-scaling.
 //!
 //! **Aileron CL:** Derived from JSBSim `Roll_aileron` coefficient
 //! `Cl_da = 0.3498/rad`. For each aileron zone at y_arm = 4.05 m from CL:
@@ -239,21 +242,21 @@ const HTAIL_CL_DATA: [f64; 12] = sourced!(
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-/// Build a Table2D AeroCoeff for CL using the shared wing table scaled by `fraction`.
-fn cl_zone(fraction: f64) -> AeroCoeff {
+/// Build a Table2D AeroCoeff for CL using the full USA-35B airfoil data (unscaled).
+fn cl_table() -> AeroCoeff {
     AeroCoeff::Table2D {
         rows: ALPHA_BP.to_vec(),
         cols: RE_BP.to_vec(),
-        data: CL_DATA.iter().map(|&v| v * fraction).collect(),
+        data: CL_DATA.to_vec(),
     }
 }
 
-/// Build a Table2D AeroCoeff for CD using the shared wing table scaled by `fraction`.
-fn cd_zone(fraction: f64) -> AeroCoeff {
+/// Build a Table2D AeroCoeff for CD using the full USA-35B airfoil data (unscaled).
+fn cd_table() -> AeroCoeff {
     AeroCoeff::Table2D {
         rows: ALPHA_BP.to_vec(),
         cols: RE_BP.to_vec(),
-        data: CD_DATA.iter().map(|&v| v * fraction).collect(),
+        data: CD_DATA.to_vec(),
     }
 }
 
@@ -470,6 +473,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         zone: AeroZone {
                             cl: AeroCoeff::Scalar(0.0),
                             cd: AeroCoeff::Scalar(sourced!(0.001, "JSBSim:J3Cub.xml: Drag_gear residual per landing-gear leg; exposed axle + bungee")),
+                            area_m2: WING_AREA_M2,
                             ..Default::default()
                         },
                         zone_force: ZoneForce::default(),
@@ -492,6 +496,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         zone: AeroZone {
                             cl: AeroCoeff::Scalar(0.0),
                             cd: AeroCoeff::Scalar(sourced!(0.001, "JSBSim:J3Cub.xml: Drag_gear residual per wheel; tyre frontal area")),
+                            area_m2: WING_AREA_M2,
                             ..Default::default()
                         },
                         zone_force: ZoneForce::default(),
@@ -615,13 +620,17 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
 
 // ── Zone builder functions (pub for testing / custom assemblies) ──────────────
 
-/// One wing panel zone at position (`x_m`, `y_m`, `WING_Z`).
+/// One wing panel zone at position (`x_m`, `y_m`, on the dihedral plane).
 ///
 /// `x_m` is the entity and collider center along the chord axis (physical
 /// position, used for mass distribution). `ac_x_m` is the aerodynamic center
 /// where lift forces are applied; for all wing panels this should be
 /// [`WING_AC_X`] regardless of how the chord is partitioned. When
 /// `ac_x_m == x_m` the `ac_offset` inside [`AeroZone`] is zero.
+///
+/// `fraction` is the fraction of the total wing area this panel represents.
+/// The panel's aerodynamic area is `fraction * WING_AREA_M2` and the CL/CD
+/// tables are the unscaled airfoil data.
 pub fn wing_zone(
     _name: &str,
     x_m: f64,
@@ -644,9 +653,11 @@ pub fn wing_zone(
     (
         AeroZoneBundle {
             zone: AeroZone {
-                cl: cl_zone(fraction),
-                cd: cd_zone(fraction),
+                cl: cl_table(),
+                cd: cd_table(),
                 ac_offset,
+                area_m2: fraction * WING_AREA_M2,
+                chord_m: CHORD_M,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),
@@ -688,6 +699,8 @@ pub fn aileron_zone(
                 )),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 control_role: Some(role),
+                area_m2: WING_AREA_M2,
+                chord_m: CHORD_M,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),
@@ -747,6 +760,8 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                     data: HTAIL_CL_DATA.to_vec(),
                 },
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
+                area_m2: WING_AREA_M2,
+                chord_m: CHORD_M,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),
@@ -785,6 +800,8 @@ pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
                 )),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 control_role: Some(ControlSurfaceRole::Elevator),
+                area_m2: WING_AREA_M2,
+                chord_m: CHORD_M,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),
@@ -823,6 +840,8 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                         sourced!(-0.254, "CY at +90 deg: −0.162 × PI/2 ≈ −0.254"),
                     ],
                 },
+                area_m2: WING_AREA_M2,
+                chord_m: CHORD_M,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),
@@ -859,6 +878,8 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
                     "JSBSim:J3Cub.xml: Yaw_rudder CN_dr = −0.0565/rad; CY_rud = CN_dr × b/x_arm = 0.0565 × 10.742/4.0, negated for −Y force convention"
                 )),
                 control_role: Some(ControlSurfaceRole::Rudder),
+                area_m2: WING_AREA_M2,
+                chord_m: CHORD_M,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),

@@ -92,7 +92,6 @@ pub struct AeroZone {
     /// additionally scaled by the matching [`super::ControlInputs`] value.
     pub control_role: Option<ControlSurfaceRole>,
     /// Extra drag added when the zone is partially failed. Represents structural drag from
-    /// Extra drag added when the zone is partially failed. Represents structural drag from
     /// deformation.
     ///
     /// `None` (the default) means this zone has no damage-drag model. This is
@@ -108,6 +107,32 @@ pub struct AeroZone {
     /// Only set this on zones where partial failure causes visible structural
     /// deformation that increases drag (e.g. a bent wing panel, torn fabric).
     pub damage_drag_coeff: Option<f64>,
+
+    /// Aerodynamic planform area of this zone (m²).
+    ///
+    /// Force is computed as `coeff * q_bar * area_m2`, so each zone is
+    /// self-contained: its CL/CD tables hold the true airfoil coefficients and
+    /// the area scales them to the correct force magnitude. This replaces the
+    /// old pattern of scaling whole-aircraft coefficients by area fraction and
+    /// multiplying by the aircraft reference area.
+    ///
+    /// For wing zones, set this to the physical planform area of the panel.
+    /// For tail and control surface zones whose coefficients were derived from
+    /// whole-aircraft stability derivatives (e.g. CM_alpha, CN_beta), set this
+    /// to the aircraft reference wing area so that the derived coefficients
+    /// produce the correct force.
+    ///
+    /// Defaults to 0.0, meaning the zone produces no aerodynamic force. This is
+    /// correct for mass-only zones (fuselage, struts, gear) that have zero
+    /// CL/CD.
+    pub area_m2: f64,
+
+    /// Reference chord for this zone (m), used to dimensionalize pitching-moment
+    /// coefficients: `M_pitch = CM * q_bar * area_m2 * chord_m`.
+    ///
+    /// For wing zones, use the mean aerodynamic chord. Defaults to 0.0 (no
+    /// pitching moment contribution, which is correct when CM is Absent).
+    pub chord_m: f64,
 }
 
 /// Which flight control function this zone performs, if any.
@@ -165,6 +190,8 @@ impl Default for AeroZone {
             ac_offset: Vec3::ZERO,
             control_role: None,
             damage_drag_coeff: None,
+            area_m2: 0.0,
+            chord_m: 0.0,
         }
     }
 }

@@ -111,7 +111,6 @@ pub fn compute_aero_forces(
         let r = flight.r_rads;
         let s = geo.wing_area_m2;
         let b = geo.wing_span_m;
-        let c = geo.chord_m;
 
         let body_to_world = DQuat::from_array(rot.0.to_array().map(|x| x as f64));
         // Unit velocity vector in body frame, reconstructed from alpha and beta.
@@ -123,7 +122,8 @@ pub fn compute_aero_forces(
         let com_world: Vec3 = pos.0 + rot.0 * com.0;
         let use_lod = lod_damping.is_some();
 
-        let mut total_cl = 0.0_f64;
+        // Area-weighted CL sum for induced drag: CL_aircraft = total / S_ref.
+        let mut total_cl_x_area = 0.0_f64;
 
         for child in children.iter() {
             if let Ok((zone, zone_transform, mut zone_force, opt_failure)) =
@@ -190,11 +190,11 @@ pub fn compute_aero_forces(
                     qbar,
                     remaining,
                 );
-                total_cl += coeffs.cl;
+                total_cl_x_area += coeffs.cl * zone.area_m2;
 
                 // Step 2: world-space force and torque.
                 let wf =
-                    zone_force_world(&coeffs, qbar, s, b, c, alpha_local, vel_zone_unit_local, zone_to_world);
+                    zone_force_world(&coeffs, qbar, zone.area_m2, b, zone.chord_m, alpha_local, vel_zone_unit_local, zone_to_world);
 
                 if !wf.force.is_finite() || !wf.torque.is_finite() {
                     warn_once!("Non-finite aero force/torque on zone: zeroed");
@@ -223,9 +223,11 @@ pub fn compute_aero_forces(
         }
 
         // Step 4: induced drag. CD_i = CL² / (π · e · AR).
+        // CL_aircraft is the area-weighted sum of per-zone CLs divided by S_ref.
         if let Some(id) = induced_drag {
             let ar = b * b / s;
-            let cd_i = total_cl * total_cl / (std::f64::consts::PI * id.oswald_factor * ar);
+            let cl_aircraft = total_cl_x_area / s;
+            let cd_i = cl_aircraft * cl_aircraft / (std::f64::consts::PI * id.oswald_factor * ar);
             let drag_world = body_to_world * (vel_body_unit_global * (-cd_i * qbar * s));
             cf.0 += drag_world.as_vec3();
         }
