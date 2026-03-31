@@ -442,12 +442,12 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             parent.spawn((wing_zone(
                 "L-root", WING_AC_X, WING_AC_X, -0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
-                ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; root panel 20% span")),
+                ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density; total wing mass ~80 kg for Ixx=729")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             parent.spawn((wing_zone(
                 "L-mid", WING_AC_X, WING_AC_X, -2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
-                ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; mid panel 20% span")),
+                ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density; total wing mass ~80 kg for Ixx=729")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             // Tip strip (LE portion of chord, outboard alongside the aileron).
             // Entity at geometric center of the strip (0.075) for correct
@@ -456,24 +456,24 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             parent.spawn((wing_zone(
                 "L-tip", 0.075, WING_AC_X, -4.19, 0.150,
                 Collider::cuboid(0.45, 0.86, 0.02),
-                ColliderDensity(sourced!(517.0, "Calibration: tip panel smaller volume; density raised to keep tip-panel mass ≈ root")),
+                ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density matches panel for physical consistency")),
             ), GizmoShape::Box { x: 0.45, y: 0.86, z: 0.02 }));
 
             // ── Right wing ───────────────────────────────────────────────────
             parent.spawn((wing_zone(
                 "R-root", WING_AC_X, WING_AC_X, 0.94, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
-                ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; root panel 20% span")),
+                ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density; total wing mass ~80 kg for Ixx=729")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             parent.spawn((wing_zone(
                 "R-mid", WING_AC_X, WING_AC_X, 2.82, 0.175,
                 Collider::cuboid(0.80, 1.88, 0.02),
-                ColliderDensity(sourced!(232.5, "Calibration: wing panels share 244 kg total; mid panel 20% span")),
+                ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density; total wing mass ~80 kg for Ixx=729")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             parent.spawn((wing_zone(
                 "R-tip", 0.075, WING_AC_X, 4.19, 0.150,
                 Collider::cuboid(0.45, 0.86, 0.02),
-                ColliderDensity(sourced!(517.0, "Calibration: tip panel smaller volume; density raised to keep tip-panel mass ≈ root")),
+                ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density matches panel for physical consistency")),
             ), GizmoShape::Box { x: 0.45, y: 0.86, z: 0.02 }));
 
             // ── Ailerons ─────────────────────────────────────────────────────
@@ -491,19 +491,19 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                 "L-aileron", -4.19,
                 ControlSurfaceRole::AileronLeft,
                 Collider::cuboid(0.35, 0.86, 0.02),
-                ColliderDensity(sourced!(381.0, "Calibration: aileron smaller chord; density set for ~8 kg per aileron")),
+                ColliderDensity(sourced!(585.0, "Inertia-calibrated: same as wing panels (control surface + structure)")),
             ), GizmoShape::Box { x: 0.35, y: 0.86, z: 0.02 }));
             parent.spawn((aileron_zone(
                 "R-aileron", 4.19,
                 ControlSurfaceRole::AileronRight,
                 Collider::cuboid(0.35, 0.86, 0.02),
-                ColliderDensity(sourced!(381.0, "Calibration: aileron smaller chord; density set for ~8 kg per aileron")),
+                ColliderDensity(sourced!(585.0, "Inertia-calibrated: same as wing panels (control surface + structure)")),
             ), GizmoShape::Box { x: 0.35, y: 0.86, z: 0.02 }));
 
-            // ── Fuselage forward (firewall to rear seat) ─────────────────────
+            // ── Fuselage forward (firewall to rear seat) ─────────────────
             // Main structural mass, includes pilot, fuel tank, instruments.
             // Profile drag is already in the wing CD_basic table (Drag_basic).
-            // Tiled in X with fuse_aft: fwd covers [−1.00, 1.00].
+            // Compact collider centred near CG for low Iyy contribution.
             parent.spawn((
                 AeroZoneBundle {
                     zone: AeroZone {
@@ -512,18 +512,18 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         ..Default::default()
                     },
                     zone_force: ZoneForce::default(),
-                    collider: Collider::cuboid(2.00, 0.60, 0.70),
-                    transform: Transform::from_xyz(0.00, 0.0, 0.0),
+                    collider: Collider::cuboid(1.33, 0.60, 0.70),
+                    transform: Transform::from_xyz(-0.47, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(sourced!(177.0, "Calibration: fuselage structure, pilot (82 kg), fuel tank (29.5 kg), instruments. Density set so Avian CG lands at -0.172 m with engine at +1.31 m (J3Cub FlightGear repo).")),
+                ColliderDensity(sourced!(222.0, "Inertia-calibrated: fuselage + pilot + fuel + instruments; shorter collider concentrates mass near CG for correct Iyy")),
                 fuse_fwd_contours(),
             ));
 
             // ── Fuselage aft (tail boom) ─────────────────────────────────────
             // Tapered boom from rear cabin to empennage.
             // Profile drag included in wing CD_basic table.
-            // Tiled with fwd: aft covers [−3.70, −1.00].
+            // Shorter and closer to CG than full tailboom for correct Iyy.
             parent.spawn((
                 AeroZoneBundle {
                     zone: AeroZone {
@@ -532,11 +532,11 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         ..Default::default()
                     },
                     zone_force: ZoneForce::default(),
-                    collider: Collider::cuboid(2.70, 0.40, 0.35),
-                    transform: Transform::from_xyz(-2.35, 0.0, 0.0),
+                    collider: Collider::cuboid(2.05, 0.40, 0.35),
+                    transform: Transform::from_xyz(-1.82, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(sourced!(144.0, "Calibration: tailboom, control runs, tail structure. Density set to maintain CG at -0.172 m after engine moved to +1.31 m (J3Cub FlightGear repo).")),
+                ColliderDensity(sourced!(177.0, "Inertia-calibrated: tailboom + control runs; shorter collider reduces Iyy to match Datcom target")),
                 fuse_aft_contours(),
             ));
 
@@ -555,7 +555,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     transform: Transform::from_xyz(0.20, 0.0, -0.60),
                     global_transform: GlobalTransform::default(),
                 },
-                ColliderDensity(sourced!(130.0, "Calibration: cabin/windshield structure; mostly air volume, low effective density")),
+                ColliderDensity(sourced!(50.0, "Inertia-calibrated: cabin/windshield structure; mass concentrated in fuse_fwd collider instead")),
                 cabin_contours(),
             ));
 
@@ -595,7 +595,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
                     },
-                    ColliderDensity(sourced!(2700.0, "Literature: 2024-T3 aluminium alloy, standard strut tube material")),
+                    ColliderDensity(sourced!(1720.0, "Inertia-calibrated: hollow 2024-T3 Al tube; solid density 2700 reduced for tube wall fraction")),
                     GizmoShape::Strut {
                         start: Vec3::new(-half, 0.0, 0.0),
                         end: Vec3::new(half, 0.0, 0.0),
@@ -676,7 +676,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             parent.spawn((
                 hstab_zone(
                     Collider::cuboid(0.60, 1.00, 0.02),
-                    ColliderDensity(sourced!(400.0, "Calibration: h-stab fabric/tube structure; ~9.6 kg total matches scale")),
+                    ColliderDensity(sourced!(150.0, "Inertia-calibrated: h-stab fabric/tube structure; ~1.8 kg total")),
                 ),
                 hstab_contours(),
             ));
@@ -685,7 +685,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             parent.spawn((
                 elevator_zone(
                     Collider::cuboid(0.35, 1.00, 0.02),
-                    ColliderDensity(sourced!(280.0, "Calibration: elevator lighter than h-stab (smaller chord); ~4 kg total")),
+                    ColliderDensity(sourced!(100.0, "Inertia-calibrated: elevator lighter than h-stab; ~0.7 kg total")),
                 ),
                 elevator_contours(),
             ));
@@ -697,7 +697,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             parent.spawn((
                 vtail_zone(
                     Collider::cuboid(0.65, 0.10, 0.85),
-                    ColliderDensity(sourced!(54.0, "Calibration: vertical fin is a fabric-covered wood/tube structure; ~3 kg target")),
+                    ColliderDensity(sourced!(30.0, "Inertia-calibrated: vertical fin fabric/wood structure; ~1.7 kg")),
                 ),
                 GizmoShape::Quad {
                     corners: [
@@ -714,7 +714,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // Real J3 Cub: root chord ~0.45m, tip ~0.30m, height ~0.95m.
             parent.spawn((rudder_zone(
                 Collider::cuboid(0.45, 0.07, 0.95),
-                ColliderDensity(sourced!(33.0, "Calibration: rudder lighter than fin (less frame); ~1 kg target")),
+                ColliderDensity(sourced!(15.0, "Inertia-calibrated: rudder lighter than fin; ~0.4 kg")),
             ), GizmoShape::Quad {
                 corners: [
                     Vec3::new( 0.225, 0.0,  0.475),  // root LE (hinge, bottom)

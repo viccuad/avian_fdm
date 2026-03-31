@@ -571,27 +571,50 @@ fn j3cub_inertia_comparison() {
         found = true;
         let m = mass.value() as f64;
         let (principal, local_frame) = inertia.principal_angular_inertia_with_local_frame();
-        let ixx = principal.x as f64;
-        let iyy = principal.y as f64;
-        let izz = principal.z as f64;
 
-        println!("\n-- J3 Cub Inertia Comparison --------------------------------");
+        // Reconstruct body-frame inertia tensor from principal axes + rotation.
+        // I_body = R * diag(principal) * R^T
+        let r = bevy::math::Mat3::from_quat(local_frame);
+        let p = [principal.x as f64, principal.y as f64, principal.z as f64];
+        let mut ib = [[0.0f64; 3]; 3];
+        for i in 0..3 {
+            for j in 0..3 {
+                for k in 0..3 {
+                    let ri = [r.x_axis[i] as f64, r.y_axis[i] as f64, r.z_axis[i] as f64];
+                    let rj = [r.x_axis[j] as f64, r.y_axis[j] as f64, r.z_axis[j] as f64];
+                    ib[i][j] += ri[k] * p[k] * rj[k];
+                }
+            }
+        }
+        let ixx = ib[0][0];
+        let iyy = ib[1][1];
+        let izz = ib[2][2];
+
+        println!("\n-- J3 Cub Inertia Comparison (body frame) -------------------");
         println!("  {:>20} {:>10} {:>10} {:>8}", "", "Avian", "JSBSim", "Ratio");
         println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Mass (kg)", m, JSBSIM_MASS_KG, m / JSBSIM_MASS_KG);
         println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Ixx (kg*m2)", ixx, JSBSIM_IXX, ixx / JSBSIM_IXX);
         println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Iyy (kg*m2)", iyy, JSBSIM_IYY, iyy / JSBSIM_IYY);
         println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Izz (kg*m2)", izz, JSBSIM_IZZ, izz / JSBSIM_IZZ);
         println!("  {:>20} {:?}", "CG offset (m)", com.0);
-        println!("  {:>20} {:?}", "Inertia frame", local_frame);
         println!("------------------------------------------------------------");
 
-        // Soft assertions: log but don't fail if off by more than 50%.
-        // The simplified cuboid colliders are approximations.
+        // Mass within 5%
         let mass_ratio = m / JSBSIM_MASS_KG;
         assert!(
-            mass_ratio > 0.5 && mass_ratio < 2.0,
-            "Mass way off: {m:.1} kg (JSBSim: {JSBSIM_MASS_KG:.1} kg, ratio: {mass_ratio:.2})"
+            mass_ratio > 0.95 && mass_ratio < 1.05,
+            "Mass off: {m:.1} kg (target: {JSBSIM_MASS_KG:.1} kg, ratio: {mass_ratio:.2})"
         );
+        // Inertia within 15% (body-frame, after rotation)
+        let ixx_ratio = ixx / JSBSIM_IXX;
+        let iyy_ratio = iyy / JSBSIM_IYY;
+        let izz_ratio = izz / JSBSIM_IZZ;
+        assert!(ixx_ratio > 0.85 && ixx_ratio < 1.15,
+            "Ixx off: {ixx:.0} (target: {JSBSIM_IXX:.0}, ratio: {ixx_ratio:.2})");
+        assert!(iyy_ratio > 0.85 && iyy_ratio < 1.15,
+            "Iyy off: {iyy:.0} (target: {JSBSIM_IYY:.0}, ratio: {iyy_ratio:.2})");
+        assert!(izz_ratio > 0.85 && izz_ratio < 1.15,
+            "Izz off: {izz:.0} (target: {JSBSIM_IZZ:.0}, ratio: {izz_ratio:.2})");
     }
 
     assert!(found, "No aircraft entity found with mass properties");
