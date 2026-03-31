@@ -135,6 +135,40 @@ pub struct AeroZone {
     pub chord_m: f64,
 }
 
+impl AeroZone {
+    /// Validate all coefficients and fields. Returns a list of problems
+    /// (empty means valid).
+    ///
+    /// Checks each [`AeroCoeff`] field for table structure errors (unsorted
+    /// breakpoints, mismatched dimensions, NaN/Inf values) and warns about
+    /// negative `area_m2`.
+    ///
+    /// Call at spawn time to catch data-entry mistakes early. See
+    /// [`AeroCoeff::validate`] for the per-coefficient checks.
+    pub fn validate(&self, zone_name: &str) -> Vec<String> {
+        let mut problems = Vec::new();
+        let fields: &[(&str, &AeroCoeff)] = &[
+            ("cl", &self.cl),
+            ("cd", &self.cd),
+            ("cy", &self.cy),
+            ("cm", &self.cm),
+            ("croll", &self.croll),
+            ("cn", &self.cn),
+        ];
+        for (field, coeff) in fields {
+            let label = format!("{zone_name}.{field}");
+            problems.extend(coeff.validate(&label));
+        }
+        if self.area_m2 < 0.0 {
+            problems.push(format!("{zone_name}: area_m2 is negative ({:.4})", self.area_m2));
+        }
+        if self.chord_m < 0.0 {
+            problems.push(format!("{zone_name}: chord_m is negative ({:.4})", self.chord_m));
+        }
+        problems
+    }
+}
+
 /// Which flight control function this zone performs, if any.
 #[derive(Reflect, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[reflect(Serialize, Deserialize)]
