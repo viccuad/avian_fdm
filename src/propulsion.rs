@@ -119,21 +119,14 @@ pub fn compute_engine_zone_forces(
 ///
 /// Clamps to the boundary values when `x` is outside the table range.
 pub(crate) fn interp_curve(curve: &[[f64; 2]], x: f64) -> f64 {
+    use crate::components::aero_coeff::lerp_1d;
     if curve.is_empty() { return 0.0; }
     if curve.len() == 1 { return curve[0][1]; }
-    if x <= curve[0][0] { return curve[0][1]; }
-    if x >= curve[curve.len() - 1][0] { return curve[curve.len() - 1][1]; }
-    for i in 0..curve.len() - 1 {
-        let x0 = curve[i][0];
-        let x1 = curve[i + 1][0];
-        if x >= x0 && x <= x1 {
-            let t = (x - x0) / (x1 - x0);
-            return curve[i][1] + t * (curve[i + 1][1] - curve[i][1]);
-        }
-    }
-    // Every in-range x is covered by the loop above; the boundary checks at the
-    // top of the function prevent reaching here.
-    unreachable!("interp_curve: x={x} not found in curve with {} entries", curve.len())
+    // Clamp to table bounds (lerp_1d assumes in-range input).
+    let x = x.clamp(curve[0][0], curve[curve.len() - 1][0]);
+    let bp: Vec<f64> = curve.iter().map(|p| p[0]).collect();
+    let vals: Vec<f64> = curve.iter().map(|p| p[1]).collect();
+    lerp_1d(x, &bp, &vals)
 }
 
 #[cfg(test)]
