@@ -246,6 +246,60 @@ const RUDDER_CY_DELTA: f64 = sourced!(
     "Calibration: CY_rud = |CN_dr| × S_ref × b / (S_rud × x_arm) = 0.0565 × 16.584 × 10.742 / (0.356 × 3.6); negative for −Y force convention"
 );
 
+// ── Aileron geometry ─────────────────────────────────────────────────────────
+
+/// Aileron span per side (m): occupies the outboard wing tip region.
+const AILERON_SPAN_M: f64 = sourced!(0.86, "Geometry: J3 Cub aileron span per side, from wing zone layout");
+
+/// Aileron effective area (m2): aileron_span * wing_chord.
+///
+/// The aileron changes the effective camber over the full wing chord, not just
+/// the trailing-edge strip. The influenced wing panel area is the correct
+/// reference for the lift increment.
+const AILERON_AREA_M2: f64 = AILERON_SPAN_M * CHORD_M; // 1.376 m2
+
+/// Aileron CL per radian of deflection.
+///
+/// From JSBSim Cl_da = 0.3498/rad. The whole-aircraft roll moment from
+/// one aileron: M_roll = CL_ail * delta * qbar * S_ail * y_arm.
+/// Two ailerons (differential): M_total = 2 * CL_ail * qbar * S_ail * y_arm * delta.
+/// JSBSim: M_total = Cl_da * qbar * S_ref * b * delta.
+///
+/// So: CL_ail = Cl_da * S_ref * b / (2 * S_ail * y_arm)
+///            = 0.3498 * 16.584 * 10.742 / (2 * 1.376 * 4.05) = 5.59/rad.
+const AILERON_CL_DELTA: f64 = sourced!(
+    5.59,
+    "Calibration: CL_ail = Cl_da × S_ref × b / (2 × S_ail × y_arm) = 0.3498 × 16.584 × 10.742 / (2 × 1.376 × 4.05)"
+);
+
+// ── Landing gear geometry ────────────────────────────────────────────────────
+
+/// Gear leg frontal area (m2): exposed axle/bungee strut, approx 0.6m long * 0.04m diameter.
+const GEAR_LEG_AREA_M2: f64 = sourced!(0.024, "Geometry: J3 Cub gear leg frontal area, 0.6 m × 0.04 m exposed axle + bungee");
+
+/// Gear leg drag coefficient (based on frontal area).
+///
+/// From JSBSim Drag_gear: each leg contributes CD = 0.001 against S_ref.
+/// Physical: CD_leg = 0.001 * S_ref / S_leg = 0.001 * 16.584 / 0.024 = 0.691.
+/// Typical for a partially faired strut (bare cylinder ~ 1.0-1.2).
+const GEAR_LEG_CD: f64 = sourced!(
+    0.691,
+    "Calibration: CD_leg = 0.001 × S_ref / S_leg = 0.001 × 16.584 / 0.024; partially faired strut"
+);
+
+/// Wheel frontal area (m2): circle with radius 0.15m (8-inch tyre).
+const WHEEL_AREA_M2: f64 = sourced!(0.0707, "Geometry: J3 Cub main wheel frontal area, pi × 0.15^2");
+
+/// Wheel drag coefficient (based on frontal area).
+///
+/// From JSBSim Drag_gear: each wheel contributes CD = 0.001 against S_ref.
+/// Physical: CD_wheel = 0.001 * S_ref / S_wheel = 0.001 * 16.584 / 0.0707 = 0.235.
+/// Lower than a bare disc (~0.4-0.6) because JSBSim models it as residual drag.
+const WHEEL_CD: f64 = sourced!(
+    0.235,
+    "Calibration: CD_wheel = 0.001 × S_ref / S_wheel = 0.001 × 16.584 / 0.0707; JSBSim residual"
+);
+
 /// Wing aerodynamic-centre x-offset from entity root (m).
 /// The Avian-computed CG lands at ≈ −0.172 m (fuselage centroid at −0.45 m),
 /// so the wing AC is ≈ 0.072 m **forward** of the CG. This is 4.5 % MAC, matching
@@ -562,8 +616,8 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     AeroZoneBundle {
                         zone: AeroZone {
                             cl: AeroCoeff::Scalar(0.0),
-                            cd: AeroCoeff::Scalar(sourced!(0.001, "JSBSim:J3Cub.xml: Drag_gear residual per landing-gear leg; exposed axle + bungee")),
-                            area_m2: WING_AREA_M2,
+                            cd: AeroCoeff::Scalar(GEAR_LEG_CD),
+                            area_m2: GEAR_LEG_AREA_M2,
                             ..Default::default()
                         },
                         zone_force: ZoneForce::default(),
@@ -585,8 +639,8 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                     AeroZoneBundle {
                         zone: AeroZone {
                             cl: AeroCoeff::Scalar(0.0),
-                            cd: AeroCoeff::Scalar(sourced!(0.001, "JSBSim:J3Cub.xml: Drag_gear residual per wheel; tyre frontal area")),
-                            area_m2: WING_AREA_M2,
+                            cd: AeroCoeff::Scalar(WHEEL_CD),
+                            area_m2: WHEEL_AREA_M2,
                             ..Default::default()
                         },
                         zone_force: ZoneForce::default(),
@@ -782,14 +836,10 @@ pub fn aileron_zone(
     (
         AeroZoneBundle {
             zone: AeroZone {
-                // CL_ail = 0.3498 × 10.742 / (2 × 4.05) ≈ 0.464
-                cl: AeroCoeff::Scalar(sourced!(
-                    0.464,
-                    "JSBSim:J3Cub.xml: Roll_aileron Cl_da = 0.3498/rad; CL_ail = Cl_da × b / (2 × y_arm) = 0.3498 × 10.742 / (2 × 4.05)"
-                )),
+                cl: AeroCoeff::Scalar(AILERON_CL_DELTA),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
                 control_role: Some(role),
-                area_m2: WING_AREA_M2,
+                area_m2: AILERON_AREA_M2,
                 chord_m: CHORD_M,
                 ..Default::default()
             },
@@ -1243,32 +1293,30 @@ mod tests {
 
     /// Aileron roll moment magnitude matches JSBSim Roll_aileron at full deflection.
     ///
-    /// JSBSim: N_roll = q·S·b·0.3498 = q·S·10.742·0.3498 = 3.757·q·S
-    /// Our model: 2 × CL_ail × y_arm × q·S = 2 × 0.464 × 4.05 × q·S = 3.759·q·S
+    /// JSBSim: M_roll = Cl_da * q * S_ref * b = 0.3498 * q * S_ref * 10.742
+    /// Our model: 2 * CL_ail * q * S_ail * y_arm
+    ///          = 2 * 5.59 * q * 1.376 * 4.05
     #[test]
     fn aileron_roll_moment_matches_jsbsim() {
-        let cl_ail = 0.464_f64;
         let y_arm = 4.05_f64;
-        let our_coeff = 2.0 * cl_ail * y_arm; // = 3.759
+        let our_coeff = 2.0 * AILERON_CL_DELTA * AILERON_AREA_M2 * y_arm;
 
-        let jsbsim_coeff = 0.3498 * WING_SPAN_M; // = 3.757
-        assert!((our_coeff - jsbsim_coeff).abs() < 0.01,
-            "aileron coefficient mismatch: ours={our_coeff:.4}, jsbsim={jsbsim_coeff:.4}");
+        let jsbsim_coeff = 0.3498 * WING_SPAN_M * WING_AREA_M2;
+        assert!((our_coeff - jsbsim_coeff).abs() / jsbsim_coeff < 0.01,
+            "aileron moment mismatch: ours={our_coeff:.2}, jsbsim={jsbsim_coeff:.2}");
     }
 
-    /// Elevator CL produces a nose-up moment at the tail arm.
+    /// Elevator pitch moment matches JSBSim CM_de at full deflection.
     ///
-    /// Moment = CL_elev × q·S × tail_arm (via cross-product in accumulate).
-    /// JSBSim: M_pitch = CM_de × q·S·c̄ = −1.2004 × q·S·1.6 = −1.9206·q·S
-    /// Our model: −0.477 × tail_arm = −0.477 × 4.023 = −1.919·q·S ≈ −1.921·q·S ✓
+    /// JSBSim: M_pitch = CM_de * q * S_ref * c = -1.2004 * q * S_ref * 1.6
+    /// Our model: CL_elev * q * S_elev * l_t = -7.40 * q * 1.07 * 4.023
     #[test]
     fn elevator_pitch_moment_matches_jsbsim() {
-        let cl_elev = -0.477_f64;
-        let our_moment_coeff = cl_elev * H_TAIL_ARM_M; // = −1.919
+        let our_moment = ELEVATOR_CL_DELTA * ELEVATOR_AREA_M2 * H_TAIL_ARM_M;
 
         let cm_de = -1.2004_f64;
-        let jsbsim_moment_coeff = cm_de * CHORD_M; // = −1.921
-        assert!((our_moment_coeff - jsbsim_moment_coeff).abs() < 0.005,
-            "elevator moment coeff: ours={our_moment_coeff:.4}, jsbsim={jsbsim_moment_coeff:.4}");
+        let jsbsim_moment = cm_de * WING_AREA_M2 * CHORD_M;
+        assert!((our_moment - jsbsim_moment).abs() / jsbsim_moment.abs() < 0.01,
+            "elevator moment: ours={our_moment:.2}, jsbsim={jsbsim_moment:.2}");
     }
 }
