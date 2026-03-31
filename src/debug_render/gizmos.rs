@@ -125,15 +125,16 @@ pub(super) fn debug_render_resultant(
             gizmos.arrow(cg, cg + cf.0 * scale, color);
         }
 
-        if let Some(color) = config.weight_color {
-            let weight = Vec3::new(0.0, -mass.value() * 9.806_65, 0.0);
-            gizmos.arrow(cg, cg + weight * scale, color);
+        let weight = Vec3::new(0.0, -mass.value() * 9.806_65, 0.0);
 
-            if let Some(net_color) = config.resultant_color {
-                let net = cf.0 + weight;
-                if net.length_squared() > 1.0 {
-                    gizmos.arrow(cg, cg + net * scale, net_color);
-                }
+        if let Some(color) = config.weight_color {
+            gizmos.arrow(cg, cg + weight * scale, color);
+        }
+
+        if let Some(net_color) = config.resultant_color {
+            let net = cf.0 + weight;
+            if net.length_squared() > 1.0 {
+                gizmos.arrow(cg, cg + net * scale, net_color);
             }
         }
     }

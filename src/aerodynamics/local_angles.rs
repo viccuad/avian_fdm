@@ -4,7 +4,9 @@
 ///
 /// Body angular rates create local velocity increments at each zone that shift
 /// its effective angle of attack and sideslip beyond the whole-aircraft values.
-/// Three additive correction layers are applied:
+/// Three additive correction layers are applied on top of the zone-frame
+/// geometric alpha/beta (which already captures dihedral, sweep, etc. via
+/// velocity projection into the zone's local coordinate frame):
 ///
 /// **Layer 1. Roll-rate Δα (asymmetric stall, snap rolls, spins)**
 ///
@@ -60,8 +62,10 @@
 ///
 /// # Arguments
 ///
-/// - `alpha`: whole-aircraft angle of attack (rad).
-/// - `beta`: whole-aircraft sideslip (rad).
+/// - `alpha`: zone-frame angle of attack (rad), from projecting body velocity
+///   into the zone's local coordinate frame. For zones with identity rotation
+///   this equals the whole-aircraft alpha.
+/// - `beta`: zone-frame sideslip (rad), same projection.
 /// - `p`, `q`, `r`: body-axis angular rates (rad/s).
 /// - `x`: zone body-frame longitudinal station (m) from CG; positive forward.
 /// - `y`: zone body-frame spanwise station (m) from CG; positive starboard.
@@ -155,7 +159,7 @@ mod tests {
         assert!((b - 0.1).abs() < 1e-12, "zero rates should not alter β");
     }
 
-    /// All three layers combine additively.
+    /// All three rate layers combine additively.
     #[test]
     fn all_layers_combine_additively() {
         // p=1, q=1, r=1; x=2, y=3; V=10
@@ -164,6 +168,55 @@ mod tests {
         let (a, b) = zone_local_angles(0.1, 0.05, 1.0, 1.0, 1.0, 2.0, 3.0, 10.0);
         assert!((a - 0.2).abs() < 1e-12, "combined α layers, got {a}");
         assert!((b - 0.25).abs() < 1e-12, "combined β layers, got {b}");
+    }
+
+    /// Dihedral effect via zone rotation: projecting body velocity into a zone
+    /// frame that is rotated by the dihedral angle naturally gives more alpha
+    /// on the starboard wing and less on the port wing at positive sideslip.
+    ///
+    /// This test verifies the geometric projection that replaces the old
+    /// explicit dihedral_rad correction layer.
+    #[test]
+    fn zone_rotation_dihedral_gives_correct_alpha_asymmetry() {
+        use bevy_math::{DQuat, DVec3};
+
+        let gamma = 0.0698_f64; // 4 degrees, J3 Cub dihedral
+        let alpha_body = 0.05_f64;
+        let beta = 0.2_f64; // wind from the right
+
+        // Body velocity unit vector.
+        let vel_body = DVec3::new(
+            alpha_body.cos() * beta.cos(),
+            beta.sin(),
+            alpha_body.sin() * beta.cos(),
+        );
+
+        // Starboard wing: tip UP means from_rotation_x(-gamma).
+        let zone_q_stbd = DQuat::from_rotation_x(-gamma);
+        let vel_stbd = zone_q_stbd.inverse() * vel_body;
+        let alpha_stbd = f64::atan2(vel_stbd.z, vel_stbd.x);
+
+        // Port wing: tip UP means from_rotation_x(+gamma).
+        let zone_q_port = DQuat::from_rotation_x(gamma);
+        let vel_port = zone_q_port.inverse() * vel_body;
+        let alpha_port = f64::atan2(vel_port.z, vel_port.x);
+
+        assert!(
+            alpha_stbd > alpha_body,
+            "starboard dihedral zone sees MORE alpha at positive beta: {alpha_stbd:.5} vs body {alpha_body:.5}"
+        );
+        assert!(
+            alpha_port < alpha_body,
+            "port dihedral zone sees LESS alpha at positive beta: {alpha_port:.5} vs body {alpha_body:.5}"
+        );
+        // The asymmetry should be close to the small-angle approximation Γ·β
+        // (not exact because alpha is non-zero and the projection is 3D).
+        let expected_delta = gamma * beta.sin();
+        assert!(
+            (alpha_stbd - alpha_body - expected_delta).abs() < 5e-4,
+            "asymmetry should be near Γ·sin(β) ≈ {expected_delta:.5}, got {:.5}",
+            alpha_stbd - alpha_body
+        );
     }
 
     /// Emergent roll damping: symmetric zones at ±y produce differential lift
@@ -193,11 +246,11 @@ mod tests {
 
         assert!(cr.cl > cl_coeffs.cl, "starboard tip should have higher CL: {:.3} vs {:.3}", cr.cl, cl_coeffs.cl);
 
-        let stab_r = DQuat::from_rotation_y(-al_r);
-        let stab_l = DQuat::from_rotation_y(-al_l);
         let b2w = DQuat::IDENTITY;
-        let wf_r = zone_force_world(&cr, qbar, 16.0, 10.0, 1.6, stab_r, b2w);
-        let wf_l = zone_force_world(&cl_coeffs, qbar, 16.0, 10.0, 1.6, stab_l, b2w);
+        let vel_r = DVec3::new(al_r.cos() * bl_r.cos(), bl_r.sin(), al_r.sin() * bl_r.cos());
+        let vel_l = DVec3::new(al_l.cos() * bl_l.cos(), bl_l.sin(), al_l.sin() * bl_l.cos());
+        let wf_r = zone_force_world(&cr, qbar, 16.0, 10.0, 1.6, al_r, vel_r, b2w);
+        let wf_l = zone_force_world(&cl_coeffs, qbar, 16.0, 10.0, 1.6, al_l, vel_l, b2w);
 
         let arm_r = DVec3::new(0.0, 4.0, 0.0);
         let arm_l = DVec3::new(0.0, -4.0, 0.0);

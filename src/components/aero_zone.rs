@@ -92,6 +92,7 @@ pub struct AeroZone {
     /// additionally scaled by the matching [`super::ControlInputs`] value.
     pub control_role: Option<ControlSurfaceRole>,
     /// Extra drag added when the zone is partially failed. Represents structural drag from
+    /// Extra drag added when the zone is partially failed. Represents structural drag from
     /// deformation.
     ///
     /// `None` (the default) means this zone has no damage-drag model. This is

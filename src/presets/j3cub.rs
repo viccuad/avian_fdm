@@ -57,9 +57,10 @@
 //! Negative sign: positive rudder (nose-right input) creates a leftward side force
 //! at the tail (−Y in body frame), producing a positive (nose-right) yaw torque.
 //!
-//! **Weathercock stability:** `CN_β = 0.0602/rad` requires beta-dependent `CY`,
-//! which is a v2 feature (Group B in the roadmap). The V-tail zone is present as
-//! a structural mass placeholder; its CY is zero for now.
+//! **Weathercock stability:** `CY_β = −CN_β × b / x_arm = −0.0602 × 10.742 / 4.0 ≈ −0.162/rad`.
+//! The vertical fin generates a side force proportional to sideslip that, at the aft
+//! moment arm, produces a restoring yaw moment (positive CN at positive beta).
+//! Implemented as a linear Table1D (CY vs beta) on the vtail zone.
 //!
 //! ## Mass budget
 //!
@@ -139,6 +140,16 @@ const WING_AC_X: f64 = sourced!(-0.10, "Geometry: AC at 25% MAC; tuned so Avian 
 /// Wing height above CG in body frame (m, negative = up since +Z = down).
 /// JSBSim: CG at z = −23.23 in, wing datum at z = 0 in: 23.23 in = 0.590 m above CG.
 const WING_Z: f64 = sourced!(-0.590, "JSBSim:J3Cub_FlightGear.xml: CG z = −23.23 in; wing datum z = 0 -> 23.23 in = 0.590 m");
+
+/// Geometric dihedral of each wing panel (radians).
+/// The J3 Cub has approximately 4 degrees of dihedral. Each wing zone's
+/// `Transform` is rotated by this angle about the body X axis so that velocity
+/// projection into the zone's local frame naturally captures the dihedral
+/// effect (more alpha on the upwind wing at sideslip, providing Cl_beta < 0).
+const WING_DIHEDRAL_RAD: f64 = sourced!(
+    0.0698,
+    "Geometry: J3 Cub wing dihedral approximately 4 deg; provides Cl_beta lateral stability"
+);
 
 // ── Shared alpha / Re breakpoints for Table2D ────────────────────────────────
 
@@ -402,11 +413,24 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             ));
 
             // ── Wing struts ──────────────────────────────────────────────────
+            // J3 Cub has a single N-strut per side running from the lower cabin
+            // longeron to the front spar at roughly 60% of the half-span.
+            // Reference: J3 Cub three-view drawings, JSBSim FlightGear model.
+            //
+            // Fuselage end: at the cabin side (y = ±0.55m, near the outer face
+            // of the fuse_fwd collider at ±0.60), at the lower cabin longeron
+            // (z = +0.15m, just below the cabin floor at z = -0.10m).
+            //
+            // Wing end: at y = ±3.2m (60% of 5.37m half-span), on the dihedral
+            // plane so the strut meets the actual wing surface:
+            //   z_wing = WING_Z - |y| * sin(Γ)
+            //
             // Mass/structural contribution; drag included in wing CD_basic.
-            // Colliders are rotated to align with the strut direction.
             for (sign, _name) in [(-1.0_f32, "L-strut"), (1.0, "R-strut")] {
-                let fuse_attach = Vec3::new(0.20, 0.25 * sign, 0.30);
-                let wing_attach = Vec3::new(-0.10 + 0.35, 2.5 * sign, WING_Z as f32);
+                let strut_y = 3.2_f32;
+                let wing_z = (WING_Z - strut_y as f64 * WING_DIHEDRAL_RAD.sin()) as f32;
+                let fuse_attach = Vec3::new(WING_AC_X as f32, 0.30 * sign, 0.15);
+                let wing_attach = Vec3::new(WING_AC_X as f32, strut_y * sign, wing_z);
                 let mid = (fuse_attach + wing_attach) * 0.5;
                 let dir = wing_attach - fuse_attach;
                 let length = dir.length();
@@ -608,6 +632,15 @@ pub fn wing_zone(
     density: ColliderDensity,
 ) -> impl Bundle {
     let ac_offset = Vec3::new((ac_x_m - x_m) as f32, 0.0, 0.0);
+    // Place the zone center on the dihedral plane so that adjacent rotated
+    // panels are coplanar and form a continuous wing surface.
+    // At spanwise station y_m, the wing surface sits at:
+    //   z = WING_Z - |y_m| * sin(Γ)
+    // (tips are higher = more negative Z, since +Z is down in body frame).
+    let z_m = WING_Z - y_m.abs() * WING_DIHEDRAL_RAD.sin();
+    // Rotate the zone about the body X axis by the dihedral angle so its
+    // local frame matches the tilted panel surface.
+    let dihedral_rot = Quat::from_rotation_x(-(WING_DIHEDRAL_RAD * y_m.signum()) as f32);
     (
         AeroZoneBundle {
             zone: AeroZone {
@@ -618,11 +651,8 @@ pub fn wing_zone(
             },
             zone_force: ZoneForce::default(),
             collider,
-            transform: Transform::from_xyz(
-                x_m as f32,
-                y_m as f32,
-                WING_Z as f32,
-            ),
+            transform: Transform::from_xyz(x_m as f32, y_m as f32, z_m as f32)
+                .with_rotation(dihedral_rot),
             global_transform: GlobalTransform::default(),
         },
         density,
@@ -646,6 +676,8 @@ pub fn aileron_zone(
     // Wing TE is at WING_AC_X - chord/2 = -0.10 - 0.40 = -0.50.
     // Aileron chord = 0.35, center = -0.50 + 0.175 = -0.325.
     let aileron_x = (WING_AC_X - 0.40 + 0.175) as f32; // -0.325
+    let z_m = WING_Z - y_m.abs() * WING_DIHEDRAL_RAD.sin();
+    let dihedral_rot = Quat::from_rotation_x(-(WING_DIHEDRAL_RAD * y_m.signum()) as f32);
     (
         AeroZoneBundle {
             zone: AeroZone {
@@ -660,11 +692,8 @@ pub fn aileron_zone(
             },
             zone_force: ZoneForce::default(),
             collider,
-            transform: Transform::from_xyz(
-                aileron_x,
-                y_m as f32,
-                WING_Z as f32,
-            ),
+            transform: Transform::from_xyz(aileron_x, y_m as f32, z_m as f32)
+                .with_rotation(dihedral_rot),
             global_transform: GlobalTransform::default(),
         },
         density,
@@ -767,17 +796,33 @@ pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
     )
 }
 
-/// Vertical tail zone: structural mass placeholder.
+/// Vertical tail zone: structural mass and weathercock stability.
 ///
-/// Full weathercock stability (CY vs β) is Group B (v2 feature). Until then,
-/// CY = 0 and this zone provides only the structural mass at the tail.
+/// `CY_β = −CN_β × b / x_arm = −0.0602 × 10.742 / 4.0 ≈ −0.162/rad`
+///
+/// Negative CY_β: positive sideslip (wind from right) produces a leftward (−Y) force
+/// at the aft tail, generating a restoring (nose-right) yaw moment that opposes
+/// the sideslip. This is the primary weathercock stability of the aircraft.
 pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
     (
         AeroZoneBundle {
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
                 cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
-                cy: AeroCoeff::Absent, // TODO v2: beta-dependent CY_beta
+                // CY_β = −0.162/rad: linear side force vs sideslip (weathercock stability).
+                // Clamped at ±PI/2 where the fin would stall.
+                cy: AeroCoeff::Table1D {
+                    breakpoints: vec![
+                        sourced!(-1.5708, "−PI/2 rad (−90 deg): max negative sideslip"),
+                        sourced!( 0.0,    "zero sideslip: no fin side force"),
+                        sourced!( 1.5708, "+PI/2 rad (+90 deg): max positive sideslip"),
+                    ],
+                    values: vec![
+                        sourced!( 0.254, "CY at −90 deg: 0.162 × PI/2 ≈ 0.254"),
+                        sourced!( 0.0,   "CY at zero beta"),
+                        sourced!(-0.254, "CY at +90 deg: −0.162 × PI/2 ≈ −0.254"),
+                    ],
+                },
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),

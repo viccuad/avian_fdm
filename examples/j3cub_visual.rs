@@ -29,7 +29,7 @@
 //!
 //! Press **Escape** to quit.
 
-use avian3d::prelude::{AngularVelocity, LinearVelocity, PhysicsPlugins};
+use avian3d::prelude::{AngularVelocity, LinearVelocity, PhysicsPlugins, Rotation};
 use avian_fdm::prelude::*;
 use avian_fdm::presets::j3cub;
 use bevy::input::gamepad::{Gamepad, GamepadAxis};
@@ -50,11 +50,15 @@ fn main() {
         .add_plugins(PhysicsPlugins::default())
         .add_plugins(AircraftFdmPlugin::default())
         .add_plugins(AircraftFdmDebugPlugin)
-        // At cruise (~4300 N lift), the total-force arrow will be ~7 m long —
-        // comparable to the aircraft fuselage, so it's easy to read.
+        // The net force (white) shows deviations from trim equilibrium.
+        // Scale chosen so a 500 N net force produces a 5 m arrow: easy to read.
+        // The total aero and weight arrows are turned off so the net force
+        // is not visually dwarfed by the ~4000 N lift/weight arrows.
         .insert_gizmo_config(
             FdmGizmos {
                 force_scale: 1.0 / 600.0,
+                total_force_color: None,
+                weight_color: None,
                 ..FdmGizmos::default()
             },
             GizmoConfig::default(),
@@ -69,6 +73,7 @@ fn main() {
                 orbit_camera,
                 toggle_colliders,
                 update_hud,
+                debug_print_rotation,
             ),
         )
         .run();
@@ -119,7 +124,10 @@ fn spawn_aircraft(mut commands: Commands) {
     );
     commands.entity(root).insert((
         LinearVelocity(Vec3::new(27.0, 0.0, 0.0)),
-        ControlInputs { throttle: 0.6, ..default() },
+        ControlInputs {
+            throttle: 0.6,
+            ..default()
+        },
     ));
 }
 
@@ -169,17 +177,17 @@ fn spawn_legend(mut commands: Commands, store: Res<GizmoConfigStore>) {
 
     // (prefix, description, channel colour)
     let rows: &[(&str, &str, Option<Color>)] = &[
-        ("→ ", "per-zone aero force",  config.lift_color),
-        ("→ ", "engine thrust",        config.thrust_color),
-        ("→ ", "total aero+thrust",    config.total_force_color),
-        ("→ ", "weight",               config.weight_color),
-        ("→ ", "net force (~0 at trim)",config.resultant_color),
-        ("~ ", "pitch moment",         config.pitch_moment_color),
-        ("~ ", "roll moment",          config.roll_moment_color),
-        ("~ ", "yaw moment",           config.yaw_moment_color),
-        ("— ", "relative wind / AoA",  config.wind_color),
-        ("○ ", "CG",                   config.cg_color),
-        ("○ ", "zone AC",              config.ac_color),
+        ("→ ", "per-zone aero force", config.lift_color),
+        ("→ ", "engine thrust", config.thrust_color),
+        ("→ ", "total aero+thrust", config.total_force_color),
+        ("→ ", "weight", config.weight_color),
+        ("→ ", "net force (~0 at trim)", config.resultant_color),
+        ("~ ", "pitch moment", config.pitch_moment_color),
+        ("~ ", "roll moment", config.roll_moment_color),
+        ("~ ", "yaw moment", config.yaw_moment_color),
+        ("— ", "relative wind / AoA", config.wind_color),
+        ("○ ", "CG", config.cg_color),
+        ("○ ", "zone AC", config.ac_color),
     ];
 
     commands.spawn((
@@ -205,8 +213,6 @@ fn spawn_legend(mut commands: Commands, store: Res<GizmoConfigStore>) {
     });
 }
 
-
-
 /// Resets the aircraft to its initial state when **R** is pressed.
 ///
 /// Restores position, orientation, velocity, and control inputs without
@@ -231,10 +237,12 @@ fn restart_aircraft(
         *transform = Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(level);
         *lin_vel = LinearVelocity(Vec3::new(27.0, 0.0, 0.0));
         *ang_vel = AngularVelocity::default();
-        *ctrl = ControlInputs { throttle: 0.6, ..default() };
+        *ctrl = ControlInputs {
+            throttle: 0.6,
+            ..default()
+        };
     }
 }
-
 
 ///
 /// Keyboard deflections are binary (full deflection while key held).
@@ -305,7 +313,6 @@ fn handle_input(
     }
 }
 
-
 /// Orbit camera: left-drag to rotate, scroll to zoom, always looks at the aircraft.
 fn orbit_camera(
     mut orbit: ResMut<OrbitCamera>,
@@ -351,11 +358,20 @@ fn toggle_colliders(keys: Res<ButtonInput<KeyCode>>, mut show: ResMut<ShowCollid
 
 /// Updates the flight-state HUD in the upper-left corner.
 fn update_hud(
-    flight_query: Query<(&FlightState, &ControlInputs), With<AircraftGeometry>>,
+    flight_query: Query<
+        (
+            &FlightState,
+            &ControlInputs,
+            &Transform,
+            &avian3d::prelude::ConstantForce,
+            &avian3d::prelude::ComputedMass,
+        ),
+        With<AircraftGeometry>,
+    >,
     time: Res<Time>,
     mut hud: Query<&mut Text, With<HudText>>,
 ) {
-    let Ok((fs, ctrl)) = flight_query.single() else {
+    let Ok((fs, ctrl, tf, cf, mass)) = flight_query.single() else {
         return;
     };
     let Ok(mut text) = hud.single_mut() else {
@@ -363,22 +379,71 @@ fn update_hud(
     };
     let t = time.elapsed_secs();
 
+    // Euler yaw from the Bevy Transform rotation (y-axis rotation).
+    let (yaw_sin, yaw_cos) = (tf.rotation.y, tf.rotation.w);
+    let yaw_deg = 2.0 * f32::atan2(yaw_sin, yaw_cos).to_degrees();
+
+    // Net force = total aero - weight.
+    let weight_y = mass.value() * 9.806_65;
+    let net = cf.0 - Vec3::new(0.0, weight_y, 0.0);
+
     text.0 = format!(
         "t   = {t:.1} s\n\
          alt = {alt:.0} m\n\
          TAS = {tas:.1} m/s\n\
-         AoA = {aoa:+.2}°\n\
+         AoA = {aoa:+.2}  beta = {beta:+.2}°\n\
+         yaw = {yaw:+.1}°\n\
          q̄   = {q:.0} Pa\n\
          Re  = {re:.2e}\n\
-         thr = {thr:.0}%  elv = {elv:+.2}  ail = {ail:+.2}  rud = {rud:+.2}",
+         thr = {thr:.0}%  elv = {elv:+.2}  ail = {ail:+.2}  rud = {rud:+.2}\n\
+         net = ({nx:+.0}, {ny:+.0}, {nz:+.0}) N",
         alt = fs.altitude_m,
         tas = fs.airspeed_ms,
         aoa = fs.alpha_rad.to_degrees(),
+        beta = fs.beta_rad.to_degrees(),
+        yaw = yaw_deg,
         q = fs.dynamic_pressure_pa,
         re = fs.reynolds_number,
         thr = ctrl.throttle * 100.0,
         elv = ctrl.elevator,
         ail = ctrl.aileron,
         rud = ctrl.rudder,
+        nx = net.x,
+        ny = net.y,
+        nz = net.z,
     );
+}
+
+/// Prints Avian Rotation vs Bevy Transform rotation every 0.25 seconds to
+/// check whether the physics rotation tracks the visual rotation.
+fn debug_print_rotation(
+    query: Query<
+        (
+            &Rotation,
+            &Transform,
+            &FlightState,
+            &avian3d::prelude::ConstantForce,
+        ),
+        With<AircraftGeometry>,
+    >,
+    time: Res<Time>,
+    mut last: Local<f32>,
+) {
+    if time.elapsed_secs() - *last < 0.25 {
+        return;
+    }
+    *last = time.elapsed_secs();
+    for (avian_rot, tf, fs, cf) in &query {
+        let avian_q = avian_rot.0;
+        let bevy_q = tf.rotation;
+        println!(
+            "[debug] t={:.2}  avian_rot=({:.3},{:.3},{:.3},{:.3})  bevy_rot=({:.3},{:.3},{:.3},{:.3})  alpha={:.2}  beta={:.2}  cf0=({:.0},{:.0},{:.0})",
+            time.elapsed_secs(),
+            avian_q.x, avian_q.y, avian_q.z, avian_q.w,
+            bevy_q.x,  bevy_q.y,  bevy_q.z,  bevy_q.w,
+            fs.alpha_rad.to_degrees(),
+            fs.beta_rad.to_degrees(),
+            cf.0.x, cf.0.y, cf.0.z,
+        );
+    }
 }

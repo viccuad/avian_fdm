@@ -114,7 +114,12 @@ pub fn compute_aero_forces(
         let c = geo.chord_m;
 
         let body_to_world = DQuat::from_array(rot.0.to_array().map(|x| x as f64));
-        let stab_to_body_global = DQuat::from_rotation_y(-alpha);
+        // Unit velocity vector in body frame, reconstructed from alpha and beta.
+        // Used for drag direction: drag must always oppose the full 3D velocity,
+        // including the sideslip component, not just the in-plane component.
+        let (sa, ca) = (alpha.sin(), alpha.cos());
+        let (sb, cb) = (beta.sin(), beta.cos());
+        let vel_body_unit_global = DVec3::new(ca * cb, sb, sa * cb);
         let com_world: Vec3 = pos.0 + rot.0 * com.0;
         let use_lod = lod_damping.is_some();
 
@@ -137,13 +142,32 @@ pub fn compute_aero_forces(
                 let zone_body_from_cg: DVec3 =
                     to_dvec3(zone_transform.translation) - to_dvec3(com.0);
 
+                // Zone rotation in body frame as a double-precision quaternion.
+                let zone_q = DQuat::from_array(zone_transform.rotation.to_array().map(|x| x as f64));
+
                 // Step 0: per-zone local α/β (skipped in LOD mode).
-                let (alpha_local, beta_local, stab_to_body_local) = if use_lod {
-                    (alpha, beta, stab_to_body_global)
+                //
+                // In full mode: project the body-frame velocity unit vector into
+                // the zone's local frame. This naturally captures any geometric
+                // orientation effect (dihedral, sweep, anhedral, etc.) without
+                // needing explicit correction parameters. Angular-rate corrections
+                // (roll/pitch/yaw) are then added on top.
+                //
+                // In LOD mode: use whole-aircraft α/β and body-to-world rotation
+                // directly (zone geometry is ignored as an approximation).
+                let (alpha_local, beta_local, vel_zone_unit_local, zone_to_world) = if use_lod {
+                    (alpha, beta, vel_body_unit_global, body_to_world)
                 } else {
+                    // Velocity in zone's local frame.
+                    let vel_zone = zone_q.inverse() * vel_body_unit_global;
+                    let alpha_zone = f64::atan2(vel_zone.z, vel_zone.x);
+                    let beta_zone = f64::atan2(
+                        vel_zone.y,
+                        (vel_zone.x * vel_zone.x + vel_zone.z * vel_zone.z).sqrt(),
+                    );
                     let (al, bl) = zone_local_angles(
-                        alpha,
-                        beta,
+                        alpha_zone,
+                        beta_zone,
                         p,
                         q,
                         r,
@@ -151,7 +175,9 @@ pub fn compute_aero_forces(
                         zone_body_from_cg.y,
                         v,
                     );
-                    (al, bl, DQuat::from_rotation_y(-al))
+                    let (sal, cal) = (al.sin(), al.cos());
+                    let (sbl, cbl) = (bl.sin(), bl.cos());
+                    (al, bl, DVec3::new(cal * cbl, sbl, sal * cbl), body_to_world * zone_q)
                 };
 
                 // Step 1: coefficient evaluation.
@@ -168,7 +194,7 @@ pub fn compute_aero_forces(
 
                 // Step 2: world-space force and torque.
                 let wf =
-                    zone_force_world(&coeffs, qbar, s, b, c, stab_to_body_local, body_to_world);
+                    zone_force_world(&coeffs, qbar, s, b, c, alpha_local, vel_zone_unit_local, zone_to_world);
 
                 if !wf.force.is_finite() || !wf.torque.is_finite() {
                     warn_once!("Non-finite aero force/torque on zone: zeroed");
@@ -200,8 +226,7 @@ pub fn compute_aero_forces(
         if let Some(id) = induced_drag {
             let ar = b * b / s;
             let cd_i = total_cl * total_cl / (std::f64::consts::PI * id.oswald_factor * ar);
-            let drag_world =
-                body_to_world * (stab_to_body_global * DVec3::new(-cd_i * qbar * s, 0.0, 0.0));
+            let drag_world = body_to_world * (vel_body_unit_global * (-cd_i * qbar * s));
             cf.0 += drag_world.as_vec3();
         }
 
