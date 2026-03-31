@@ -508,5 +508,91 @@ fn jsbsim_regenerate_reference() {
     println!("  ✓ Committed reference CSV matches fresh JSBSim run.");
 }
 
+// ── Inertia tensor verification ──────────────────────────────────────────────
 
+/// JSBSim J3 Cub inertia values (slug*ft2 converted to kg*m2).
+///
+/// Source: J3Cub.xml mass_balance section.
+///   Ixx = 538.01 slug*ft2 = 729.4 kg*m2
+///   Iyy = 386.81 slug*ft2 = 524.4 kg*m2
+///   Izz = 871.03 slug*ft2 = 1181.0 kg*m2
+///   Mass = 902.22 lb = 409.2 kg
+const JSBSIM_IXX: f64 = 538.01 * 1.35582;
+const JSBSIM_IYY: f64 = 386.81 * 1.35582;
+const JSBSIM_IZZ: f64 = 871.03 * 1.35582;
+const JSBSIM_MASS_KG: f64 = 902.22 * 0.453592;
 
+/// Verify that Avian's auto-computed mass properties from J3 Cub zone
+/// colliders are in the right ballpark compared to JSBSim.
+///
+/// This test spawns the aircraft, runs a few frames for Avian to compute
+/// mass properties, and prints the comparison. The current collider layout
+/// is a simplified approximation (cuboids), so we allow generous tolerances
+/// and primarily use this for visibility rather than hard pass/fail.
+#[test]
+fn j3cub_inertia_comparison() {
+    let mut app = App::new();
+
+    app.add_plugins(MinimalPlugins)
+        .add_plugins(bevy::transform::TransformPlugin)
+        .add_plugins(bevy::asset::AssetPlugin::default())
+        .add_plugins(PhysicsPlugins::default())
+        .add_plugins(AircraftFdmPlugin::default());
+
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(
+        Duration::from_secs_f64(1.0 / 60.0),
+    ));
+
+    app.add_systems(Startup, |mut commands: Commands| {
+        let initial_rot = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
+        j3cub::spawn(
+            &mut commands,
+            Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(initial_rot),
+        );
+    });
+
+    app.finish();
+
+    // Run a few frames so Avian computes mass properties from colliders.
+    for _ in 0..5 {
+        app.update();
+    }
+
+    // Read computed mass properties.
+    let mut found = false;
+    let world = app.world_mut();
+    let mut query = world.query::<(
+        &ComputedMass,
+        &ComputedAngularInertia,
+        &ComputedCenterOfMass,
+    )>();
+
+    for (mass, inertia, com) in query.iter(&world) {
+        found = true;
+        let m = mass.value() as f64;
+        let (principal, local_frame) = inertia.principal_angular_inertia_with_local_frame();
+        let ixx = principal.x as f64;
+        let iyy = principal.y as f64;
+        let izz = principal.z as f64;
+
+        println!("\n-- J3 Cub Inertia Comparison --------------------------------");
+        println!("  {:>20} {:>10} {:>10} {:>8}", "", "Avian", "JSBSim", "Ratio");
+        println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Mass (kg)", m, JSBSIM_MASS_KG, m / JSBSIM_MASS_KG);
+        println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Ixx (kg*m2)", ixx, JSBSIM_IXX, ixx / JSBSIM_IXX);
+        println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Iyy (kg*m2)", iyy, JSBSIM_IYY, iyy / JSBSIM_IYY);
+        println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Izz (kg*m2)", izz, JSBSIM_IZZ, izz / JSBSIM_IZZ);
+        println!("  {:>20} {:?}", "CG offset (m)", com.0);
+        println!("  {:>20} {:?}", "Inertia frame", local_frame);
+        println!("------------------------------------------------------------");
+
+        // Soft assertions: log but don't fail if off by more than 50%.
+        // The simplified cuboid colliders are approximations.
+        let mass_ratio = m / JSBSIM_MASS_KG;
+        assert!(
+            mass_ratio > 0.5 && mass_ratio < 2.0,
+            "Mass way off: {m:.1} kg (JSBSim: {JSBSIM_MASS_KG:.1} kg, ratio: {mass_ratio:.2})"
+        );
+    }
+
+    assert!(found, "No aircraft entity found with mass properties");
+}
