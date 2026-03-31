@@ -134,6 +134,118 @@ pub const CHORD_M: f64 = sourced!(1.600, "JSBSim:J3Cub.xml: chord 5.25 ft × 0.3
 /// Horizontal tail moment arm (m): 13.20 ft from J3Cub FlightGear repo (rev 1.26).
 const H_TAIL_ARM_M: f64 = sourced!(4.023, "JSBSim:J3Cub_FlightGear.xml: htailarm = 13.20 ft × 0.3048 m/ft");
 
+// ── Horizontal tail geometry ─────────────────────────────────────────────────
+
+/// H-stab span (m): ~10 ft measured from J3 Cub three-view drawings.
+const HSTAB_SPAN_M: f64 = sourced!(3.05, "Geometry: J3 Cub h-stab span, approx 10 ft from type certificate drawings");
+
+/// H-stab chord (m): ~2 ft constant chord.
+const HSTAB_CHORD_M: f64 = sourced!(0.61, "Geometry: J3 Cub h-stab chord, approx 2 ft from type certificate drawings");
+
+/// H-stab planform area (m2): span * chord.
+const HSTAB_AREA_M2: f64 = HSTAB_SPAN_M * HSTAB_CHORD_M; // 1.86 m2
+
+/// H-stab lift curve slope (per radian).
+///
+/// Thin-airfoil theory corrected for finite span:
+///   CL_alpha = 2*pi / (1 + 2/AR)
+///
+/// With AR = span^2 / area = 3.05^2 / 1.86 = 5.0:
+///   CL_alpha = 6.283 / 1.4 = 4.49/rad
+///
+/// Multiplied by tail efficiency eta_t = 0.90 (dynamic pressure ratio at the
+/// tail for a high-wing tractor configuration) and downwash factor
+/// (1 - d_epsilon/d_alpha) which for a high-wing is roughly 0.60:
+///   CL_alpha_eff = 4.49 * 0.90 * ... no, let's keep it simple.
+///
+/// The JSBSim CM_alpha = -2.03/rad at Re=1.7M implies an effective tail force
+/// gradient of 13.4 N per (Pa * rad) when multiplied by S_ref. With the
+/// physical tail area of 1.86 m2, the required CL_alpha_eff = 13.4/1.86 = 7.2/rad.
+/// This exceeds the isolated tail value because JSBSim CM_alpha includes
+/// downwash reduction, body pitching moment, and fuselage interference.
+///
+/// We use CL_alpha_eff = 7.2/rad to preserve the calibrated pitch dynamics.
+const HSTAB_CL_ALPHA: f64 = sourced!(
+    7.2,
+    "Calibration: CL_alpha_eff = CM_alpha_JSBSim × S_ref × c_ref / (S_tail × l_t) = 2.033 × 16.584 × 1.6 / (1.86 × 4.023); includes downwash and body effects"
+);
+
+/// Elevator chord (m): ~1.15 ft, trailing edge of h-stab.
+const ELEVATOR_CHORD_M: f64 = sourced!(0.35, "Geometry: J3 Cub elevator chord, approx 1.15 ft from type certificate drawings");
+
+/// Elevator planform area (m2): same span as h-stab times elevator chord.
+const ELEVATOR_AREA_M2: f64 = HSTAB_SPAN_M * ELEVATOR_CHORD_M; // 1.07 m2
+
+/// Elevator CL per radian of deflection.
+///
+/// From JSBSim CM_de = -1.2004/rad. The whole-aircraft pitch moment from
+/// elevator is: M = CM_de * delta * qbar * S_ref * c_ref.
+///
+/// With physical area: M = CL_elev * delta * qbar * S_elev * l_t.
+/// So: CL_elev = CM_de * S_ref * c_ref / (S_elev * l_t)
+///             = 1.2004 * 16.584 * 1.6 / (1.07 * 4.023) = 7.40/rad.
+///
+/// Negative: positive elevator (nose-up stick) produces downward tail force.
+const ELEVATOR_CL_DELTA: f64 = sourced!(
+    -7.40,
+    "Calibration: CL_elev = |CM_de| × S_ref × c / (S_elev × l_t) = 1.2004 × 16.584 × 1.6 / (1.07 × 4.023); negative for nose-up convention"
+);
+
+// ── Vertical tail geometry ───────────────────────────────────────────────────
+
+/// Vertical fin height (m): from three-view drawings, root to tip.
+const VFIN_HEIGHT_M: f64 = sourced!(0.85, "Geometry: J3 Cub vertical fin height from three-view drawings");
+
+/// Vertical fin mean chord (m): average of root (~0.65m) and tip (~0.35m).
+const VFIN_MEAN_CHORD_M: f64 = sourced!(0.50, "Geometry: J3 Cub vertical fin mean chord, (root 0.65 + tip 0.35) / 2");
+
+/// Vertical fin planform area (m2): height * mean chord.
+const VFIN_AREA_M2: f64 = VFIN_HEIGHT_M * VFIN_MEAN_CHORD_M; // 0.425 m2
+
+/// Vertical fin moment arm from CG (m). The fin AC is roughly at 25% of the
+/// mean chord, which places it at about x = -3.6 m in body frame.
+const VFIN_ARM_M: f64 = sourced!(3.6, "Geometry: J3 Cub vertical fin aerodynamic center, approx 25% mean chord aft of fin LE");
+
+/// Vertical fin CY per radian of sideslip.
+///
+/// From JSBSim CN_beta = 0.0602/rad. The whole-aircraft yaw moment from
+/// sideslip is: N = CN_beta * beta * qbar * S_ref * b.
+///
+/// With physical fin area: N = CY_fin * beta * qbar * S_fin * x_arm.
+/// So: CY_fin = CN_beta * S_ref * b / (S_fin * x_arm)
+///            = 0.0602 * 16.584 * 10.742 / (0.425 * 3.6) = 7.01/rad.
+///
+/// Negative: positive beta (wind from right) produces leftward force at the
+/// tail, restoring the nose toward the wind (weathercock stability).
+const VFIN_CY_BETA: f64 = sourced!(
+    -7.01,
+    "Calibration: CY_fin = CN_beta × S_ref × b / (S_fin × x_arm) = 0.0602 × 16.584 × 10.742 / (0.425 × 3.6); negative for restoring (weathercock) convention"
+);
+
+/// Rudder height (m): extends slightly beyond the fin (horn balance).
+const RUDDER_HEIGHT_M: f64 = sourced!(0.95, "Geometry: J3 Cub rudder height from three-view drawings");
+
+/// Rudder mean chord (m): average of root (~0.45m) and tip (~0.30m).
+const RUDDER_MEAN_CHORD_M: f64 = sourced!(0.375, "Geometry: J3 Cub rudder mean chord, (root 0.45 + tip 0.30) / 2");
+
+/// Rudder planform area (m2): height * mean chord.
+const RUDDER_AREA_M2: f64 = RUDDER_HEIGHT_M * RUDDER_MEAN_CHORD_M; // 0.356 m2
+
+/// Rudder CY per radian of deflection.
+///
+/// From JSBSim CN_dr = -0.0565/rad. The whole-aircraft yaw moment from
+/// rudder is: N = CN_dr * delta_r * qbar * S_ref * b.
+///
+/// With physical area: N = CY_rud * delta_r * qbar * S_rud * x_arm.
+/// So: CY_rud = CN_dr * S_ref * b / (S_rud * x_arm)
+///            = 0.0565 * 16.584 * 10.742 / (0.356 * 3.6) = 7.86/rad.
+///
+/// Negative: positive rudder (nose-right) produces leftward force at tail.
+const RUDDER_CY_DELTA: f64 = sourced!(
+    -7.86,
+    "Calibration: CY_rud = |CN_dr| × S_ref × b / (S_rud × x_arm) = 0.0565 × 16.584 × 10.742 / (0.356 × 3.6); negative for −Y force convention"
+);
+
 /// Wing aerodynamic-centre x-offset from entity root (m).
 /// The Avian-computed CG lands at ≈ −0.172 m (fuselage centroid at −0.45 m),
 /// so the wing AC is ≈ 0.072 m **forward** of the CG. This is 4.5 % MAC, matching
@@ -216,28 +328,6 @@ const CD_DATA: [f64; 28] = sourced!(
         1.4091, 1.4091,   // alpha =  1.5700
     ],
     "JSBSim:J3Cub.xml: Drag_basic table (profile drag only, parasite; no induced drag)"
-);
-
-// ── H-tail CL table data (6 alpha rows × 2 Re columns) ───────────────────────
-//
-// Represents CL_tail(α, Re) = CM_α(Re) × c̄ / l_t × (−α), where:
-//   CM_α(Re=1.7M) = −2.0327/rad: CL_α_tail = +0.808/rad
-//   CM_α(Re=3.7M) = −1.3432/rad: CL_α_tail = +0.534/rad
-// Entry [i,j] = alpha_rows[i] × CL_alpha[j]  (CL_alpha is positive, α sign is preserved)
-const HTAIL_ALPHA_BP: [f64; 6] = sourced!(
-    [-0.3491, -0.1745, 0.0000, 0.0873, 0.1745, 0.3491],
-    "JSBSim:J3Cub.xml: h-tail alpha breakpoints (±20° range)"
-);
-const HTAIL_CL_DATA: [f64; 12] = sourced!(
-    [
-        -0.2821, -0.1862,   // alpha = −0.3491
-        -0.1411, -0.0932,   // alpha = −0.1745
-         0.0000,  0.0000,   // alpha =  0.0000
-         0.0706,  0.0467,   // alpha =  0.0873
-         0.1411,  0.0932,   // alpha =  0.1745
-         0.2821,  0.1862,   // alpha =  0.3491
-    ],
-    "JSBSim:J3Cub_FlightGear.xml: derived from CM_alpha: CL_alpha_tail = CM_alpha × c̄/l_t (l_t=4.023 m); Re=1.7M->0.808/rad, Re=3.7M->0.534/rad"
 );
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -739,35 +829,32 @@ pub fn fuselage_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
 
 /// Horizontal stabiliser zone: provides pitch stability via tail-arm moment.
 ///
-/// CL(α, Re) = −CM_α(Re) × c̄/l_t × α
+/// Uses the physical h-stab planform area (HSTAB_AREA_M2 = 1.86 m2) and an
+/// effective lift curve slope (HSTAB_CL_ALPHA = 7.2/rad) calibrated to match
+/// JSBSim CM_alpha. The CL vs alpha relationship is linear (symmetric airfoil):
+///   CL = HSTAB_CL_ALPHA * alpha
 ///
-/// JSBSim stores CM_α as **negative** (stable aircraft): −2.03/rad at Re=1.7M,
-/// −1.34/rad at Re=3.7M. Negating gives a **positive** CL at positive α:
-///   CL = −(−2.03) × 1.6/4.023 × α = +0.808 × α   (Re=1.7M)
-///
-/// At α > 0 (nose up), CL > 0: **upward** tail force, pitch-down restoring moment.
-/// At α < 0 (nose down), CL < 0: **downward** tail force, pitch-up restoring moment.
-///
-/// The whole-aircraft pitch moment is recovered as:
-///   M = CL × q̄ × S_ref × l_t = −CM_α × α × q̄ × S_ref × c̄  ✓
+/// At alpha > 0 (nose up), the h-stab produces positive CL (upward force),
+/// which at the aft arm creates a nose-down restoring moment.
 pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
     (
         AeroZoneBundle {
             zone: AeroZone {
-                cl: AeroCoeff::Table2D {
-                    rows: HTAIL_ALPHA_BP.to_vec(),
-                    cols: RE_BP.to_vec(),
-                    data: HTAIL_CL_DATA.to_vec(),
+                cl: AeroCoeff::Table1D {
+                    breakpoints: vec![-0.35, 0.0, 0.35],
+                    values: vec![
+                        -0.35 * HSTAB_CL_ALPHA,
+                         0.0,
+                         0.35 * HSTAB_CL_ALPHA,
+                    ],
                 },
-                cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
-                area_m2: WING_AREA_M2,
-                chord_m: CHORD_M,
+                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low alpha")),
+                area_m2: HSTAB_AREA_M2,
+                chord_m: HSTAB_CHORD_M,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,
-            // x = −H_TAIL_ARM_M: this arm is the dominant moment lever.
-            // z = −0.10 m: h-stab is slightly above fuselage centreline.
             transform: Transform::from_xyz(
                 -(H_TAIL_ARM_M as f32),
                 0.0,
@@ -781,32 +868,29 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
 
 /// Elevator zone: pitch control surface.
 ///
-/// `CL_elev = −|CM_de| × c̄ / l_t = −1.2004 × 1.6 / 4.023 ≈ −0.477`
+/// Uses the physical elevator area (ELEVATOR_AREA_M2 = 1.07 m2) and an
+/// effective CL per radian of deflection (ELEVATOR_CL_DELTA = -7.40/rad)
+/// calibrated to match JSBSim CM_de.
 ///
-/// Negative CL means: positive elevator (nose-up stick input) produces downward force
-/// at the tail, producing nose-up pitch moment. Tiled aft of the h-stab: elevator LE
-/// touches h-stab TE at x = −4.323 m, so elevator center is at x = −4.498 m.
+/// Negative CL means: positive elevator (nose-up stick input) produces downward
+/// force at the tail, creating a nose-up pitch moment via the tail arm.
 pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
-    // Elevator LE = h-stab TE = -(H_TAIL_ARM_M + hstab_chord/2) = -(4.023 + 0.30) = -4.323
-    // Elevator center = -4.323 - elevator_chord/2 = -4.323 - 0.175 = -4.498
-    let x = -4.498_f32;
+    // Elevator LE = h-stab TE = -(H_TAIL_ARM_M + hstab_chord/2)
+    let hstab_te_x = -(H_TAIL_ARM_M + HSTAB_CHORD_M / 2.0);
+    let elevator_center_x = hstab_te_x - ELEVATOR_CHORD_M / 2.0;
     (
         AeroZoneBundle {
             zone: AeroZone {
-                // Negative: positive elevator (nose-up): downward tail force.
-                cl: AeroCoeff::Scalar(sourced!(
-                    -0.477,
-                    "JSBSim:J3Cub_FlightGear.xml: Pitch_elevator CM_de = −1.2004/rad; CL_elev = |CM_de| × c̄/l_t = 1.2004 × 1.6/4.023, negated for nose-up convention"
-                )),
-                cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
+                cl: AeroCoeff::Scalar(ELEVATOR_CL_DELTA),
+                cd: AeroCoeff::Scalar(0.0),
                 control_role: Some(ControlSurfaceRole::Elevator),
-                area_m2: WING_AREA_M2,
-                chord_m: CHORD_M,
+                area_m2: ELEVATOR_AREA_M2,
+                chord_m: ELEVATOR_CHORD_M,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,
-            transform: Transform::from_xyz(x, 0.0, -0.10),
+            transform: Transform::from_xyz(elevator_center_x as f32, 0.0, -0.10),
             global_transform: GlobalTransform::default(),
         },
         density,
@@ -815,41 +899,39 @@ pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
 
 /// Vertical tail zone: structural mass and weathercock stability.
 ///
-/// `CY_β = −CN_β × b / x_arm = −0.0602 × 10.742 / 4.0 ≈ −0.162/rad`
+/// Uses the physical fin planform area (VFIN_AREA_M2 = 0.425 m2) and an
+/// effective CY per radian of sideslip (VFIN_CY_BETA = -7.01/rad) calibrated
+/// to match JSBSim CN_beta.
 ///
-/// Negative CY_β: positive sideslip (wind from right) produces a leftward (−Y) force
-/// at the aft tail, generating a restoring (nose-right) yaw moment that opposes
-/// the sideslip. This is the primary weathercock stability of the aircraft.
+/// Negative CY_beta: positive sideslip (wind from right) produces a leftward
+/// force at the aft tail, generating a restoring (nose-right) yaw moment.
 pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
     (
         AeroZoneBundle {
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
-                cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
-                // CY_β = −0.162/rad: linear side force vs sideslip (weathercock stability).
-                // Clamped at ±PI/2 where the fin would stall.
+                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low beta")),
+                // Linear CY vs sideslip, clamped at +/-90 degrees where the fin stalls.
                 cy: AeroCoeff::Table1D {
                     breakpoints: vec![
-                        sourced!(-1.5708, "−PI/2 rad (−90 deg): max negative sideslip"),
-                        sourced!( 0.0,    "zero sideslip: no fin side force"),
-                        sourced!( 1.5708, "+PI/2 rad (+90 deg): max positive sideslip"),
+                        -std::f64::consts::FRAC_PI_2,
+                        0.0,
+                        std::f64::consts::FRAC_PI_2,
                     ],
                     values: vec![
-                        sourced!( 0.254, "CY at −90 deg: 0.162 × PI/2 ≈ 0.254"),
-                        sourced!( 0.0,   "CY at zero beta"),
-                        sourced!(-0.254, "CY at +90 deg: −0.162 × PI/2 ≈ −0.254"),
+                        -VFIN_CY_BETA * std::f64::consts::FRAC_PI_2,
+                        0.0,
+                        VFIN_CY_BETA * std::f64::consts::FRAC_PI_2,
                     ],
                 },
-                area_m2: WING_AREA_M2,
-                chord_m: CHORD_M,
+                area_m2: VFIN_AREA_M2,
+                chord_m: VFIN_MEAN_CHORD_M,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,
-            // z = −0.60 m: midpoint. Root at fuselage top (z=−0.175),
-            // tip extends ~0.85 m above.
             transform: Transform::from_xyz(
-                -(H_TAIL_ARM_M as f32 - 0.46),
+                -(VFIN_ARM_M as f32),
                 0.0,
                 -0.60,
             ),
@@ -861,33 +943,31 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
 
 /// Rudder zone: yaw control surface.
 ///
-/// `CY_rud = −CN_dr × b / x_arm = −(−0.0565) × 10.742 / 4.0 ≈ −0.152`
+/// Uses the physical rudder planform area (RUDDER_AREA_M2 = 0.356 m2) and an
+/// effective CY per radian of deflection (RUDDER_CY_DELTA = -7.86/rad)
+/// calibrated to match JSBSim CN_dr.
 ///
-/// Negative CY: positive rudder (nose-right) produces leftward (−Y) force at tail, producing
-/// positive yaw torque (nose-right). The vertical moment arm (z = −1.1 m) is
-/// small relative to the longitudinal arm (x = −4 m) but included for realism.
+/// Negative CY: positive rudder (nose-right) produces leftward force at the
+/// tail, generating positive (nose-right) yaw torque.
 pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
     (
         AeroZoneBundle {
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
-                cd: AeroCoeff::Scalar(0.0), // included in wing CD_basic
-                // Negative CY: positive rudder (nose-right): −Y force at tail, producing +Z torque.
-                cy: AeroCoeff::Scalar(sourced!(
-                    -0.152,
-                    "JSBSim:J3Cub.xml: Yaw_rudder CN_dr = −0.0565/rad; CY_rud = CN_dr × b/x_arm = 0.0565 × 10.742/4.0, negated for −Y force convention"
-                )),
+                cd: AeroCoeff::Scalar(0.0),
+                cy: AeroCoeff::Scalar(RUDDER_CY_DELTA),
                 control_role: Some(ControlSurfaceRole::Rudder),
-                area_m2: WING_AREA_M2,
-                chord_m: CHORD_M,
+                area_m2: RUDDER_AREA_M2,
+                chord_m: RUDDER_MEAN_CHORD_M,
                 ..Default::default()
             },
             zone_force: ZoneForce::default(),
             collider,
-            // Rudder center sits just aft of vtail, same height range.
-            // x = −3.99 so LE (+0.175) lands at x = −3.813 = vtail TE.
+            // Rudder LE is at the fin TE. Fin center at -VFIN_ARM_M, fin extends
+            // VFIN_MEAN_CHORD_M/2 aft, so rudder LE = -(VFIN_ARM_M + VFIN_MEAN_CHORD_M/2).
+            // Rudder center = rudder LE - RUDDER_MEAN_CHORD_M/2.
             transform: Transform::from_xyz(
-                -3.99,
+                -((VFIN_ARM_M + VFIN_MEAN_CHORD_M / 2.0 + RUDDER_MEAN_CHORD_M / 2.0) as f32),
                 0.0,
                 -0.45,
             ),
@@ -1131,34 +1211,31 @@ mod tests {
         assert_eq!(CD_DATA.len(), ALPHA_BP.len() * RE_BP.len());
     }
 
-    /// H-tail CL table has the correct element count.
-    #[test]
-    fn htail_cl_data_length() {
-        assert_eq!(HTAIL_CL_DATA.len(), HTAIL_ALPHA_BP.len() * RE_BP.len());
-    }
-
-    /// At zero alpha the h-stab produces zero CL (neutral trim contribution).
+    /// H-stab CL is zero at zero alpha (linear model).
     #[test]
     fn hstab_cl_zero_at_zero_alpha() {
-        let coeff = AeroCoeff::Table2D {
-            rows: HTAIL_ALPHA_BP.to_vec(),
-            cols: RE_BP.to_vec(),
-            data: HTAIL_CL_DATA.to_vec(),
+        let coeff = AeroCoeff::Table1D {
+            breakpoints: vec![-0.35, 0.0, 0.35],
+            values: vec![
+                -0.35 * HSTAB_CL_ALPHA,
+                 0.0,
+                 0.35 * HSTAB_CL_ALPHA,
+            ],
         };
         let cl = coeff.evaluate(0.0, RE_BP[0]);
         assert!(cl.abs() < 1e-10, "h-stab CL at alpha=0 should be 0, got {cl}");
     }
 
     /// H-stab CL is **positive** at positive alpha -> upward tail force -> pitch-down restoring moment.
-    ///
-    /// JSBSim `Pitch_alpha`: CM_α = −2.0327/rad (Re=1.7M), so
-    /// CL_hstab = −CM_α × c̄/l_t × α = +0.821 × α > 0 at positive α.
     #[test]
     fn hstab_cl_positive_at_positive_alpha() {
-        let coeff = AeroCoeff::Table2D {
-            rows: HTAIL_ALPHA_BP.to_vec(),
-            cols: RE_BP.to_vec(),
-            data: HTAIL_CL_DATA.to_vec(),
+        let coeff = AeroCoeff::Table1D {
+            breakpoints: vec![-0.35, 0.0, 0.35],
+            values: vec![
+                -0.35 * HSTAB_CL_ALPHA,
+                 0.0,
+                 0.35 * HSTAB_CL_ALPHA,
+            ],
         };
         let cl = coeff.evaluate(0.1, RE_BP[0]);
         assert!(cl > 0.0, "h-stab CL at positive alpha should be positive (upward force at tail), got {cl}");
