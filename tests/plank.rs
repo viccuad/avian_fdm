@@ -234,12 +234,12 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
         parent.spawn((
             AeroZoneBundle {
                 zone: AeroZone {
-                    cl: linear_cl(HSTAB_CL_ALPHA).with_post_stall_lift(HSTAB_AR),
-                    cd: AeroCoeff::Scalar(0.006).with_post_stall_drag(HSTAB_AR),
+                    cl: linear_cl(HSTAB_CL_ALPHA),
+                    cd: AeroCoeff::Scalar(0.006),
                     area_m2: HSTAB_AREA,
                     chord_m: HSTAB_CHORD,
                     ..Default::default()
-                },
+                }.with_post_stall_extension(),
                 collider: Collider::cuboid(0.5, 1.5, 0.03),
                 transform: Transform::from_xyz(-HSTAB_ARM as f32, 0.0, 0.0),
                 ..Default::default()
@@ -256,12 +256,12 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
             AeroZoneBundle {
                 zone: AeroZone {
                     cl: AeroCoeff::Absent,
-                    cd: AeroCoeff::Scalar(0.006).with_post_stall_drag(VSTAB_AR),
-                    cy: linear_cl(-VSTAB_FIN_SLOPE).with_post_stall_lift(VSTAB_AR),
+                    cd: AeroCoeff::Scalar(0.006),
+                    cy: linear_cl(-VSTAB_FIN_SLOPE),
                     area_m2: VSTAB_AREA,
                     chord_m: VSTAB_CHORD,
                     ..Default::default()
-                },
+                }.with_post_stall_extension(),
                 collider: Collider::cuboid(0.5, 0.03, 0.75),
                 transform: Transform::from_xyz(-VSTAB_ARM as f32, 0.0, -0.75),
                 ..Default::default()

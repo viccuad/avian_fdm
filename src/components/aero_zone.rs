@@ -136,6 +136,59 @@ pub struct AeroZone {
 }
 
 impl AeroZone {
+    /// Extend all aerodynamic coefficient tables to +/-180 deg using the
+    /// Viterna-Corrigan post-stall model.
+    ///
+    /// Computes the aspect ratio from this zone's geometry as
+    /// AR = area_m2 / chord_m^2. This is exact for rectangular surfaces
+    /// (wings, stabilizers, fins with constant chord). For tapered or swept
+    /// surfaces, the true AR is span^2 / area, which differs from
+    /// area / chord^2 when chord varies along the span. In those cases, use
+    /// the lower-level [`AeroCoeff::with_post_stall_lift`] and
+    /// [`AeroCoeff::with_post_stall_drag`] methods directly, passing the
+    /// correct AR.
+    ///
+    /// Applies `with_post_stall_lift` to CL, CY, and `with_post_stall_drag`
+    /// to CD. Other coefficients (CM, Croll, Cn) and variants that do not
+    /// benefit from extension (Absent, Placeholder) are left unchanged.
+    ///
+    /// When all tables cover the full +/-180 deg range, no clamping occurs
+    /// during evaluation regardless of how extreme the local angle of attack
+    /// becomes during post-stall flight or tumbling.
+    ///
+    /// Zones with zero chord or zero area are returned unchanged (no
+    /// meaningful AR can be computed).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use avian_fdm::components::*;
+    /// # use avian_fdm::components::aero_coeff::AeroCoeff;
+    /// let zone = AeroZone {
+    ///     cl: AeroCoeff::Table1D {
+    ///         breakpoints: vec![-0.35, 0.0, 0.35],
+    ///         values: vec![-2.5, 0.0, 2.5],
+    ///     },
+    ///     cd: AeroCoeff::Scalar(0.01),
+    ///     area_m2: 3.0,
+    ///     chord_m: 1.0,
+    ///     ..Default::default()
+    /// }.with_post_stall_extension();
+    /// // AR = 3.0 / 1.0^2 = 3.0, computed automatically.
+    /// // CL extended to +/-180 via Viterna lift model.
+    /// // CD converted to Table1D with flat-plate drag progression.
+    /// ```
+    pub fn with_post_stall_extension(mut self) -> Self {
+        if self.chord_m <= 0.0 || self.area_m2 <= 0.0 {
+            return self;
+        }
+        let ar = self.area_m2 / (self.chord_m * self.chord_m);
+        self.cl = self.cl.with_post_stall_lift(ar);
+        self.cd = self.cd.with_post_stall_drag(ar);
+        self.cy = self.cy.with_post_stall_lift(ar);
+        self
+    }
+
     /// Validate all coefficients and fields. Returns a list of problems
     /// (empty means valid).
     ///

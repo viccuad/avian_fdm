@@ -387,25 +387,21 @@ const CD_DATA: [f64; 28] = sourced!(
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 /// Build a Table2D AeroCoeff for CL using the full USA-35B airfoil data (unscaled).
-/// Extended to +/-180 deg via Viterna-Corrigan for realistic post-stall behavior.
 fn cl_table() -> AeroCoeff {
-    let wing_ar = WING_SPAN_M / CHORD_M;
     AeroCoeff::Table2D {
         rows: ALPHA_BP.to_vec(),
         cols: RE_BP.to_vec(),
         data: CL_DATA.to_vec(),
-    }.with_post_stall_lift(wing_ar)
+    }
 }
 
 /// Build a Table2D AeroCoeff for CD using the full USA-35B airfoil data (unscaled).
-/// Extended to +/-180 deg via Viterna-Corrigan for realistic post-stall behavior.
 fn cd_table() -> AeroCoeff {
-    let wing_ar = WING_SPAN_M / CHORD_M;
     AeroCoeff::Table2D {
         rows: ALPHA_BP.to_vec(),
         cols: RE_BP.to_vec(),
         data: CD_DATA.to_vec(),
-    }.with_post_stall_drag(wing_ar)
+    }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -807,7 +803,7 @@ pub fn wing_zone(
                 area_m2: fraction * WING_AREA_M2,
                 chord_m: CHORD_M,
                 ..Default::default()
-            },
+            }.with_post_stall_extension(),
             zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(x_m as f32, y_m as f32, z_m as f32)
@@ -896,7 +892,6 @@ pub fn fuselage_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
 /// drag when broadside to the wind. This prevents unrealistic pitch-locking
 /// during tumbles and deep stalls.
 pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
-    let hstab_ar = HSTAB_SPAN_M / HSTAB_CHORD_M;
     (
         AeroZoneBundle {
             zone: AeroZone {
@@ -907,13 +902,12 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                          0.0,
                          0.35 * HSTAB_CL_ALPHA,
                     ],
-                }.with_post_stall_lift(hstab_ar),
-                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low alpha"))
-                    .with_post_stall_drag(hstab_ar),
+                },
+                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low alpha")),
                 area_m2: HSTAB_AREA_M2,
                 chord_m: HSTAB_CHORD_M,
                 ..Default::default()
-            },
+            }.with_post_stall_extension(),
             zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(
@@ -971,14 +965,11 @@ pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
 /// stalls realistically in deep sideslip and does not lock the aircraft
 /// into an unrealistic yaw pattern during tumbles.
 pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
-    let vfin_ar = VFIN_HEIGHT_M / VFIN_MEAN_CHORD_M;
     (
         AeroZoneBundle {
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
-                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low beta"))
-                    .with_post_stall_drag(vfin_ar),
-                // Linear CY vs sideslip, extended to +/-180 deg for post-stall.
+                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low beta")),
                 cy: AeroCoeff::Table1D {
                     breakpoints: vec![
                         -std::f64::consts::FRAC_PI_2,
@@ -990,11 +981,11 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                         0.0,
                         VFIN_CY_BETA * std::f64::consts::FRAC_PI_2,
                     ],
-                }.with_post_stall_lift(vfin_ar),
+                },
                 area_m2: VFIN_AREA_M2,
                 chord_m: VFIN_MEAN_CHORD_M,
                 ..Default::default()
-            },
+            }.with_post_stall_extension(),
             zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(
