@@ -387,21 +387,25 @@ const CD_DATA: [f64; 28] = sourced!(
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 /// Build a Table2D AeroCoeff for CL using the full USA-35B airfoil data (unscaled).
+/// Extended to +/-180 deg via Viterna-Corrigan for realistic post-stall behavior.
 fn cl_table() -> AeroCoeff {
+    let wing_ar = WING_SPAN_M / CHORD_M;
     AeroCoeff::Table2D {
         rows: ALPHA_BP.to_vec(),
         cols: RE_BP.to_vec(),
         data: CL_DATA.to_vec(),
-    }
+    }.with_post_stall_lift(wing_ar)
 }
 
 /// Build a Table2D AeroCoeff for CD using the full USA-35B airfoil data (unscaled).
+/// Extended to +/-180 deg via Viterna-Corrigan for realistic post-stall behavior.
 fn cd_table() -> AeroCoeff {
+    let wing_ar = WING_SPAN_M / CHORD_M;
     AeroCoeff::Table2D {
         rows: ALPHA_BP.to_vec(),
         cols: RE_BP.to_vec(),
         data: CD_DATA.to_vec(),
-    }
+    }.with_post_stall_drag(wing_ar)
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -886,7 +890,13 @@ pub fn fuselage_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
 ///
 /// At alpha > 0 (nose up), the h-stab produces positive CL (upward force),
 /// which at the aft arm creates a nose-down restoring moment.
+///
+/// The table is extended to +/-180 deg via Viterna-Corrigan post-stall model,
+/// so the h-stab stalls realistically at high alpha and produces flat-plate
+/// drag when broadside to the wind. This prevents unrealistic pitch-locking
+/// during tumbles and deep stalls.
 pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
+    let hstab_ar = HSTAB_SPAN_M / HSTAB_CHORD_M;
     (
         AeroZoneBundle {
             zone: AeroZone {
@@ -897,8 +907,9 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                          0.0,
                          0.35 * HSTAB_CL_ALPHA,
                     ],
-                },
-                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low alpha")),
+                }.with_post_stall_lift(hstab_ar),
+                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low alpha"))
+                    .with_post_stall_drag(hstab_ar),
                 area_m2: HSTAB_AREA_M2,
                 chord_m: HSTAB_CHORD_M,
                 ..Default::default()
@@ -955,13 +966,19 @@ pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
 ///
 /// Negative CY_beta: positive sideslip (wind from right) produces a leftward
 /// force at the aft tail, generating a restoring (nose-right) yaw moment.
+///
+/// The CY table is extended to +/-180 deg via Viterna-Corrigan so the fin
+/// stalls realistically in deep sideslip and does not lock the aircraft
+/// into an unrealistic yaw pattern during tumbles.
 pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
+    let vfin_ar = VFIN_HEIGHT_M / VFIN_MEAN_CHORD_M;
     (
         AeroZoneBundle {
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
-                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low beta")),
-                // Linear CY vs sideslip, clamped at +/-90 degrees where the fin stalls.
+                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low beta"))
+                    .with_post_stall_drag(vfin_ar),
+                // Linear CY vs sideslip, extended to +/-180 deg for post-stall.
                 cy: AeroCoeff::Table1D {
                     breakpoints: vec![
                         -std::f64::consts::FRAC_PI_2,
@@ -973,7 +990,7 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                         0.0,
                         VFIN_CY_BETA * std::f64::consts::FRAC_PI_2,
                     ],
-                },
+                }.with_post_stall_lift(vfin_ar),
                 area_m2: VFIN_AREA_M2,
                 chord_m: VFIN_MEAN_CHORD_M,
                 ..Default::default()

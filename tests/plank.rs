@@ -234,8 +234,8 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
         parent.spawn((
             AeroZoneBundle {
                 zone: AeroZone {
-                    cl: linear_cl(HSTAB_CL_ALPHA),
-                    cd: AeroCoeff::Scalar(0.006),
+                    cl: linear_cl(HSTAB_CL_ALPHA).with_post_stall_lift(HSTAB_AR),
+                    cd: AeroCoeff::Scalar(0.006).with_post_stall_drag(HSTAB_AR),
                     area_m2: HSTAB_AREA,
                     chord_m: HSTAB_CHORD,
                     ..Default::default()
@@ -256,8 +256,8 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
             AeroZoneBundle {
                 zone: AeroZone {
                     cl: AeroCoeff::Absent,
-                    cd: AeroCoeff::Scalar(0.006),
-                    cy: linear_cl(-VSTAB_FIN_SLOPE),
+                    cd: AeroCoeff::Scalar(0.006).with_post_stall_drag(VSTAB_AR),
+                    cy: linear_cl(-VSTAB_FIN_SLOPE).with_post_stall_lift(VSTAB_AR),
                     area_m2: VSTAB_AREA,
                     chord_m: VSTAB_CHORD,
                     ..Default::default()
