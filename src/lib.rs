@@ -640,15 +640,28 @@
 //! |  4. compute_aero_forces                                                 |
 //! |                          reads: FlightState, AircraftGeometry,          |
 //! |                                 ControlInputs, AeroZone, Failure,       |
-//! |                                 GlobalTransform(zone), Children         |
+//! |                                 Transform(zone), Children               |
 //! |                          writes: ZoneForce, ConstantForce(root),        |
 //! |                                  ConstantTorque(root)                   |
 //! +-------------------------------------------------------------------------+
 //!         |
 //!         v  Solver: Avian integrates forces
 //!         |
-//!         v  PostUpdate: Bevy propagates transforms
+//!         v  PostUpdate: Bevy propagates GlobalTransform from Position/Rotation
 //! ```
+//!
+//! ### Why zone positions use Transform, not GlobalTransform
+//!
+//! Avian writes the root entity's physics state into `Position` and `Rotation`.
+//! Bevy propagates those into `GlobalTransform` only in `PostUpdate`, which runs
+//! after the physics schedule. Reading `GlobalTransform` on zone children during
+//! `BroadPhase` would give values from the *previous* frame.
+//!
+//! Instead, `compute_aero_forces` reads `Position`/`Rotation` on the root and
+//! local `Transform` on each zone (which is authored at spawn time and never
+//! changes at runtime). Zone world position is reconstructed manually:
+//! `world_pos = root_position + root_rotation * zone_transform.translation`.
+//! This is always one physics step ahead of `GlobalTransform`.
 //!
 //! ### Inserting a custom system (e.g. autopilot)
 //!
