@@ -72,7 +72,29 @@ impl Plugin for AircraftFdmPlugin {
         crate::systems::register_fdm_systems(app);
 
         if self.validate_on_startup {
-            app.add_systems(PostStartup, validate_aero_zones);
+            app.add_systems(PostStartup, (validate_rigid_bodies, validate_aero_zones));
+        }
+    }
+}
+
+/// Startup validation system: warns if any [`AircraftGeometry`] root entity
+/// does not have `RigidBody::Dynamic`.
+///
+/// A `RigidBody::Static` or `RigidBody::Kinematic` root will silently ignore
+/// all accumulated forces, so the aircraft will never move under aerodynamics.
+///
+/// Registered automatically by [`AircraftFdmPlugin`] when
+/// `validate_on_startup` is `true` (default in debug builds).
+pub fn validate_rigid_bodies(
+    query: Query<(Entity, &avian3d::prelude::RigidBody), With<crate::components::AircraftGeometry>>,
+) {
+    for (entity, rb) in &query {
+        if !rb.is_dynamic() {
+            warn!(
+                "Entity {entity} has AircraftGeometry but RigidBody is not Dynamic. \
+                 Aerodynamic forces will be ignored by Avian. \
+                 Set RigidBody::Dynamic on the aircraft root entity."
+            );
         }
     }
 }
