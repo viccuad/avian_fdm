@@ -167,7 +167,7 @@ pub fn update_flight_state(
     )>,
     wind: Option<Res<WindResource>>,
 ) {
-    use crate::math::{to_dvec3, world_to_body};
+    use crate::math::{world_to_body, VecToF64};
     use bevy_math::{DQuat, DVec3};
 
     let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(DVec3::ZERO);
@@ -177,14 +177,14 @@ pub fn update_flight_state(
 
         // Body angular rates, rotate world AngularVelocity to body frame.
         let q = DQuat::from_array(transform.rotation().to_array().map(|x| x as f64));
-        let av_world = to_dvec3(ang_vel.0);
+        let av_world = ang_vel.0.vec_to_f64();
         let omega_body = q.inverse() * av_world;
         let p_rads = omega_body.x;
         let q_rads = omega_body.y;
         let r_rads = omega_body.z;
 
         // World-frame velocity relative to air mass.
-        let vel_world = to_dvec3(lin_vel.0) - wind_world;
+        let vel_world = lin_vel.0.vec_to_f64() - wind_world;
 
         let airspeed_ms = vel_world.length();
 

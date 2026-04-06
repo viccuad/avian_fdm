@@ -15,6 +15,7 @@
 
 use avian_fdm::prelude::*;
 use avian_fdm_j3cub_jsbsim::presets::j3cub;
+use avian3d::math::Vector;
 use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
 use bevy::ecs::message::MessageWriter;
 use bevy::prelude::*;
@@ -45,7 +46,7 @@ fn spawn_aircraft(mut commands: Commands) {
         &mut commands,
         Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(level),
     );
-    commands.entity(root).insert(LinearVelocity(Vec3::new(27.0, 0.0, 0.0)));
+    commands.entity(root).insert(LinearVelocity(Vector::new(27.0, 0.0, 0.0)));
 }
 
 /// Linearly ramp throttle from 50% → 75% over the first 12.5 seconds.

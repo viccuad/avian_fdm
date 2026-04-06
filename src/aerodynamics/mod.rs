@@ -38,15 +38,16 @@ pub use local_angles::zone_local_angles;
 pub(crate) use world_forces::zone_force_world;
 
 use crate::_bevy::*;
+use avian3d::math::AdjustPrecision;
 use avian3d::prelude::{ComputedCenterOfMass, ConstantForce, ConstantTorque, Position, Rotation};
 use bevy_math::{DQuat, DVec3};
+use crate::math::{to_dvec3, VecToF64};
 
 use crate::components::EngineZone;
 use crate::components::{
     get_remaining, AeroZone, AircraftGeometry, AtmosphereState, ControlInputs, Failure,
     FlightState, InducedDrag, LodDamping, ZoneForce,
 };
-use crate::math::to_dvec3;
 
 //
 // Step 3: Engine force accumulation
@@ -59,13 +60,15 @@ use crate::math::to_dvec3;
 /// thrust is asymmetric.
 fn accumulate_engine_force(
     zf: &ZoneForce,
-    com_world: Vec3,
-    total_force: &mut Vec3,
-    total_torque: &mut Vec3,
+    com_world_d: DVec3,
+    total_force_d: &mut DVec3,
+    total_torque_d: &mut DVec3,
 ) {
     if zf.force != Vec3::ZERO {
-        *total_force += zf.force;
-        *total_torque += (zf.world_point - com_world).cross(zf.force);
+        let force_d = to_dvec3(zf.force);
+        *total_force_d += force_d;
+        // ZoneForce.world_point is Vec3 (always f32 for visualization).
+        *total_torque_d += (to_dvec3(zf.world_point) - com_world_d).cross(force_d);
     }
 }
 
@@ -98,8 +101,8 @@ pub fn compute_aero_forces(
     for (mut cf, mut ct, pos, rot, com, flight, atm, geo, ctrl, children, lod_damping, induced_drag) in
         root_query.iter_mut()
     {
-        cf.0 = Vec3::ZERO;
-        ct.0 = Vec3::ZERO;
+        cf.0 = Default::default();
+        ct.0 = Default::default();
 
         if flight.airspeed_ms < 1e-4 {
             continue;
@@ -120,13 +123,10 @@ pub fn compute_aero_forces(
         let rho = atm.density_kgm3;
 
         let body_to_world = DQuat::from_array(rot.0.to_array().map(|x| x as f64));
-        // Unit velocity vector in body frame, reconstructed from alpha and beta.
-        // Used for drag direction: drag must always oppose the full 3D velocity,
-        // including the sideslip component, not just the in-plane component.
         let (sa, ca) = (alpha.sin(), alpha.cos());
         let (sb, cb) = (beta.sin(), beta.cos());
         let vel_body_unit_global = DVec3::new(ca * cb, sb, sa * cb);
-        let com_world: Vec3 = pos.0 + rot.0 * com.0;
+        let com_world_d: DVec3 = pos.0.vec_to_f64() + body_to_world * com.0.vec_to_f64();
         let use_lod = lod_damping.is_some();
 
         // Area-weighted CL sum for induced drag: CL_aircraft = total / S_ref.
@@ -147,7 +147,7 @@ pub fn compute_aero_forces(
                 // Local Transform is used instead of GlobalTransform to avoid
                 // the one-frame propagation lag (PostUpdate runs after physics).
                 let zone_body_from_cg: DVec3 =
-                    to_dvec3(zone_transform.translation) - to_dvec3(com.0);
+                    to_dvec3(zone_transform.translation) - com.0.vec_to_f64();
 
                 // Zone rotation in body frame as a double-precision quaternion.
                 let zone_q = DQuat::from_array(zone_transform.rotation.to_array().map(|x| x as f64));
@@ -216,22 +216,33 @@ pub fn compute_aero_forces(
                     continue;
                 }
 
-                let force_world = wf.force.as_vec3();
-                let torque_world = wf.torque.as_vec3();
-                let ac_world = pos.0 + rot.0 * (zone_transform.translation + zone.ac_offset);
+                // ZoneForce stores Vec3 (f32) for debug visualization.
+                // ConstantForce/ConstantTorque use avian3d::math::Vector
+                // (Vec3 in f32 mode, DVec3 in f64 mode); adjust_precision()
+                // converts DVec3 to whichever backend is active.
+                let force_d = wf.force;
+                let torque_d = wf.torque;
+                // ac_world: aerodynamic centre in world space. zone_transform
+                // and zone.ac_offset are always Vec3 (Bevy Transform is f32).
+                let ac_world_d = pos.0.vec_to_f64()
+                    + body_to_world * to_dvec3(zone_transform.translation + zone.ac_offset);
 
-                zone_force.force = force_world;
-                zone_force.torque = torque_world;
-                zone_force.world_point = ac_world;
+                zone_force.force       = force_d.as_vec3();
+                zone_force.torque      = torque_d.as_vec3();
+                zone_force.world_point = ac_world_d.as_vec3();
 
-                cf.0 += force_world;
-                ct.0 += (ac_world - com_world).cross(force_world) + torque_world;
+                cf.0 += force_d.adjust_precision();
+                ct.0 += ((ac_world_d - com_world_d).cross(force_d) + torque_d).adjust_precision();
                 continue;
             }
 
             // Step 3: engine zone thrust accumulation.
             if let Ok(zf) = engine_zone_query.get(child) {
-                accumulate_engine_force(zf, com_world, &mut cf.0, &mut ct.0);
+                let mut ef_d = DVec3::ZERO;
+                let mut et_d = DVec3::ZERO;
+                accumulate_engine_force(zf, com_world_d, &mut ef_d, &mut et_d);
+                cf.0 += ef_d.adjust_precision();
+                ct.0 += et_d.adjust_precision();
                 continue;
             }
         }
@@ -243,14 +254,14 @@ pub fn compute_aero_forces(
             let cl_aircraft = total_cl_x_area / s;
             let cd_i = cl_aircraft * cl_aircraft / (std::f64::consts::PI * id.oswald_factor * ar);
             let drag_world = body_to_world * (vel_body_unit_global * (-cd_i * qbar * s));
-            cf.0 += drag_world.as_vec3();
+            cf.0 += drag_world.adjust_precision();
         }
 
         // Step 5: LOD damping (mutually exclusive with step 0).
         if let Some(lod) = lod_damping {
             let damp = damping_torque(flight, lod, geo, body_to_world);
             if damp.is_finite() {
-                ct.0 += damp.as_vec3();
+                ct.0 += damp.adjust_precision();
             }
         }
     }
@@ -260,7 +271,7 @@ pub fn compute_aero_forces(
 mod tests {
     use super::*;
     use crate::components::ZoneForce;
-    use bevy_math::Vec3;
+    use bevy_math::{DVec3, Vec3};
 
     /// On-centre engine produces pure thrust, no torque.
     #[test]
@@ -270,9 +281,9 @@ mod tests {
             world_point: Vec3::ZERO,
             torque: Vec3::ZERO,
         };
-        let (mut f, mut t) = (Vec3::ZERO, Vec3::ZERO);
-        accumulate_engine_force(&zf, Vec3::ZERO, &mut f, &mut t);
-        assert!((f - Vec3::new(500.0, 0.0, 0.0)).length() < 1e-5);
+        let (mut f, mut t) = (DVec3::ZERO, DVec3::ZERO);
+        accumulate_engine_force(&zf, DVec3::ZERO, &mut f, &mut t);
+        assert!((f - DVec3::new(500.0, 0.0, 0.0)).length() < 1e-5);
         assert!(t.length() < 1e-5, "on-axis engine must not produce torque");
     }
 
@@ -284,8 +295,8 @@ mod tests {
             world_point: Vec3::new(0.0, 2.0, 0.0),
             torque: Vec3::ZERO,
         };
-        let (mut f, mut t) = (Vec3::ZERO, Vec3::ZERO);
-        accumulate_engine_force(&zf, Vec3::ZERO, &mut f, &mut t);
+        let (mut f, mut t) = (DVec3::ZERO, DVec3::ZERO);
+        accumulate_engine_force(&zf, DVec3::ZERO, &mut f, &mut t);
         // arm=(0,2,0) × thrust=(500,0,0) → torque=(0,0,-1000)
         assert!(
             (t.z - (-1000.0)).abs() < 1e-4,
@@ -302,9 +313,9 @@ mod tests {
             world_point: Vec3::new(0.0, 5.0, 0.0),
             torque: Vec3::ZERO,
         };
-        let (mut f, mut t) = (Vec3::new(100.0, 0.0, 0.0), Vec3::new(0.0, 50.0, 0.0));
-        accumulate_engine_force(&zf, Vec3::ZERO, &mut f, &mut t);
-        assert!((f - Vec3::new(100.0, 0.0, 0.0)).length() < 1e-5);
-        assert!((t - Vec3::new(0.0, 50.0, 0.0)).length() < 1e-5);
+        let (mut f, mut t) = (DVec3::new(100.0, 0.0, 0.0), DVec3::new(0.0, 50.0, 0.0));
+        accumulate_engine_force(&zf, DVec3::ZERO, &mut f, &mut t);
+        assert!((f - DVec3::new(100.0, 0.0, 0.0)).length() < 1e-5);
+        assert!((t - DVec3::new(0.0, 50.0, 0.0)).length() < 1e-5);
     }
 }

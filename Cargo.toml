@@ -10,10 +10,16 @@ exclude = ["/assets/", "/docs/", "/.github/"]
 members = [".", "avian_fdm_j3cub_jsbsim"]
 
 [features]
-# Enable the avian3d f32 backend and collider shapes (Collider::cuboid, etc.).
-# Users who write their own aircraft and want f64 precision should omit this
-# feature and enable `avian3d/f64` + `avian3d/parry-f64` on their own avian3d dep.
+# Exactly one of `f32` or `f64` must be enabled. They select the avian3d physics
+# backend and are mutually exclusive: enabling both is a compile error.
+#
+# `f32` — standard Bevy/avian3d precision. Sufficient for most flight simulators
+#          and required for integration with Bevy rendering (Transform, Gizmos, etc.).
+#
+# `f64` — double-precision backend. Use when simulation accuracy matters more than
+#          Bevy rendering integration, e.g. pure headless FDM or large-world sims.
 f32 = ["avian3d/default-collider", "avian3d/f32", "avian3d/parry-f32"]
+f64 = ["avian3d/default-collider", "avian3d/f64", "avian3d/parry-f64"]
 debug-plugin = ["dep:bevy_color", "dep:bevy_gizmos", "avian3d/f32", "avian3d/parry-f32"]
 
 [dependencies]

@@ -356,6 +356,7 @@ dependencies = [
  "itertools 0.14.0",
  "obvhs",
  "parry3d",
+ "parry3d-f64",
  "smallvec",
  "thiserror 2.0.18",
  "thread_local",
@@ -4087,6 +4088,33 @@ dependencies = [
  "smallvec",
  "spade",
  "static_assertions",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "parry3d-f64"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38558e45fda09a243836f590b9890f7f21dd2078dd7aafc876a9e8998d378d42"
+dependencies = [
+ "approx",
+ "arrayvec",
+ "bitflags 2.11.0",
+ "downcast-rs 2.0.2",
+ "either",
+ "ena",
+ "foldhash 0.2.0",
+ "glamx",
+ "hashbrown 0.16.1",
+ "log",
+ "num-derive",
+ "num-traits",
+ "ordered-float",
+ "rstar",
+ "simba",
+ "slab",
+ "smallvec",
+ "spade",
  "thiserror 2.0.18",
 ]
 

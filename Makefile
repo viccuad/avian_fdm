@@ -1,30 +1,34 @@
 .PHONY: check
 check:
-	cargo check --all-features --workspace
+	# f32 and f64 are mutually exclusive avian3d backends; check each separately.
+	cargo check --workspace --features "f32"
+	cargo check --workspace --features "f64"
+	cargo check --workspace --features "f32,debug-plugin"
 
 .PHONY: clippy
 clippy:
-	cargo clippy --all-features --workspace
+	cargo clippy --workspace --features "f32"
+	cargo clippy --workspace --features "f64"
 
 .PHONY: test
 test:
-	# avian3d requires an explicit f32/f64 backend (we set default-features = false),
-	# so bare `cargo test` and `--no-default-features` do not compile.
-	cargo test -p avian_fdm --features "f32"
-	cargo test -p avian_fdm --all-features
-	cargo test -p avian_fdm_j3cub_jsbsim
+	# f32 and f64 are mutually exclusive avian3d backends; test each separately.
+	cargo test --workspace --features "f32"
+	cargo test --workspace --features "f64"
+	cargo test --workspace --features "f32,debug-plugin"
 
 .PHONY: doc
 doc:
-	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features --workspace
+	RUSTDOCFLAGS="-D warnings" cargo doc -p avian_fdm --no-deps --features "f32,debug-plugin"
+	RUSTDOCFLAGS="-D warnings" cargo doc -p avian_fdm_j3cub_jsbsim --no-deps --features "f32"
 
 .PHONY: build
 build:
-	cargo build --release --all-features --workspace
+	cargo build --workspace --release --features "f32"
 
 .PHONY: jsbsim
 jsbsim:
-	cargo test -p avian_fdm --features "f32" -- jsbsim --nocapture
+	cargo test -p avian_fdm_j3cub_jsbsim --features "f32" -- jsbsim --nocapture
 
 .PHONY: bench
 bench:

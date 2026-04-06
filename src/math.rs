@@ -6,6 +6,26 @@
 
 use bevy_math::{DQuat, DVec3, Vec3};
 
+/// Convert any avian3d `Vector` (f32 `Vec3` or f64 `DVec3`) to `DVec3` for
+/// internal FDM arithmetic. Avian chooses `Vector = Vec3` with the `f32`
+/// feature and `Vector = DVec3` with the `f64` feature. avian_fdm always
+/// does its physics math in f64 regardless of the backend.
+pub(crate) trait VecToF64 {
+    fn vec_to_f64(self) -> DVec3;
+}
+
+impl VecToF64 for Vec3 {
+    #[inline]
+    fn vec_to_f64(self) -> DVec3 {
+        DVec3::new(self.x as f64, self.y as f64, self.z as f64)
+    }
+}
+
+impl VecToF64 for DVec3 {
+    #[inline]
+    fn vec_to_f64(self) -> DVec3 { self }
+}
+
 /// Convert a Bevy `Vec3` (f32) to a `DVec3` (f64) for FDM calculations.
 ///
 /// Used throughout the codebase to bridge Avian's f32 physics transforms

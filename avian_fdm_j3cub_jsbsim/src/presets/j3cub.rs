@@ -110,6 +110,7 @@
 use bevy_ecs::prelude::*;
 use bevy_math::prelude::*;
 use bevy_transform::prelude::*;
+use avian3d::math::Scalar;
 use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
 
 use bevy_math::DVec3;
@@ -591,7 +592,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                             ..Default::default()
                         },
                         zone_force: ZoneForce::default(),
-                        collider: Collider::cuboid(length, 0.04, 0.04),
+                        collider: Collider::cuboid(length as Scalar, 0.04, 0.04),
                         transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
                     },
@@ -621,7 +622,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                             ..Default::default()
                         },
                         zone_force: ZoneForce::default(),
-                        collider: Collider::cuboid(length, 0.04, 0.04),
+                        collider: Collider::cuboid(length as Scalar, 0.04, 0.04),
                         transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
                     },

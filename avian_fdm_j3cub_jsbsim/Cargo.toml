@@ -6,16 +6,16 @@ description = "J3Cub aircraft preset for avian_fdm derived from github.com/wlbra
 license = "GPL-3.0-only"
 
 [features]
+# Exactly one of `f32` or `f64` must be enabled; mirrors the avian_fdm feature of
+# the same name. The visual example and JSBSim comparison test require `f32` since
+# Bevy rendering and JSBSim both operate at f32 precision.
+f32 = ["avian_fdm/f32", "avian3d/f32", "avian3d/parry-f32", "avian3d/default-collider"]
+f64 = ["avian_fdm/f64", "avian3d/f64", "avian3d/parry-f64", "avian3d/default-collider"]
 debug-plugin = ["avian_fdm/debug-plugin"]
 
 [dependencies]
-avian_fdm = { path = "../", features = ["f32"] }
-avian3d = { version = "0.6", default-features = false, features = [
-    "3d",
-    "f32",
-    "parry-f32",
-    "default-collider",
-] }
+avian_fdm = { path = "../" }
+avian3d = { version = "0.6", default-features = false, features = ["3d"] }
 bevy_ecs = { version = "0.18", default-features = false }
 bevy_math = { version = "0.18", default-features = false }
 bevy_transform = { version = "0.18", default-features = false }
@@ -32,7 +32,8 @@ name = "j3cub_minimal"
 
 [[example]]
 name = "j3cub_visual"
-required-features = ["debug-plugin"]
+required-features = ["f32", "debug-plugin"]
 
 [[test]]
 name = "jsbsim_comparison"
+required-features = ["f32"]
