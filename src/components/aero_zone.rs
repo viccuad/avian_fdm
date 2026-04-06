@@ -218,11 +218,19 @@ pub struct AeroZoneBundle {
     pub zone: AeroZone,
     /// Per-frame force output (written by FDM, read by accumulation system).
     pub zone_force: ZoneForce,
-    /// Avian collider, required for Avian to include this zone's mass (via
-    /// [`avian3d::prelude::ColliderDensity`]) in the parent rigid body's
+    /// Avian collider defining this zone's shape and volume.
+    ///
+    /// Used by Avian to compute the zone's mass contribution (via
+    /// [`avian3d::prelude::ColliderDensity`]) to the parent rigid body's
     /// [`avian3d::prelude::ComputedMass`].
-    /// One can use it also for hit detection, but it's better to use a Sensor over a real model
-    /// part.
+    ///
+    /// Zone colliders are **real physics colliders**: by default they will
+    /// interact with any other collider in the world (terrain, obstacles).
+    /// If you want aerodynamics-only with no collision response, assign
+    /// [`avian3d::prelude::CollisionLayers`] to each zone entity to put it on
+    /// a layer that does not interact with the world. Do not use
+    /// [`avian3d::prelude::Sensor`] - sensor colliders are excluded from mass
+    /// computation and will give the aircraft wrong inertia.
     pub collider: Collider,
     /// Position/orientation relative to the aircraft root.
     pub transform: Transform,

@@ -122,6 +122,14 @@ pub struct AircraftGeometry {
 /// and included with zero defaults. Override them after spawning to set an
 /// initial velocity.
 ///
+/// # Collision filtering
+///
+/// Zone colliders are real physics colliders and will interact with terrain or
+/// other objects in the scene by default. For aerodynamics-only simulation
+/// (no collision response), use [`avian3d::prelude::CollisionLayers`] on each
+/// zone child entity to prevent contact with world geometry. Do not use
+/// [`avian3d::prelude::Sensor`] - it excludes the collider from mass computation.
+///
 /// # Optional components (add to the same entity after spawning)
 ///
 /// - [`InducedDrag`], add for conventional lifting aircraft (most fixed-wing).
