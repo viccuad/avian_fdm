@@ -633,8 +633,7 @@
 //! |                                 Rotation(root)                          |
 //! |                          writes: FlightState                            |
 //! |                                                                         |
-//! |  3. compute_engine_zone_forces  [propulsion feature]                    |
-//! |                          reads: FlightState, AtmosphereState,           |
+//! |  3. compute_engine_zone_forces  reads: FlightState, AtmosphereState,    |
 //! |                                 ControlInputs, EngineZone               |
 //! |                          writes: ZoneForce(engine), PropwashState       |
 //! |                                                                         |
@@ -785,7 +784,6 @@ pub(crate) mod math;
 pub mod plugin;
 pub mod systems;
 
-#[cfg(feature = "propulsion")]
 pub mod propulsion;
 
 #[cfg(feature = "debug-plugin")]
@@ -810,6 +808,5 @@ pub mod prelude {
         AircraftFdmDebugPlugin, FdmDebugRender, FdmGizmos, ShowColliders,
     };
 
-    #[cfg(feature = "propulsion")]
     pub use crate::components::{EngineZone, PropwashState};
 }

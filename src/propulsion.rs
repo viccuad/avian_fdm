@@ -22,8 +22,6 @@
 //!
 //! `V_ind` is stored in [`PropwashState`] on the root entity and read by
 //! `compute_aero_forces` for propwash effects (Group A, post-v1).
-//!
-//! Only compiled with `features = ["propulsion"]`.
 
 use std::f64::consts::PI;
 use crate::_bevy::*;

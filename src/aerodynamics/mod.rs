@@ -41,7 +41,6 @@ use crate::_bevy::*;
 use avian3d::prelude::{ComputedCenterOfMass, ConstantForce, ConstantTorque, Position, Rotation};
 use bevy_math::{DQuat, DVec3};
 
-#[cfg(feature = "propulsion")]
 use crate::components::EngineZone;
 use crate::components::{
     get_remaining, AeroZone, AircraftGeometry, AtmosphereState, ControlInputs, Failure,
@@ -91,7 +90,7 @@ pub fn compute_aero_forces(
         Option<&InducedDrag>,
     )>,
     mut zone_query: Query<(&AeroZone, &Transform, &mut ZoneForce, Option<&Failure>)>,
-    #[cfg(feature = "propulsion")] engine_zone_query: Query<
+    engine_zone_query: Query<
         &ZoneForce,
         (With<EngineZone>, Without<AeroZone>),
     >,
@@ -231,7 +230,6 @@ pub fn compute_aero_forces(
             }
 
             // Step 3: engine zone thrust accumulation.
-            #[cfg(feature = "propulsion")]
             if let Ok(zf) = engine_zone_query.get(child) {
                 accumulate_engine_force(zf, com_world, &mut cf.0, &mut ct.0);
                 continue;

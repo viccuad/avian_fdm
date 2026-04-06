@@ -11,7 +11,7 @@ test:
 	# avian3d requires an explicit f32/f64 backend (we set default-features = false),
 	# so bare `cargo test` and `--no-default-features` do not compile.
 	# Test with the two meaningful feature combinations instead.
-	cargo test --features "presets,propulsion"
+	cargo test --features "presets"
 	cargo test --all-features
 
 .PHONY: doc
@@ -24,11 +24,11 @@ build:
 
 .PHONY: jsbsim
 jsbsim:
-	cargo test --features "presets,propulsion" -- jsbsim --nocapture
+	cargo test --features "presets" -- jsbsim --nocapture
 
 .PHONY: bench
 bench:
-	cargo test --features "presets,propulsion" --test perf_limits -- --nocapture
+	cargo test --features "presets" --test perf_limits -- --nocapture
 
 .PHONY: ci
 ci: check clippy test doc build

@@ -110,15 +110,12 @@
 use crate::_bevy::*;
 use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
 
-#[cfg(feature = "propulsion")]
 use bevy_math::DVec3;
 
 use crate::components::{
     AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
-    ControlSurfaceRole, GizmoContours, InducedDrag, ZoneForce,
+    ControlSurfaceRole, EngineZone, GizmoContours, InducedDrag, PropwashState, ZoneForce,
 };
-#[cfg(feature = "propulsion")]
-use crate::components::{EngineZone, PropwashState};
 
 // ── Aircraft reference constants ─────────────────────────────────────────────
 
@@ -725,7 +722,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             }));
 
             // ── Engine ────────────────────────────────────────────────────────
-            #[cfg(feature = "propulsion")]
             parent.spawn((
                 engine_zone(
                     Collider::cuboid(0.50, 0.40, 0.40),
@@ -1044,7 +1040,6 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
 /// Position: 1.31 m forward of CG (J3Cub FlightGear repo: engine at JSBSim x = −37.52 in,
 /// CG at x = 13.80 in → body x = (13.80 − (−37.52)) × 0.0254 = +1.306 m ≈ 1.31 m).
 /// 0.04 m below CG: propeller shaft is slightly below the aircraft reference datum.
-#[cfg(feature = "propulsion")]
 pub fn engine_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
     (
         EngineZone {
@@ -1189,7 +1184,6 @@ fn cabin_contours() -> GizmoContours {
 ///
 /// Zone center at aircraft (1.65, 0, 0.04). Engine GizmoShape is a cylinder;
 /// contours add the spinner and prop disc on top.
-#[cfg(feature = "propulsion")]
 fn engine_contours() -> GizmoContours {
     // Spinner cone (linestrip profile, one side).
     let spinner: Vec<Vec3> = vec![

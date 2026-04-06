@@ -20,10 +20,7 @@
 use avian3d::prelude::Collider;
 use bevy_transform::TransformSystems;
 use crate::_bevy::*;
-use crate::components::{AeroZone, AircraftGeometry};
-
-#[cfg(feature = "propulsion")]
-use crate::components::EngineZone;
+use crate::components::{AeroZone, AircraftGeometry, EngineZone};
 
 use super::configuration::FdmGizmos;
 
@@ -63,9 +60,6 @@ pub(super) fn plugin(app: &mut App) {
 pub(super) fn debug_render_colliders(
     mut gizmos: Gizmos<FdmGizmos>,
     root_query: Query<&Transform, With<AircraftGeometry>>,
-    #[cfg(not(feature = "propulsion"))]
-    zone_query: Query<(&Transform, Option<&Collider>), With<AeroZone>>,
-    #[cfg(feature = "propulsion")]
     zone_query: Query<(&Transform, Option<&Collider>), Or<(With<AeroZone>, With<EngineZone>)>>,
 ) {
     use avian3d::parry::shape::TypedShape;

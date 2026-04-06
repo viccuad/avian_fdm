@@ -12,8 +12,6 @@ exclude = ["/assets/", "/docs/", "/.github/"]
 # Users who write their own aircraft without presets must enable precision on their
 # avian3d dependency directly. To switch to f64, add avian_fdm with
 # `default-features = false` and enable `avian3d/f64` + `avian3d/parry-f64`.
-default = ["propulsion"]
-propulsion = []
 debug-plugin = ["dep:bevy_color", "dep:bevy_gizmos", "avian3d/f32", "avian3d/parry-f32"]
 # presets enables default-collider which transitively enables parry-f32.
 presets = ["avian3d/default-collider", "avian3d/f32", "avian3d/parry-f32"]
@@ -44,7 +42,7 @@ bevy = { version = "0.18", features = [
 
 [[test]]
 name = "perf_limits"
-required-features = ["presets", "propulsion"]
+required-features = ["presets"]
 
 [[example]]
 name = "j3cub_minimal"

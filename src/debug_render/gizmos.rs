@@ -93,13 +93,11 @@ pub(super) fn debug_render_zone_forces(
 pub(super) fn debug_render_thrust(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
-    #[cfg(feature = "propulsion")]
     query: Query<(&ZoneForce, &GlobalTransform), With<crate::components::EngineZone>>,
 ) {
     let config = store.config::<FdmGizmos>().1;
     let Some(color) = config.thrust_color else { return };
 
-    #[cfg(feature = "propulsion")]
     for (zf, zone_gt) in &query {
         if zf.force.length_squared() < 1.0 {
             continue;
@@ -107,9 +105,6 @@ pub(super) fn debug_render_thrust(
         let start = zone_gt.translation();
         gizmos.arrow(start, start + zf.force * config.force_scale, color);
     }
-
-    #[cfg(not(feature = "propulsion"))]
-    let _ = (gizmos, color);
 }
 
 /// Draw the total aero+thrust force, weight, and net-force arrows from the CG.

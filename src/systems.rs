@@ -34,8 +34,6 @@ use avian3d::prelude::{PhysicsSchedule, PhysicsStepSystems};
 
 use crate::atmosphere::{update_atmosphere, update_flight_state};
 use crate::aerodynamics::compute_aero_forces;
-
-#[cfg(feature = "propulsion")]
 use crate::propulsion::compute_engine_zone_forces;
 
 /// Named system sets for the FDM pipeline. Use these to hook in custom systems.
@@ -96,13 +94,6 @@ pub(crate) fn register_fdm_systems(app: &mut App) {
         update_flight_state.in_set(AircraftFdmSystem::FlightState),
     );
 
-    #[cfg(not(feature = "propulsion"))]
-    app.add_systems(
-        PhysicsSchedule,
-        compute_aero_forces.in_set(AircraftFdmSystem::Forces),
-    );
-
-    #[cfg(feature = "propulsion")]
     app.add_systems(
         PhysicsSchedule,
         (compute_engine_zone_forces, compute_aero_forces)
