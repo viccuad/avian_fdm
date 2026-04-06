@@ -8,7 +8,7 @@
 /// geometric alpha/beta (which already captures dihedral, sweep, etc. via
 /// velocity projection into the zone's local coordinate frame):
 ///
-/// **Layer 1. Roll-rate Δα (asymmetric stall, snap rolls, spins)**
+/// **Layer 1. Roll-rate delta-alpha (asymmetric stall, snap rolls, spins)**
 ///
 /// A zone at spanwise station `y` (metres, positive starboard) sees a
 /// body-Z velocity increment `Δw = p · y` from roll rate `p` (rad/s).
@@ -16,12 +16,10 @@
 /// distance from roll axis (m) ÷ airspeed (m/s).**
 ///
 /// ```text
-/// Δα_roll = p · y / V
+/// delta_alpha_roll = p * y / V
 /// ```
 ///
-/// At p = 1 rad/s, V = 50 m/s, y = +4.57 m (J3 Cub wing tip): Δα ≈ +5.2°.
-/// When the aircraft is near stall, the descending tip stalls while the rising
-/// tip keeps flying, producing uncommanded roll that can steepen into a spin.
+/// **Layer 2. Pitch-rate delta-alpha (pitch damping, tail effectiveness)**
 ///
 /// **Layer 2. Pitch-rate Δα (pitch damping, tail effectiveness)**
 ///
@@ -36,14 +34,10 @@
 /// The formula below follows directly from body-frame kinematics (ω × r):
 ///
 /// ```text
-/// Δα_pitch = −q · x / V
+/// delta_alpha_pitch = -q * x / V
 /// ```
 ///
-/// At q = 1 rad/s, V = 50 m/s, x = −4 m (aft tail): Δα ≈ +0.08 rad.
-/// The tail sees more AoA, generates more lift at its negative arm, and
-/// produces a nose-down restoring moment - pitch damping emerges naturally.
-///
-/// **Layer 3. Yaw-rate Δβ (yaw damping, Dutch roll)**
+/// **Layer 3. Yaw-rate delta-beta (yaw damping, Dutch roll)**
 ///
 /// A zone at longitudinal station `x` sees a body-Y velocity increment from
 /// yaw rate `r` (rad/s). The cross product `ω × r` gives y-component `r·x`
@@ -51,9 +45,11 @@
 /// (x < 0, aft), a right yaw (r > 0) produces a leftward lateral velocity at
 /// the tail, reducing β_local. The resulting side force at the aft position
 /// opposes the yaw, providing yaw damping.
+/// Dutch roll is a coupled yaw-roll oscillation. Yaw rate shifts the sideslip
+/// seen by aft surfaces, providing yaw damping:
 ///
 /// ```text
-/// Δβ_yaw = r · x / V
+/// delta_beta_yaw = r * x / V
 /// ```
 ///
 /// Note: spanwise wing zones (y ≠ 0, x ≈ 0) see near-zero sideslip change

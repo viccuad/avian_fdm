@@ -10,9 +10,7 @@
 //!
 //! Mass, centre of gravity, and the full inertia tensor are computed
 //! automatically by Avian from the [`avian3d::prelude::ColliderDensity`] on
-//! each child collider. Performance reductions from damage in zones (setting
-//! [`components::Failure::remaining`]) instantly updates the physics
-//! without any bookkeeping on the game's part.
+//! each child collider.
 //!
 //! ---
 //!
@@ -28,10 +26,10 @@
 //! 8. [Emergent Behavior](#emergent-behavior)
 //! 9. [Zone Decomposition and Damage](#zone-decomposition-and-damage)
 //!    - [Collider strategy](#collider-strategy)
-//! 9. [Reading Simulation Output](#reading-simulation-output)
-//! 10. [Data Flow](#data-flow)
-//! 11. [Feature Flags](#feature-flags)
-//! 12. [Further Reading](#further-reading)
+//! 10. [Reading Simulation Output](#reading-simulation-output)
+//! 11. [Data Flow](#data-flow)
+//! 12. [Feature Flags](#feature-flags)
+//! 13. [Further Reading](#further-reading)
 //!
 //! ---
 //!
@@ -81,14 +79,11 @@
 //!
 //! ## What is a Flight Dynamics Model?
 //!
-//! A **Flight Dynamics Model** (FDM) is the mathematical subsystem that
-//! computes all forces and moments acting on an aircraft at each instant, given
-//! its current state (position, velocity, attitude, angular rate) and the
-//! pilot's control inputs.
-//!
-//! The output of an FDM feeds Newton's laws: the rigid-body integrator advances
-//! the state forward in time. `avian_fdm` is the FDM; [Avian] is the
-//! integrator.
+//! A **Flight Dynamics Model** (FDM) computes all forces and moments acting on
+//! an aircraft each instant, given its state (position, velocity, attitude,
+//! angular rate) and the pilot's control inputs. The output feeds a rigid-body
+//! integrator that advances the state forward in time. `avian_fdm` is the FDM;
+//! [Avian] is the integrator.
 //!
 //! ### Scope of this library for now
 //!
@@ -97,7 +92,7 @@
 //! - Lift, drag, and side-force per zone
 //! - Pitch, roll, and yaw damping derivatives
 //! - Piston engine + fixed-pitch propeller model
-//! - Failure degradation (performance loss as `remaining` reaches 0)
+//! - Failure degradation (performance loss with damage)
 //! - 6-DoF integration (via Avian)
 //!
 //! **Out of scope** (or game's responsibility):
@@ -113,14 +108,19 @@
 //!
 //! `avian_fdm` uses the **small-perturbation stability-derivative method**
 //! (sometimes called the *linear aerodynamic model*). Aerodynamic coefficients
-//! C_L, C_D, C_Y are expressed as tabulated functions of angle of attack α
-//! and Reynolds number Re, then multiplied by dynamic pressure q̄  and
+//! C_L, C_D, C_Y are expressed as tabulated functions of angle of attack alpha
+//! and Reynolds number Re, then multiplied by dynamic pressure q̄  (q-bar) and
 //! reference area S. **Aerodynamic force = coefficient × dynamic pressure × wing area:**
 //!
+//! Aerodynamic coefficients (CL, CD, CY) are dimensionless numbers that
+//! describe how much lift, drag, or side-force an airfoil produces. They are
+//! stored as lookup tables indexed by angle of attack and Reynolds number,
+//! then multiplied by dynamic pressure and wing area to obtain forces.
+//! Force = coefficient * dynamic pressure * wing area:
+//!
 //! ```text
-//! Lift  = C_L(α, Re) · q̄  · S
-//! Drag  = C_D(α, Re) · q̄  · S
-//! Side  = C_Y(α, Re) · q̄  · S
+//! Lift  = C_L(alpha, Re) * q-bar * S
+//! Drag  = C_D(alpha, Re) * q-bar * S
 //! ```
 //!
 //! This is the same method used by [JSBSim], [FlightGear], and most
@@ -132,8 +132,7 @@
 //!
 //! ## Coordinate Frames
 //!
-//! Two frames appear throughout the codebase. Understanding both is essential
-//! when reading zone transforms or force vectors.
+//! Two frames appear throughout the codebase.
 //!
 //! ### Body frame (SAE aerospace convention)
 //!
@@ -154,10 +153,10 @@
 //!
 //! This matches the SAE J670 standard used in JSBSim and most aerospace
 //! textbooks (Stevens & Lewis, Etkin & Reid, Nelson).
-//!
 //! Zone transforms in the presets are authored in this frame. Example:
 //! a wing zone at `Transform::from_xyz(-0.10, -2.82, -0.58)` is 0.10 m aft of
 //! the CG datum, 2.82 m to port (−Y), and 0.58 m above datum (−Z = up).
+//! Zone transforms in the presets are authored in this frame.
 //!
 //! ### Stability frame
 //!
@@ -189,15 +188,13 @@
 //!
 //! An aircraft in free flight has **6 degrees of freedom** (6-DoF): three
 //! translational (x, y, z) and three rotational (roll φ, pitch θ, yaw ψ).
-//! Avian integrates all six, so this section explains what Avian is solving and
-//! what `avian_fdm` must supply.
 //!
 //! ### Translational dynamics
 //!
-//! Newton's second law in vector form, **net force equals mass times acceleration:**
+//! Net force = mass * acceleration (Newton's second law):
 //!
 //! ```text
-//! F_net = m · (dV/dt)
+//! F_net = m * (dV/dt)
 //! ```
 //!
 //! where **V** is the centre-of-mass velocity in world coordinates. `avian_fdm`
@@ -226,23 +223,17 @@
 //! roll/pitch/yaw moments. Avian evaluates this system internally; `avian_fdm`
 //! supplies (L, M, N) via [`avian3d::prelude::ConstantTorque`] by computing the
 //! cross product of each zone force with its moment arm.
-//! **Torque = lever arm × force (cross product):**
+//! **Torque = lever arm x force (cross product):**
 //!
 //! ```text
-//! τ_zone = (r_zone − r_CG) × F_zone
+//! tau_zone = (r_zone - r_CG) x F_zone
 //! ```
 //!
 //! where **r_zone** is the zone's world position and **r_CG** is the
 //! world-space centre of mass (read from
 //! [`avian3d::prelude::ComputedCenterOfMass`]).
-//!
-//! ### Why Avian handles integration
-//!
-//! Implementing a numerically stable 6-DoF integrator is non-trivial, it
-//! requires careful handling of quaternion renormalisation, sub-stepping for
-//! stiff systems, and correct coupling between translation and rotation.
-//! Avian provides all of this, tested and optimised. `avian_fdm` stays in its
-//! lane: force and moment computation only.
+//! Avian handles quaternion renormalisation, sub-stepping, and
+//! translation-rotation coupling internally.
 //!
 //! ---
 //!
@@ -250,20 +241,17 @@
 //!
 //! See [`atmosphere`] for the full implementation.
 //!
-//! ### Why density drives everything
-//!
-//! Every aerodynamic force scales with **dynamic pressure**, the kinetic energy
-//! of the airflow per unit volume,
-//! **Dynamic pressure q-bar = half × air density (kg/m³) × airspeed² (m/s)**:
+//! Every aerodynamic force scales with dynamic pressure, which is the
+//! kinetic energy of the airflow per unit volume. Dynamic pressure =
+//! half * air density * airspeed squared:
 //!
 //! ```text
-//! q̄  = ½ · ρ · V²
+//! q-bar = 0.5 * rho * V^2
 //! ```
 //!
-//! where ρ is air density (kg/m³) and V is true airspeed (m/s). At sea level
-//! ρ₀ = 1.225 kg/m³; at 2 500 m it drops to roughly 0.98 kg/m³, a 20%
-//! reduction that directly cuts lift and drag by 20% at the same airspeed.
-//! An aircraft must fly faster at altitude to generate the same lift.
+//! At sea level, rho = 1.225 kg/m^3. At 2 500 m it drops about 20%, directly
+//! cutting lift and drag by 20% at the same airspeed. An aircraft must fly
+//! faster at altitude to generate the same lift.
 //!
 //! Dynamic pressure also controls Reynolds number.
 //! **Reynolds number = (density × speed × chord) ÷ viscosity, a dimensionless ratio
@@ -277,39 +265,10 @@
 //! number governs boundary-layer behaviour: at low Re the flow separates
 //! earlier (sharper stall, higher C_D₀), so the FDM uses Re as the second
 //! dimension of its C_L/C_D lookup tables.
-//!
-//! ### International Standard Atmosphere (ISA)
-//!
-//! The [`atmosphere`] module implements ICAO Doc 7488 for 0–20 km:
-//!
-//! **Troposphere (h ≤ 11 000 m)**: temperature drops linearly with altitude (lapse rate),
-//! pressure follows a power law, density is derived from the ideal gas law:
-//! ```text
-//! T = 288.15 − 0.0065 · h          (K)
-//! p = 101 325 · (T / 288.15)^5.256 (Pa)
-//! ρ = p / (287.053 · T)             (kg/m³)
-//! ```
-//!
-//! **Stratosphere (11 000 m < h ≤ 20 000 m)**: temperature is constant (isothermal layer),
-//! pressure decays exponentially with altitude (barometric formula):
-//! ```text
-//! T = 216.65                                     (K, isothermal)
-//! p = p₁₁ · exp(−g · (h − 11000) / (R · T₁₁))  (Pa)
-//! ρ = p / (R · T)                                (kg/m³)
-//! ```
-//!
-//! Dynamic viscosity μ uses **Sutherland's law**: the gas-kinetic model that
-//! correctly predicts viscosity *increasing* with temperature (opposite to
-//! liquids). **Viscosity scales as temperature to the 3/2 power, corrected by
-//! Sutherland's constant (110.4 K) for real-gas behaviour:**
-//!
-//! ```text
-//! μ = 1.716×10⁻⁵ · (T/273.15)^(3/2) · (273.15 + 110.4) / (T + 110.4)
-//! ```
-//!
-//! Every frame, [`atmosphere::update_atmosphere`] writes a fresh
-//! [`components::AtmosphereState`] to the root entity; the aerodynamics and
-//! propulsion systems read from it.
+//! The [`atmosphere`] module implements the International Standard Atmosphere
+//! (ICAO Doc 7488) for 0-20 km. Each frame,
+//! [`atmosphere::update_atmosphere`] writes a fresh
+//! [`components::AtmosphereState`] to the root entity.
 //!
 //! ---
 //!
@@ -317,250 +276,58 @@
 //!
 //! See [`aerodynamics`] for the full implementation.
 //!
-//! ### Stability derivatives: a Taylor series in disguise
-//!
-//! Aerodynamic coefficients are measured quantities, not derived from first
-//! principles in real-time. The stability-derivative method represents them as
-//! a **Taylor series** around a trim condition (small perturbations).
-//! **Lift coefficient grows linearly with angle of attack up to stall; drag
-//! follows a parabolic polar (increases with lift squared):**
-//!
-//! ```text
-//! C_L(α) ≈ C_L₀ + C_Lα · α + C_Lα² · α² + …
-//! C_D(α) ≈ C_D₀ + k · C_L²        (parabolic drag polar)
-//! ```
-//!
-//! For large-α behaviour (stall, post-stall), a lookup table is more accurate
-//! than a truncated series. `avian_fdm` uses [`components::aero_coeff::AeroCoeff`],
-//! which supports three representations:
-//!
-//! | Variant | Use case |
-//! |---------|----------|
-//! | `Scalar(f64)` | Constant coefficient (e.g. fuselage parasitic drag) |
-//! | `Table1D` | C_L(α) for simple surfaces |
-//! | `Table2D` | C_L(α, Re) for wings where boundary-layer state matters |
-//!
-//! For example, the J3Cub preset uses `Table2D` for wing C_L and C_D, with
-//! α breakpoints from −20° to +20° and two Re columns (1.7 × 10⁶ and 3.7 × 10⁶)
-//! derived from JSBSim's J3Cub.xml and USA-35B airfoil measurements.
-//!
-//! ### Force construction pipeline
-//!
-//! For each [`components::AeroZone`] child:
-//!
-//! 1. Read α, q̄  , Re from [`components::FlightState`] on the root entity.
-//! 2. Evaluate C_L(α, Re), C_D(α, Re), C_Y(α, Re) via bilinear interpolation.
-//! 3. Multiply by the zone's share of reference area (`fraction × S_ref`).
-//! 4. Scale by `Failure.remaining` ∈ [0, 1] (zones at zero remaining contribute nothing).
-//! 5. Construct the force vector in **stability axes**:
-//!    **Force along each axis = aerodynamic coefficient × dynamic pressure × wing area:**
-//!    ```text
-//!    F_stab = (−C_D · q̄  · S,  C_Y · q̄  · S,  −C_L · q̄  · S)
-//!    ```
-//! 6. Rotate to world: `F_world = q_root · R_y(−α) · F_stab`
-//! 7. Write to [`components::ZoneForce`] on the zone entity.
-//!
-//! All of this happens in [`aerodynamics::compute_aero_forces`], which also
-//! evaluates per-zone pure torques from CM/Croll/Cn coefficients and sums
-//! everything into [`avian3d::prelude::ConstantForce`] /
-//! [`avian3d::prelude::ConstantTorque`] on the root.
+//! The aircraft is decomposed into zones. For each [`components::AeroZone`]
+//! child, the system evaluates coefficient tables at the current flight
+//! state, multiplies by dynamic pressure and zone area, and writes the
+//! resulting force and torque. Coefficients support three representations:
+//! constant (`Scalar`), 1-D table over angle of attack (`Table1D`), and
+//! 2-D table over angle of attack and Reynolds number (`Table2D`).
 //!
 //! ### Dynamic damping: emergent vs explicit
 //!
-//! There are two approaches to modeling angular-rate damping in an FDM. avian_fdm
-//! uses the emergent approach for full aircraft, and falls back to explicit coefficients
-//! for sparse models (missiles, simple drones).
-//!
-//! **Emergent damping (full-zone aircraft, default for J3Cub):**
-//!
-//! The per-zone local-angle correction in `zone_local_angles()` shifts each
-//! zone's effective angle of attack by the local angular-rate contribution:
+//! For full-zone aircraft (default), damping emerges from per-zone
+//! local-angle corrections. Each zone gets its own effective angle of attack
+//! based on its position and the body's angular rates:
 //!
 //! ```text
-//! alpha_local = alpha + (p·y - q·x) / V    (roll and pitch rate corrections)
-//! beta_local  = beta  + (r·x)       / V    (yaw rate correction)
+//! alpha_local = alpha + (p*y - q*x) / V (roll and pitch rate corrections)
+//! beta_local  = beta  + (r*x)       / V (yaw rate correction)
 //! ```
 //!
-//! This means the h-stab automatically produces more or less lift when the
-//! aircraft pitches (q), giving pitch damping. The wings produce differential
-//! lift under roll rate (p), giving roll damping. The fin produces side force
-//! under yaw rate (r), giving yaw damping. No explicit coefficient is needed -
-//! it emerges from geometry.
+//! The tail automatically produces restoring forces during pitch, the wings
+//! produce differential lift during roll, and the fin produces side force
+//! during yaw. No explicit damping coefficient is needed.
 //!
-//! **Explicit damping (LodDamping component, sparse models):**
-//!
-//! When a model has too few zones for damping to emerge correctly, attach
-//! [`components::LodDamping`] to the root. The three main derivatives are:
-//!
-//! ```text
-//! DeltaM = C_Mq * (q * c / 2V) * qbar * S * c    (pitch damping)
-//! DeltaL = C_lp * (p * b / 2V) * qbar * S * b    (roll  damping)
-//! DeltaN = C_nr * (r * b / 2V) * qbar * S * b    (yaw   damping)
-//! ```
-//!
-//! The normalised rate (e.g. p·b/2V) is dimensionless: angular rate scaled by the
-//! reference length and divided by airspeed.
-//!
-//! ### Cross-coupling derivatives and damage correctness
-//!
-//! JSBSim and other FDMs also use three cross-coupling derivatives that are
-//! currently not fully modeled in avian_fdm:
-//!
-//! **Clr - roll moment from yaw rate:**
-//! When the aircraft yaws (r > 0, nose right), the left wing moves forward
-//! and the right wing moves backward. The left wing's local velocity becomes
-//! V + r·y_left and the right's becomes V - r·y_right. Since lift scales with
-//! V², the left wing produces more lift, rolling the aircraft. The physical
-//! source is entirely the wing geometry and spanwise extent.
-//!
-//! **Cnp - yaw moment from roll rate (adverse yaw):**
-//! When the aircraft rolls (p > 0, right wing down), the downgoing right wing
-//! produces more lift and therefore more induced drag. That extra drag on one
-//! side yaws the nose right - adverse yaw. The physical source is the wing's
-//! spanwise induced-drag distribution.
-//!
-//! **Cm_alphadot - pitch moment from rate of change of alpha:**
-//! When the wing's angle of attack increases, there is a lag before the
-//! downwash from the wing reaches the horizontal tail. The tail momentarily
-//! sees less downwash than steady state, producing more lift, pitching the
-//! nose down. The physical source is the coupling between wing downwash and
-//! tail, spanning the distance between them.
-//!
-//! **Why global coefficients are wrong for damaged aircraft:**
-//!
-//! If these derivatives are stored as whole-aircraft constants on the root
-//! entity (as in [`components::LodDamping`] or as JSBSim tables), they remain
-//! at their intact-aircraft values even after wing or tail damage. A pilot
-//! losing a wingtip would still see full Dutch-roll coupling. This is
-//! physically wrong.
-//!
-//! The correct approach for a damage-aware simulator:
-//!
-//! - Clr and Cnp should emerge from per-zone dynamic-pressure scaling. When a
-//!   wing zone is failed (Failure::remaining goes to zero), its contribution to
-//!   the velocity differential vanishes automatically, reducing Clr and Cnp
-//!   without any special bookkeeping. This requires extending `zone_local_angles`
-//!   to also scale each zone's local qbar by (V +/- r·y)^2 / V^2 - currently
-//!   only the angle is corrected, not the dynamic pressure.
-//!
-//! - Cm_alphadot depends on the wing-to-tail downwash coupling and cannot emerge
-//!   from instant angle corrections alone. A reasonable approximation is to scale
-//!   a global coefficient by the h-stab Failure::remaining, so destroying the
-//!   tail correctly drives it to zero.
-//!
-//! JSBSim J3Cub values (from J3Cub.xml) for reference:
-//!
-//! ```text
-//! Clr          =  table(alpha, Re)     range: -0.035 to +8.42
-//! Cnp          =  table(Re)            range: -2.15  to -0.0006
-//! Cm_alphadot  =  -7.5904
-//! ```
+//! For sparse models (missiles, simple drones), attach
+//! [`components::LodDamping`] to the root for explicit damping derivatives.
 //!
 //! ### Control surfaces
 //!
-//! Each zone can be tagged with a [`components::ControlSurfaceRole`]:
-//!
-//! | Role | Input read | Effect |
-//! |------|-----------|--------|
-//! | `Elevator` | `ControlInputs::elevator` | Scales zone C_L linearly |
-//! | `AileronLeft` | `ControlInputs::aileron` | C_L scaled +aileron |
-//! | `AileronRight` | `ControlInputs::aileron` | C_L scaled −aileron |
-//! | `Rudder` | `ControlInputs::rudder` | Scales zone C_Y linearly |
-//!
-//! Deflection also increases drag slightly (C_D scaled by `|input|`).
-//! The moment arm from zone position to CG generates roll/pitch/yaw moments
-//! automatically. No separate moment coefficient needed.
-//!
-//! ---
+//! Each zone can be tagged with a [`components::ControlSurfaceRole`]. The
+//! moment arm from zone position to CG generates roll/pitch/yaw moments
+//! automatically. Deflection also increases drag slightly.
 //!
 //! ## Propulsion Coupling
 //!
-//! *Only compiled with `features = ["propulsion"]`.* See [`propulsion`].
-//!
-//! ### Piston engine model
-//!
-//! Thrust at altitude follows the **Gagg-Ferrar correction**: **maximum thrust
-//! scaled by throttle position and air density ratio raised to the 0.7 power
-//! (empirical constant for naturally-aspirated piston engines):**
+//! Thrust follows the Gagg-Ferrar altitude correction. Maximum thrust is
+//! scaled by throttle position and air density ratio:
 //!
 //! ```text
-//! T = T_max · η_throttle · (ρ/ρ₀)^0.7
+//! T = T_max * throttle_fraction * (rho / rho_0)^0.7
 //! ```
 //!
-//! where `η_throttle` is read from a configurable thrust-fraction lookup table
-//! (allowing non-linear throttle response curves). The density exponent 0.7 is
-//! empirically validated for naturally-aspirated piston engines.
-//!
-//! ### Actuator disk: propwash velocity
-//!
-//! The induced velocity behind the propeller (used later for propwash coupling)
-//! is estimated with **actuator disk theory**: **propeller-induced airspeed =
-//! square root of (thrust ÷ (2 × air density × disk area)), where disk area = π × radius²:**
-//!
-//! ```text
-//! V_ind = √(T / (2 · ρ · A_disk))  ,  A_disk = π · (d/2)²
-//! ```
-//!
-//! This is stored in [`components::PropwashState`] on the root entity. Future
-//! work will use V_ind to augment the lift of zones in the propwash stream (elevator and
-//! horizontal stabiliser on a tractor aircraft).
-//!
-//! ### Thrust axis
-//!
-//! Each [`components::EngineZone`] specifies `thrust_axis_body: DVec3`, the
-//! thrust direction in body frame. For a normal tractor aircraft this is
-//! `DVec3::X` (forward); for a pusher or a tilted engine it can point elsewhere.
-//! The body-frame axis is rotated to world space by the root quaternion before
-//! writing to [`components::ZoneForce`].
+//! Propeller-induced velocity is estimated with actuator disk theory for
+//! future propwash coupling. Each [`components::EngineZone`] specifies a
+//! thrust direction in body frame.
 //!
 //! ---
 //!
 //! ## Emergent Behavior
 //!
-//! The zone-based architecture produces a large set of physically correct
-//! behaviors without any explicit global coefficient for them. They arise
-//! because forces are computed per zone at each zone's aerodynamic centre, the
-//! moment arm (AC - CG) x force is computed automatically each step, and Avian
-//! recomputes mass, CG, and inertia tensor from surviving colliders.
-//!
-//! The key mechanism is the per-zone local-angle correction. Before evaluating
-//! coefficients, each zone gets its own effective angle of attack:
-//!
-//! ```text
-//! alpha_local = alpha + (p*y - q*x) / V    (roll and pitch rate)
-//! beta_local  = beta  + (r*x)       / V    (yaw rate)
-//! ```
-//!
-//! where x and y are the zone's position relative to CG in body frame, and p,
-//! q, r are body angular rates. This single formula drives most of the
-//! emergent behaviors listed below.
-//!
-//! ### Stability and damping
-//!
-//! **Static longitudinal stability (Cm_alpha):**
-//! The h-stab is aft of the CG. When alpha increases, the h-stab produces
-//! more lift, creating a nose-down moment. The tail volume (area x arm) sets
-//! the restoring stiffness. No Cm_alpha coefficient is specified.
-//!
-//! **Pitch damping (Cm_q):**
-//! Under pitch rate q, the h-stab sees alpha_local += q * x_tail / V.
-//! The extra lift opposes the pitch rate. Naturally weakens if the tail is
-//! damaged.
-//!
-//! **Roll damping (Cl_p):**
-//! Under roll rate p, the advancing wing sees alpha_local += p * y / V (more
-//! lift) and the retreating wing sees less. The differential lift opposes the
-//! roll. Naturally weaker after losing a wing panel.
-//!
-//! **Yaw damping (Cn_r):**
-//! Under yaw rate r, the fin sees beta_local += r * y_fin / V, producing a
-//! side force that opposes the yaw. Naturally zero after total fin loss.
-//!
-//! **Dihedral stability (Cl_beta):**
-//! A wing mounted above the CG (positive dihedral) rolls away from sideslip
-//! because the lower wing is more exposed to freestream. The fin positioned
-//! above the CG also contributes: its side force has a moment arm in z that
-//! rolls the aircraft away from sideslip. Both effects emerge from geometry.
+//! The zone-based architecture produces physically correct behaviors without
+//! explicit global coefficients. They arise because forces are computed per
+//! zone at each zone's position, the moment arm to the CG is computed each
+//! step, and Avian recomputes mass/CG/inertia from surviving colliders.
 //!
 //! ### Stall and high angle-of-attack behavior
 //!
@@ -761,10 +528,8 @@
 //!
 //! ## Zone Decomposition and Damage
 //!
-//! ### Decomposing an aircraft into zones
-//!
-//! The key design insight: **each structural part of the aircraft is a separate
-//! ECS entity** (an [`components::AeroZone`]) child of the root rigid body.
+//! Each structural part of the aircraft is a separate ECS entity
+//! (an [`components::AeroZone`]) child of the root rigid body.
 //! Each zone owns:
 //! - A [`avian3d::prelude::Collider`] that gives it physical volume and mass
 //!   (via [`avian3d::prelude::ColliderDensity`])
@@ -774,19 +539,6 @@
 //!
 //! Avian **automatically** computes total mass, CG, and inertia tensor from
 //! all child colliders. No explicit bookkeeping required.
-//!
-//! **Typical zone layout:**
-//!
-//! | Zone | Aerodynamic role | Dominant coefficients |
-//! |------|------------------|-----------------------|
-//! | Wing panels (×6) | Lift + roll | C_L(α, Re) table |
-//! | Ailerons (×2) | Roll control | C_L scaled by aileron input |
-//! | Fuselage | Parasitic drag | C_D only |
-//! | H-stabiliser | Pitch stability | C_L(α) restorative |
-//! | Elevator | Pitch control | C_L scaled by elevator input |
-//! | V-tail | Yaw stability (mass placeholder) | C_Y = 0 until v2 |
-//! | Rudder | Yaw control | C_Y scaled by rudder input |
-//! | Engine zone | Thrust + mass |, |
 //!
 //! ### Collider strategy
 //!
@@ -811,39 +563,21 @@
 //! `avian_fdm` only defines `Failure` as the damage target; how damage is delivered
 //! is outside the library's scope.
 //!
-//! ### How zone contributions compose
-//!
-//! Total lift = Σ C_L_zone · q̄ · S_zone (summed over all zones with remaining > 0)
-//!
-//! Each zone's `fraction` field controls its share of the reference area S_ref.
-//! For the J3Cub wing, six panels each take 15–17.5% of total wing area; they
-//! sum to 100%. The fuselage and tail zones have their own `wing_area_m2` (via
-//! the root [`components::AircraftGeometry`]) so their coefficients scale correctly.
-//!
 //! ### Failure degradation
 //!
-//! When [`components::Failure::remaining`] is set to a value ∈ (0, 1):
+//! When [`components::Failure::remaining`] is set to a value in (0, 1):
 //!
 //! ```text
-//! C_L_effective = C_L · remaining
-//! C_D_effective = C_D · remaining + C_D_damage · (1 − remaining) / q̄
+//!
+//! C_L_effective = C_L * remaining
+//! C_D_effective = C_D * remaining + C_D_damage * (1 - remaining) / q-bar
 //! ```
 //!
-//! A failed zone produces less lift AND more drag (deformation increases
-//! induced drag). At `remaining = 0`, the zone contributes zero force. It has
+//! A failed [`components::AeroZone`] produces less lift AND more drag (deformation
+//! increases induced drag). At `remaining = 0`, the zone contributes zero force. It has
 //! effectively separated from the airframe and produces no net aerodynamic effect.
-//!
-//! ### Physical detachment
-//!
-//! `avian_fdm` does **not** implement detachment logic. That is the game's
-//! responsibility. When `remaining` reaches `0.0`, the zone silently contributes
-//! zero force. The game may then choose to:
-//!
-//! - Remove the zone entity entirely
-//! - Detach it by removing [`bevy::prelude::ChildOf`] and inserting
-//!   [`avian3d::prelude::RigidBody::Dynamic`] (Avian recomputes mass/CG automatically)
-//! - Replace it with a particle effect
-//! - Leave it in place (zero-force zone costs very little)
+//! Physical detachment (removing the entity or re-parenting it) is the game's
+//! responsibility.
 //!
 //! ---
 //!
@@ -890,47 +624,39 @@
 //!
 //! ## Data Flow
 //!
-//! All FDM systems run in `PhysicsStepSystems::BroadPhase`: after Avian's
-//! child-collider position propagation (First), but before the constraint
-//! solver. Forces are written to `ConstantForce`/`ConstantTorque` and read by
-//! Avian's `ForceSystems::ApplyConstantForces` in the Solver phase.
-//!
 //! ```text
-//! ┌── PhysicsStepSystems::BroadPhase (each physics substep) ─────────────────┐
-//! │  1. update_atmosphere    reads: Position(root)                           │
-//! │                          writes: AtmosphereState{ρ, p, T, a, μ}          │
-//! │                                                                          │
-//! │  2. update_flight_state  reads: AtmosphereState, LinearVelocity(root),   │
-//! │                                 Rotation(root)                           │
-//! │                          writes: FlightState{α, β, V, q̄  , Re, Mach, p,  │
-//! │                                              q, r}                       │
-//! │                                                                          │
-//! │  3. compute_engine_zone_forces  [propulsion feature]                     │
-//! │                          reads: FlightState, AtmosphereState,            │
-//! │                                 ControlInputs, EngineZone                │
-//! │                          writes: ZoneForce(engine), PropwashState        │
-//! │                                                                          │
-//! │  4. compute_aero_forces                                                  │
-//! │                          reads: FlightState, AircraftGeometry,           │
-//! │                                 ControlInputs, AeroZone, Failure,        │
-//! │                                 GlobalTransform(zone), Children,         │
-//! │                                 Position(root), Rotation(root),          │
-//! │                                 ComputedCenterOfMass(root)               │
-//! │                          writes: ZoneForce per child (side-effect),      │
-//! │                                  ConstantForce(root),                    │
-//! │                                  ConstantTorque(root)                    │
-//! └──────────────────────────────────────────────────────────────────────────┘
-//!         │
-//!         v  PhysicsStepSystems::Solver , Avian integrates forces
-//!            Position, LinearVelocity, Rotation, AngularVelocity updated
-//!         │
-//!         v  PostUpdate , Bevy propagates Transform to GlobalTransform
+//! +-- PhysicsStepSystems::BroadPhase (each physics substep) ----------------+
+//! |  1. update_atmosphere    reads: Position(root)                          |
+//! |                          writes: AtmosphereState                        |
+//! |                                                                         |
+//! |  2. update_flight_state  reads: AtmosphereState, LinearVelocity,        |
+//! |                                 Rotation(root)                          |
+//! |                          writes: FlightState                            |
+//! |                                                                         |
+//! |  3. compute_engine_zone_forces  [propulsion feature]                    |
+//! |                          reads: FlightState, AtmosphereState,           |
+//! |                                 ControlInputs, EngineZone               |
+//! |                          writes: ZoneForce(engine), PropwashState       |
+//! |                                                                         |
+//! |  4. compute_aero_forces                                                 |
+//! |                          reads: FlightState, AircraftGeometry,          |
+//! |                                 ControlInputs, AeroZone, Failure,       |
+//! |                                 GlobalTransform(zone), Children         |
+//! |                          writes: ZoneForce, ConstantForce(root),        |
+//! |                                  ConstantTorque(root)                   |
+//! +-------------------------------------------------------------------------+
+//!         |
+//!         v  Solver: Avian integrates forces
+//!         |
+//!         v  PostUpdate: Bevy propagates transforms
 //! ```
 //!
 //! ### Inserting a custom system (e.g. autopilot)
 //!
-//! Place it after `AircraftFdmSystem::FlightState` and before
-//! `AircraftFdmSystem::Forces` using the named system sets:
+//!
+//! The autopilot reads [`components::FlightState`] and writes
+//! [`components::ControlInputs`]. Place it after `AircraftFdmSystem::FlightState`
+//! and before `AircraftFdmSystem::Forces`:
 //!
 //! ```rust,no_run
 //! # use bevy::prelude::*;
@@ -946,23 +672,14 @@
 //! // );
 //! ```
 //!
-//! The autopilot reads [`components::FlightState`] and writes
-//! [`components::ControlInputs`]; both are available at that point in the chain.
-//!
 //! ---
 //!
 //! ## Feature Flags
 //!
 //! | Feature      | Default | Description |
 //! |--------------|---------|-------------|
-//! | `propulsion` | **on**  | Piston engine ([`components::EngineZone`]) and propwash model |
 //! | `debug-plugin` | off   | Bevy Gizmo overlays for forces, moments, and zones ([`debug_render`]) |
 //! | `presets`    | off     | Reference aircraft presets ([`presets`], e.g. J-3 Cub) |
-//!
-//! [`components::Failure`] is always available. No feature gate needed.
-//! Detachment behaviour when `remaining = 0` is the game's responsibility.
-//! Disable `propulsion` with `default-features = false` for gliders and
-//! unpowered aircraft.
 //!
 //! ---
 //!
@@ -1004,22 +721,6 @@
 //!   (International Civil Aviation Organization, 1993).**
 //!   The authoritative definition of the International Standard Atmosphere
 //!   implemented in [`atmosphere`]. Free download from the ICAO store.
-//!
-//! ### Open-source simulators
-//!
-//! - **[JSBSim](https://github.com/JSBSim-Team/jsbsim)**. Mature open-source
-//!   FDM used by FlightGear and the US military. The J3Cub aerodynamic tables
-//!   in [`presets::j3cub`] are derived from JSBSim's `J3Cub.xml` and cross-
-//!   checked against USA-35B airfoil data. JSBSim's documentation explains the
-//!   stability-derivative XML format in detail.
-//!
-//! - **[FlightGear](https://www.flightgear.org/)**. Open-source flight
-//!   simulator using JSBSim as its default FDM. Useful for cross-validating
-//!   flight behaviour and visualising aerodynamic data.
-//!
-//! - **[OpenPilot / ArduPilot](https://ardupilot.org/)**. Real autopilot
-//!   firmware with extensive FDM documentation. Relevant if adding a stability-
-//!   augmentation system on top of `avian_fdm`.
 //!
 //! [Avian]: https://crates.io/crates/avian3d
 //! [JSBSim]: https://jsbsim.sourceforge.net/

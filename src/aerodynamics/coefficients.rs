@@ -199,7 +199,9 @@ mod tests {
         assert_eq!(c.cn,    0.0, "Absent cn -> 0");
     }
 
-    // ── AeroCoeff variant behaviour ───────────────────────────────────────
+    //
+    // AeroCoeff variant behaviour
+    //
 
     #[test]
     fn aero_coeff_scalar_evaluate() {

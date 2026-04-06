@@ -49,7 +49,9 @@ use crate::components::{
 };
 use crate::math::to_dvec3;
 
-// ── Step 3: Engine force accumulation ────────────────────────────────────────
+//
+// Step 3: Engine force accumulation
+//
 
 /// Accumulate a pre-computed engine zone's thrust into the root force/torque.
 ///
@@ -68,7 +70,9 @@ fn accumulate_engine_force(
     }
 }
 
-// ── Orchestrator system ──────────────────────────────────────────────────────
+//
+// Orchestrator system
+//
 
 /// Bevy system that orchestrates the aerodynamic pipeline each physics step.
 pub fn compute_aero_forces(

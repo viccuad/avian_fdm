@@ -1,6 +1,4 @@
 //! Engine zone component and propwash state.
-//!
-//! Only compiled with `features = ["propulsion"]`.
 
 use crate::_bevy::*;
 use bevy_math::DVec3;
@@ -23,7 +21,7 @@ pub struct EngineZone {
     /// Sea-level static maximum thrust (N).
     pub max_thrust_n: f64,
     /// Throttle-to-thrust-fraction lookup table. Each entry is `[throttle, fraction]`.
-    /// `throttle` ∈ [0, 1]. Must be strictly increasing in throttle.
+    /// `throttle` in [0, 1]. Must be strictly increasing in throttle.
     pub throttle_curve: Vec<[f64; 2]>,
     /// Propeller diameter (m). Used to compute induced velocity:
     /// V_ind = √(T / (2ρA)).

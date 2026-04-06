@@ -12,7 +12,9 @@ use crate::_bevy::*;
 use crate::components::{AeroZone, AircraftGeometry, Failure, FlightState, GizmoContours, GizmoShape, ZoneForce};
 use super::configuration::{FdmDebugRender, FdmGizmos};
 
-// ── Centre of gravity ─────────────────────────────────────────────────────────
+//
+// Centre of gravity
+//
 
 /// Draw a sphere at the aircraft's centre of gravity (CG).
 ///
@@ -32,7 +34,9 @@ pub(super) fn debug_render_cg(
     }
 }
 
-// ── Aerodynamic centres ───────────────────────────────────────────────────────
+//
+// Aerodynamic centres
+//
 
 /// Draw a sphere at each zone's aerodynamic centre (AC).
 ///
@@ -59,7 +63,9 @@ pub(super) fn debug_render_ac(
     }
 }
 
-// ── Force arrows ──────────────────────────────────────────────────────────────
+//
+// Force arrows
+//
 
 /// Draw a combined aero force arrow per zone, originating from the zone AC.
 ///
@@ -140,7 +146,9 @@ pub(super) fn debug_render_resultant(
     }
 }
 
-// ── Moment arcs ───────────────────────────────────────────────────────────────
+//
+// Moment arcs
+//
 
 /// Draw pitch, roll, and yaw moment arrows centered on the CG.
 ///
@@ -196,7 +204,9 @@ pub(super) fn debug_render_moments(
     }
 }
 
-// ── Zone health wireframes ────────────────────────────────────────────────────
+//
+// Zone health wireframes
+//
 
 /// Draw zone outline wireframes using [`GizmoShape`] and [`GizmoContours`].
 ///
@@ -333,7 +343,9 @@ fn draw_zone_shape(
     }
 }
 
-// ── Angle-of-attack / wind indicator ─────────────────────────────────────────
+//
+// Angle-of-attack / wind indicator
+//
 
 /// Draw the relative-wind arrow and angle-of-attack / sideslip indicators.
 ///

@@ -1,14 +1,16 @@
 //! Aircraft-level components: geometry and the core spawn bundle.
 
 use crate::_bevy::*;
+use avian3d::prelude::{ConstantForce, ConstantTorque, RigidBody};
 use serde::{Deserialize, Serialize};
-use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 
-/// Whole-aircraft angular-rate damping derivatives, used as an **LOD fallback**.
+/// Whole-aircraft angular-rate damping derivatives (LOD = Level of Detail
+/// fallback).
 ///
-/// Add this component to the aircraft root entity when the zone layout is too
-/// sparse to produce realistic physical damping from geometry alone (e.g. a
-/// single-zone missile body, or a low-fidelity AI aircraft).
+/// Damping derivatives are coefficients that control how strongly the aircraft
+/// resists rotation around each axis. Add this component to the aircraft root
+/// when the zone layout is too sparse to produce realistic damping from
+/// geometry alone (e.g. single-zone missiles, low-fidelity aircraft).
 ///
 /// **Mutually exclusive with per-zone local α/β**, when this component is
 /// present, [`compute_aero_forces`](crate::aerodynamics::compute_aero_forces)
@@ -24,9 +26,9 @@ use avian3d::prelude::{RigidBody, ConstantForce, ConstantTorque};
 /// speed to forward speed. Negative derivatives mean damping opposes motion.**
 ///
 /// ```text
-/// ΔL = Cl_p · (p · b / 2V) · q̄ · S · b     roll  damping → body X
-/// ΔM = Cm_q · (q · c̄ / 2V) · q̄ · S · c̄    pitch damping → body Y
-/// ΔN = Cn_r · (r · b / 2V) · q̄ · S · b     yaw   damping → body Z
+/// ΔL = Cl_p * (p * b / 2V) * q̄  * S * b     roll damping (body X)
+/// ΔM = Cm_q * (q * c̄ / 2V) * q̄  * S * c̄     pitch damping (body Y)
+/// ΔN = Cn_r * (r * b / 2V) * q̄  * S * b     yaw damping (body Z)
 /// ```
 ///
 /// All derivatives should be negative (damping opposes motion).
@@ -48,14 +50,11 @@ pub struct LodDamping {
 
 /// Lift-induced drag model.
 ///
-/// Add this component to the aircraft root entity to enable whole-aircraft
-/// induced drag. **Induced drag coefficient = lift coefficient squared ÷ (π ×
-/// Oswald efficiency factor × aspect ratio). Aspect ratio = wingspan² ÷ wing
-/// area. See: induced drag, drag polar, Oswald efficiency.**
+/// Induced drag is the extra drag caused by generating lift, because
+/// wing-tip vortices redirect airflow downward behind the wing.
 ///
-/// ```text
-/// CD_i = CL² / (π · e · AR),   AR = b² / S
-/// ```
+/// Add this component to the aircraft root entity to enable whole-aircraft
+/// induced drag. See: induced drag, drag polar, Oswald efficiency.
 ///
 /// **Omit this component** for:
 /// - **Gliders**, induced drag is typically already embedded in the wing zone
@@ -69,31 +68,36 @@ pub struct LodDamping {
 /// - Any conventional lifting aircraft whose zone CD comes from a 2-D profile
 ///   drag polar (JSBSim-style) that separates parasite and induced drag.
 ///
-/// | Aircraft type | Typical *e* |
-/// |---|---|
-/// | High-wing light aircraft (J3 Cub) | 0.85–0.95 |
-/// | Low-wing monoplane | 0.75–0.85 |
-/// | Elliptical wing (theoretical ideal) | 1.0 |
-/// | Delta / swept wing | 0.6–0.75 |
+/// Induced drag coefficient = lift coefficient squared divided by
+/// (pi * Oswald efficiency * aspect ratio):
+///
+/// ```text
+/// CD_i = CL² / (π * e * AR),   AR = b² / S
+/// ```
+///
+/// Typical Oswald efficiency values: high-wing light aircraft 0.85-0.95,
+/// low-wing monoplane 0.75-0.85, elliptical wing (ideal) 1.0,
+/// delta/swept wing 0.6-0.75.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct InducedDrag {
-    /// Oswald span-efficiency factor *e* ∈ (0, 1].
+    /// Oswald span-efficiency factor *e*, range (0, 1].
     ///
-    /// Accounts for non-elliptical span loading, wingtip vortex losses, and
-    /// fuselage interference.  Higher is better; 1.0 is the theoretical
-    /// elliptical ideal.
+    /// Measures how close the wing's lift distribution is to the ideal
+    /// elliptical shape. 1.0 = perfect (no wasted energy), lower values
+    /// account for real-world losses from wing shape and fuselage
+    /// interference.
     pub oswald_factor: f64,
 }
 
-/// Wing and tail geometry constants used for aerodynamic non-dimensionalisation
-/// (q̄ · S, q̄ · S · b, q̄ · S · c̄).
+/// Wing and tail geometry constants used for converting forces to
+/// dimensionless coefficients (non-dimensionalisation) and back.
 ///
 /// Lives on the **aircraft root entity** as part of [`AircraftCoreBundle`].
 ///
-/// Optional components, add separately to the root entity as needed:
-/// - [`LodDamping`], explicit damping derivatives for sparse-zone LOD aircraft.
-/// - [`InducedDrag`], lift-induced drag for conventional lifting aircraft.
+/// Optional components (add separately to the root entity as needed):
+/// - [`LodDamping`]: explicit damping for sparse-zone aircraft.
+/// - [`InducedDrag`]: lift-induced drag for conventional aircraft.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct AircraftGeometry {

@@ -1,4 +1,4 @@
-//! System wiring, registers all FDM systems into Avian's `PhysicsSchedule`
+//! System wiring: registers all FDM systems into Avian's `PhysicsSchedule`
 //! in the correct dependency order.
 //!
 //! ## Execution order within `PhysicsStepSystems::BroadPhase`

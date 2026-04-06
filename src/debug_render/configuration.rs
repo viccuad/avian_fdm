@@ -147,7 +147,9 @@ impl FdmGizmos {
     }
 }
 
-// ── Per-entity override ───────────────────────────────────────────────────────
+//
+// Per-entity override
+//
 
 /// Per-zone debug render override. Attach to an [`AeroZone`] entity to
 /// override the global [`FdmGizmos`] colour for that zone's wireframe.

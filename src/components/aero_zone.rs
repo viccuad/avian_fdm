@@ -10,29 +10,17 @@ use serde::{Deserialize, Serialize};
 ///
 /// Attach to any child entity that has an Avian [`Collider`]. The FDM
 /// system queries all entities with this component, evaluates the coefficients
-/// at the current flight state, and accumulates force + torque onto the
+/// at the current flight state, and accumulates force and torque onto the
 /// nearest `RigidBody` ancestor.
 ///
 /// ## Aerodynamic centre offset
 ///
-/// By default, aerodynamic forces are applied at the zone entity's origin
-/// (its [`Transform`] position). When building aircraft from 3D models
-/// (e.g. in Blender), it is often more convenient to place the zone entity
-/// at the geometric centre of its mesh, then specify where the aerodynamic
-/// centre is relative to that origin via [`ac_offset`](Self::ac_offset).
+/// The aerodynamic centre is the point on a wing section where the pitching
+/// moment does not change with angle of attack. By default, forces are applied
+/// at the zone entity's origin. Set [`ac_offset`](Self::ac_offset) to shift
+/// the force application point relative to the entity origin.
 ///
-/// ```text
-///   Zone origin (mesh centre)
-///        │
-///        ├── ac_offset ──▶ Aerodynamic Centre
-///        │                  (force application point)
-/// ```
-///
-/// The moment-coefficient data (CM, Croll, Cn) is assumed to be referenced
-/// to the aerodynamic centre.
-///
-/// Failure state is tracked separately via [`super::Failure`]. When absent, the
-/// zone is treated as fully intact.
+/// Failure state is tracked separately via [`super::Failure`].
 ///
 /// ## Coefficient presence semantics
 ///
@@ -91,40 +79,17 @@ pub struct AeroZone {
     /// If `Some`, this zone acts as a control surface. Its coefficients are
     /// additionally scaled by the matching [`super::ControlInputs`] value.
     pub control_role: Option<ControlSurfaceRole>,
-    /// Extra drag added when the zone is partially failed. Represents structural drag from
-    /// deformation.
-    ///
-    /// `None` (the default) means this zone has no damage-drag model. This is
-    /// the common case for most zones. `Some(coeff)` enables the calculation.
-    /// **Extra drag = damage coefficient × fraction destroyed ÷ dynamic pressure.
-    /// Peaks at intermediate failure; zero when fully intact or fully detached.**
-    ///
-    /// ```text
-    /// CD_extra = coeff × (1 − remaining) / q̄   when remaining > 0
-    ///          = 0                              when remaining == 0 (detached)
-    /// ```
-    ///
-    /// Only set this on zones where partial failure causes visible structural
-    /// deformation that increases drag (e.g. a bent wing panel, torn fabric).
+    /// Extra drag added when the zone is partially failed (structural
+    /// deformation drag). `None` (default) disables this. Extra drag =
+    /// coefficient * fraction destroyed / dynamic pressure. Zero when fully
+    /// intact or fully detached.
     pub damage_drag_coeff: Option<f64>,
 
-    /// Aerodynamic planform area of this zone (m²).
+    /// Aerodynamic planform area of this zone (m^2).
     ///
-    /// Force is computed as `coeff * q_bar * area_m2`, so each zone is
-    /// self-contained: its CL/CD tables hold the true airfoil coefficients and
-    /// the area scales them to the correct force magnitude. This replaces the
-    /// old pattern of scaling whole-aircraft coefficients by area fraction and
-    /// multiplying by the aircraft reference area.
-    ///
-    /// For wing zones, set this to the physical planform area of the panel.
-    /// For tail and control surface zones whose coefficients were derived from
-    /// whole-aircraft stability derivatives (e.g. CM_alpha, CN_beta), set this
-    /// to the aircraft reference wing area so that the derived coefficients
-    /// produce the correct force.
-    ///
-    /// Defaults to 0.0, meaning the zone produces no aerodynamic force. This is
-    /// correct for mass-only zones (fuselage, struts, gear) that have zero
-    /// CL/CD.
+    /// Force = coefficient * q-bar * area_m2, so each zone is
+    /// self-contained. For wing zones, set to the physical planform area.
+    /// Defaults to 0.0 (no aerodynamic force, correct for mass-only zones).
     pub area_m2: f64,
 
     /// Reference chord for this zone (m), used to dimensionalize pitching-moment

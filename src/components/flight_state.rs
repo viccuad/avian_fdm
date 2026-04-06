@@ -12,17 +12,20 @@ use serde::{Deserialize, Serialize};
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct FlightState {
-    /// Angle of attack α (rad). Positive = nose above relative wind.
+    /// Angle of attack, alpha (rad). Positive = nose above relative wind.
     pub alpha_rad: f64,
-    /// Sideslip angle β (rad). Positive = nose left of relative wind.
+    /// Sideslip angle, beta (rad). Positive = nose left of relative wind.
     pub beta_rad: f64,
     /// True airspeed V (m/s).
     pub airspeed_ms: f64,
-    /// Mach number M = V / a (dimensionless).
+    /// Mach number = airspeed / speed of sound (dimensionless).
     pub mach: f64,
-    /// Dynamic pressure q̄ = ½ρV² (Pa).
+    /// Dynamic pressure, q-bar = half * density * airspeed^2 (Pa).
     pub dynamic_pressure_pa: f64,
-    /// Reynolds number Re = ρVc̄/μ (dimensionless).
+    /// Reynolds number (dimensionless). Ratio of inertial to viscous forces
+    /// in the airflow; determines whether the boundary layer is laminar or
+    /// turbulent.
+    /// Re = ρVc̄/μ (dimensionless).
     pub reynolds_number: f64,
     /// Geometric altitude above sea level (m).
     pub altitude_m: f64,

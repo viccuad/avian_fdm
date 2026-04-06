@@ -1,8 +1,14 @@
 //! [`AeroCoeff`], aerodynamic coefficient storage and lookup.
 //!
-//! An aerodynamic coefficient (e.g. CL, CD) can be a constant, a 1-D table
-//! over angle of attack, or a 2-D table over angle of attack × Reynolds
-//! number. The 2-D table is the most accurate and matches JSBSim's default
+//! Aerodynamic coefficients are dimensionless numbers that describe how much
+//! lift, drag, or other force an airfoil produces at a given flight condition.
+//! They vary with angle of attack (the angle between the wing chord and the
+//! oncoming air) and with Reynolds number (a dimensionless ratio of inertial
+//! to viscous forces that determines whether airflow is smooth or turbulent).
+//!
+//! An aerodynamic coefficient (e.g: CL, CD) can be stored as a constant, a 1-D
+//! table over angle of attack, or a 2-D table over angle of attack and Reynolds
+//! number. The 2-D form is the most accurate and matches JSBSim's default
 //! representation.
 //!
 //! ## Stability derivatives
@@ -13,25 +19,21 @@
 //! angle-of-attack + pitch-rate correction term. See: stability
 //! derivatives, aerodynamic Taylor series.**
 //!
-//! ```text
-//! CL(α, Re) ≈ CL₀ + CL_α · α + CL_q · (q · c̄/2V) + …
-//! ```
+//! For a high-fidelity simulation, pre-computed tables of CL vs alpha
+//! (at several Re valyues) are more accurate than linear approximations,
+//! especially near stall (the flight regime where the wing abruptly loses lift).
 //!
-//! For a high-fidelity simulation (matching JSBSim to ±1%), pre-computed
-//! tables of CL vs α (at several Re values) are more accurate than linear
-//! derivatives, especially near stall. `AeroCoeff::Table2D` stores this
-//! directly.
+//! ```text
+//! CL(α, Re) ≈ CL₀ + CL_α * α + CL_q * (q & c̄/2V) + …
+//! ```
 //!
 //! ## Table storage layout
 //!
 //! `Table2D::data` is a **flat, row-major `Vec<f64>`** of length
-//! `rows.len() × cols.len()`. Element at row index `i`, column index `j`
+//! `rows.len() * cols.len()`. Element at row index `i`, column index `j`
 //! is accessed as `data[i * cols.len() + j]`. This layout uses a single
-//! heap allocation, maximises cache locality during bilinear interpolation,
-//! and serialises efficiently.
-//!
-//! A `Vec<Vec<f64>>` (jagged array) would require one allocation per row
-//! and has poor cache behaviour, it is intentionally avoided.
+//! heap allocation and maximises cache locality during bilinear
+//! interpolation.
 
 use crate::_bevy::*;
 use serde::{Deserialize, Serialize};
@@ -187,13 +189,23 @@ impl AeroCoeff {
     /// ```
     pub fn with_post_stall_lift(self, aspect_ratio: f64) -> Self {
         match self {
-            AeroCoeff::Table1D { breakpoints, values } => {
+            AeroCoeff::Table1D {
+                breakpoints,
+                values,
+            } => {
                 let (bp, vals) = extend_1d_lift(&breakpoints, &values, aspect_ratio);
-                AeroCoeff::Table1D { breakpoints: bp, values: vals }
+                AeroCoeff::Table1D {
+                    breakpoints: bp,
+                    values: vals,
+                }
             }
             AeroCoeff::Table2D { rows, cols, data } => {
                 let (new_rows, new_data) = extend_2d_lift(&rows, &cols, &data, aspect_ratio);
-                AeroCoeff::Table2D { rows: new_rows, cols, data: new_data }
+                AeroCoeff::Table2D {
+                    rows: new_rows,
+                    cols,
+                    data: new_data,
+                }
             }
             other => other,
         }
@@ -235,15 +247,28 @@ impl AeroCoeff {
         match self {
             AeroCoeff::Scalar(cd0) => {
                 let (bp, vals) = scalar_to_drag_table(cd0, aspect_ratio);
-                AeroCoeff::Table1D { breakpoints: bp, values: vals }
+                AeroCoeff::Table1D {
+                    breakpoints: bp,
+                    values: vals,
+                }
             }
-            AeroCoeff::Table1D { breakpoints, values } => {
+            AeroCoeff::Table1D {
+                breakpoints,
+                values,
+            } => {
                 let (bp, vals) = extend_1d_drag(&breakpoints, &values, aspect_ratio);
-                AeroCoeff::Table1D { breakpoints: bp, values: vals }
+                AeroCoeff::Table1D {
+                    breakpoints: bp,
+                    values: vals,
+                }
             }
             AeroCoeff::Table2D { rows, cols, data } => {
                 let (new_rows, new_data) = extend_2d_drag(&rows, &cols, &data, aspect_ratio);
-                AeroCoeff::Table2D { rows: new_rows, cols, data: new_data }
+                AeroCoeff::Table2D {
+                    rows: new_rows,
+                    cols,
+                    data: new_data,
+                }
             }
             other => other,
         }
@@ -272,11 +297,15 @@ impl AeroCoeff {
                     problems.push(format!("{label}: Scalar value is not finite ({v})"));
                 }
             }
-            AeroCoeff::Table1D { breakpoints, values } => {
+            AeroCoeff::Table1D {
+                breakpoints,
+                values,
+            } => {
                 if breakpoints.len() != values.len() {
                     problems.push(format!(
                         "{label}: Table1D breakpoints.len ({}) != values.len ({})",
-                        breakpoints.len(), values.len()
+                        breakpoints.len(),
+                        values.len()
                     ));
                 }
                 if breakpoints.is_empty() {
@@ -299,7 +328,9 @@ impl AeroCoeff {
                 if data.len() != expected {
                     problems.push(format!(
                         "{label}: Table2D data.len ({}) != rows ({}) x cols ({}) = {expected}",
-                        data.len(), rows.len(), cols.len()
+                        data.len(),
+                        rows.len(),
+                        cols.len()
                     ));
                 }
                 if rows.is_empty() {
@@ -309,16 +340,17 @@ impl AeroCoeff {
                     problems.push(format!("{label}: Table2D has zero cols"));
                 }
                 if !is_strictly_increasing(rows) {
-                    problems.push(format!(
-                        "{label}: Table2D rows are not strictly increasing"
-                    ));
+                    problems.push(format!("{label}: Table2D rows are not strictly increasing"));
                 }
                 if !is_strictly_increasing(cols) {
-                    problems.push(format!(
-                        "{label}: Table2D cols are not strictly increasing"
-                    ));
+                    problems.push(format!("{label}: Table2D cols are not strictly increasing"));
                 }
-                if rows.iter().chain(cols.iter()).chain(data.iter()).any(|v| !v.is_finite()) {
+                if rows
+                    .iter()
+                    .chain(cols.iter())
+                    .chain(data.iter())
+                    .any(|v| !v.is_finite())
+                {
                     problems.push(format!("{label}: Table2D contains NaN or Inf"));
                 }
             }
@@ -355,13 +387,20 @@ impl AeroCoeff {
                 0.0
             }
             AeroCoeff::Scalar(v) => *v,
-            AeroCoeff::Table1D { breakpoints, values } => {
+            AeroCoeff::Table1D {
+                breakpoints,
+                values,
+            } => {
                 if breakpoints.is_empty() {
                     warn!("AeroCoeff::Table1D has empty breakpoints; returning 0.0");
                     return 0.0;
                 }
-                let angle_rad = clamp_with_warn(angle_rad, breakpoints[0], *breakpoints.last().unwrap(),
-                    "Table1D angle_rad");
+                let angle_rad = clamp_with_warn(
+                    angle_rad,
+                    breakpoints[0],
+                    *breakpoints.last().unwrap(),
+                    "Table1D angle_rad",
+                );
                 lerp_1d(angle_rad, breakpoints, values)
             }
             AeroCoeff::Table2D { rows, cols, data } => {
@@ -369,10 +408,13 @@ impl AeroCoeff {
                     warn!("AeroCoeff::Table2D has empty rows or cols; returning 0.0");
                     return 0.0;
                 }
-                let angle_rad = clamp_with_warn(angle_rad, rows[0], *rows.last().unwrap(),
-                    "Table2D angle_rad");
-                let re = clamp_with_warn(re, cols[0], *cols.last().unwrap(),
-                    "Table2D re");
+                let angle_rad = clamp_with_warn(
+                    angle_rad,
+                    rows[0],
+                    *rows.last().unwrap(),
+                    "Table2D angle_rad",
+                );
+                let re = clamp_with_warn(re, cols[0], *cols.last().unwrap(), "Table2D re");
                 bilerp(angle_rad, re, rows, cols, data)
             }
         }
@@ -417,26 +459,38 @@ fn bilerp(angle_rad: f64, re: f64, rows: &[f64], cols: &[f64], data: &[f64]) -> 
     let nc = cols.len();
 
     // saturating_sub(2) handles the single-row / single-col degenerate case.
-    let ri = rows.partition_point(|&r| r <= angle_rad).saturating_sub(1)
-                 .min(rows.len().saturating_sub(2));
-    let ci = cols.partition_point(|&c| c <= re).saturating_sub(1)
-                 .min(cols.len().saturating_sub(2));
+    let ri = rows
+        .partition_point(|&r| r <= angle_rad)
+        .saturating_sub(1)
+        .min(rows.len().saturating_sub(2));
+    let ci = cols
+        .partition_point(|&c| c <= re)
+        .saturating_sub(1)
+        .min(cols.len().saturating_sub(2));
 
     // If only one row or one column, the "next" index is the same, t = 0.
     let ri1 = (ri + 1).min(rows.len() - 1);
     let ci1 = (ci + 1).min(cols.len() - 1);
 
-    let ta = if rows[ri1] != rows[ri] { (angle_rad - rows[ri]) / (rows[ri1] - rows[ri]) } else { 0.0 };
-    let tr = if cols[ci1] != cols[ci] { (re        - cols[ci]) / (cols[ci1] - cols[ci]) } else { 0.0 };
+    let ta = if rows[ri1] != rows[ri] {
+        (angle_rad - rows[ri]) / (rows[ri1] - rows[ri])
+    } else {
+        0.0
+    };
+    let tr = if cols[ci1] != cols[ci] {
+        (re - cols[ci]) / (cols[ci1] - cols[ci])
+    } else {
+        0.0
+    };
 
-    let v00 = data[ri  * nc + ci ];
-    let v01 = data[ri  * nc + ci1];
-    let v10 = data[ri1 * nc + ci ];
+    let v00 = data[ri * nc + ci];
+    let v01 = data[ri * nc + ci1];
+    let v10 = data[ri1 * nc + ci];
     let v11 = data[ri1 * nc + ci1];
 
     let v0 = v00 + tr * (v01 - v00); // interpolate along Re at lower angle row
     let v1 = v10 + tr * (v11 - v10); // interpolate along Re at upper angle row
-    v0 + ta * (v1 - v0)              // interpolate along angle
+    v0 + ta * (v1 - v0) // interpolate along angle
 }
 
 // ── Viterna-Corrigan post-stall extension ──────────────────────────────────
@@ -812,7 +866,10 @@ mod tests {
 
     #[test]
     fn table1d_empty_returns_zero() {
-        let c = AeroCoeff::Table1D { breakpoints: vec![], values: vec![] };
+        let c = AeroCoeff::Table1D {
+            breakpoints: vec![],
+            values: vec![],
+        };
         assert_eq!(c.evaluate(0.0, 0.0), 0.0);
     }
 
@@ -835,14 +892,20 @@ mod tests {
     fn table2d_single_re_column_no_panic() {
         let c = AeroCoeff::Table2D {
             rows: vec![0.0, 1.0],
-            cols: vec![1e6],        // single Re column
-            data: vec![0.0, 2.0],  // CL = 0 at α=0, CL = 2 at α=1
+            cols: vec![1e6],      // single Re column
+            data: vec![0.0, 2.0], // CL = 0 at α=0, CL = 2 at α=1
         };
         assert!((c.evaluate(0.0, 1e6) - 0.0).abs() < 1e-12);
         assert!((c.evaluate(1.0, 1e6) - 2.0).abs() < 1e-12);
-        assert!((c.evaluate(0.5, 1e6) - 1.0).abs() < 1e-12, "midpoint on alpha");
+        assert!(
+            (c.evaluate(0.5, 1e6) - 1.0).abs() < 1e-12,
+            "midpoint on alpha"
+        );
         // Re clamping: out-of-range Re should still work
-        assert!((c.evaluate(0.5, 999.0) - 1.0).abs() < 1e-12, "Re clamped to only column");
+        assert!(
+            (c.evaluate(0.5, 999.0) - 1.0).abs() < 1e-12,
+            "Re clamped to only column"
+        );
     }
 
     // ── Placeholder variant ───────────────────────────────────────────────────
@@ -866,7 +929,10 @@ mod tests {
 
     #[test]
     fn table1d_is_placeholder_false() {
-        let c = AeroCoeff::Table1D { breakpoints: vec![0.0], values: vec![1.0] };
+        let c = AeroCoeff::Table1D {
+            breakpoints: vec![0.0],
+            values: vec![1.0],
+        };
         assert!(!c.is_placeholder());
     }
 
@@ -1003,7 +1069,9 @@ mod tests {
             data: vec![1.0, 0.0],
         };
         let v = c.validate("cd");
-        assert!(v.iter().any(|s| s.contains("rows") && s.contains("strictly increasing")));
+        assert!(v
+            .iter()
+            .any(|s| s.contains("rows") && s.contains("strictly increasing")));
     }
 
     #[test]
@@ -1014,7 +1082,9 @@ mod tests {
             data: vec![0.0, 0.1, 0.2, 0.3],
         };
         let v = c.validate("cd");
-        assert!(v.iter().any(|s| s.contains("cols") && s.contains("strictly increasing")));
+        assert!(v
+            .iter()
+            .any(|s| s.contains("cols") && s.contains("strictly increasing")));
     }
 
     // ── Post-stall extension tests ────────────────────────────────────────
@@ -1039,11 +1109,20 @@ mod tests {
             values: vec![-2.5, 0.0, 2.5],
         };
         let extended = cl.with_post_stall_lift(3.0);
-        if let AeroCoeff::Table1D { ref breakpoints, .. } = extended {
-            assert!(*breakpoints.first().unwrap() <= -PI + 0.01,
-                "table should extend to -pi, got {}", breakpoints.first().unwrap());
-            assert!(*breakpoints.last().unwrap() >= PI - 0.01,
-                "table should extend to +pi, got {}", breakpoints.last().unwrap());
+        if let AeroCoeff::Table1D {
+            ref breakpoints, ..
+        } = extended
+        {
+            assert!(
+                *breakpoints.first().unwrap() <= -PI + 0.01,
+                "table should extend to -pi, got {}",
+                breakpoints.first().unwrap()
+            );
+            assert!(
+                *breakpoints.last().unwrap() >= PI - 0.01,
+                "table should extend to +pi, got {}",
+                breakpoints.last().unwrap()
+            );
         } else {
             panic!("expected Table1D");
         }
@@ -1057,7 +1136,10 @@ mod tests {
         };
         let extended = cl.with_post_stall_lift(3.0);
         let cl_90 = extended.evaluate(HALF_PI, 0.0);
-        assert!(cl_90.abs() < 0.05, "CL at 90 deg should be near zero, got {cl_90}");
+        assert!(
+            cl_90.abs() < 0.05,
+            "CL at 90 deg should be near zero, got {cl_90}"
+        );
     }
 
     #[test]
@@ -1068,7 +1150,10 @@ mod tests {
         };
         let extended = cl.with_post_stall_lift(3.0);
         let cl_180 = extended.evaluate(PI, 0.0);
-        assert!(cl_180.abs() < 0.05, "CL at 180 deg should be near zero, got {cl_180}");
+        assert!(
+            cl_180.abs() < 0.05,
+            "CL at 180 deg should be near zero, got {cl_180}"
+        );
     }
 
     #[test]
@@ -1083,8 +1168,10 @@ mod tests {
             let a = deg.to_radians();
             let pos = extended.evaluate(a, 0.0);
             let neg = extended.evaluate(-a, 0.0);
-            assert!((pos + neg).abs() < 0.1,
-                "CL should be antisymmetric at {deg} deg: CL(+)={pos:.3}, CL(-)={neg:.3}");
+            assert!(
+                (pos + neg).abs() < 0.1,
+                "CL should be antisymmetric at {deg} deg: CL(+)={pos:.3}, CL(-)={neg:.3}"
+            );
         }
     }
 
@@ -1100,10 +1187,14 @@ mod tests {
         let boundary = extended.evaluate(0.35, 0.0);
         let outside = extended.evaluate(0.44, 0.0);
         // No huge jump at the boundary.
-        assert!((boundary - inside).abs() < 0.5,
-            "discontinuity at boundary: {inside:.3} vs {boundary:.3}");
-        assert!((outside - boundary).abs() < 1.0,
-            "large jump past boundary: {boundary:.3} vs {outside:.3}");
+        assert!(
+            (boundary - inside).abs() < 0.5,
+            "discontinuity at boundary: {inside:.3} vs {boundary:.3}"
+        );
+        assert!(
+            (outside - boundary).abs() < 1.0,
+            "large jump past boundary: {boundary:.3} vs {outside:.3}"
+        );
     }
 
     #[test]
@@ -1116,8 +1207,11 @@ mod tests {
         assert!((extended.evaluate(0.0, 0.0) - 0.01).abs() < 1e-6);
         // At 90 deg, CD should be near CD_max.
         let cd_max = viterna_cd_max(3.0);
-        assert!((extended.evaluate(HALF_PI, 0.0) - cd_max).abs() < 0.02,
-            "CD at 90 should be {cd_max:.3}, got {:.3}", extended.evaluate(HALF_PI, 0.0));
+        assert!(
+            (extended.evaluate(HALF_PI, 0.0) - cd_max).abs() < 0.02,
+            "CD at 90 should be {cd_max:.3}, got {:.3}",
+            extended.evaluate(HALF_PI, 0.0)
+        );
     }
 
     #[test]
@@ -1127,7 +1221,10 @@ mod tests {
             values: vec![0.05, 0.01, 0.05],
         };
         let extended = cd.with_post_stall_drag(6.0);
-        if let AeroCoeff::Table1D { ref breakpoints, .. } = extended {
+        if let AeroCoeff::Table1D {
+            ref breakpoints, ..
+        } = extended
+        {
             assert!(*breakpoints.first().unwrap() <= -PI + 0.01);
             assert!(*breakpoints.last().unwrap() >= PI - 0.01);
         }
@@ -1143,8 +1240,10 @@ mod tests {
             let a = deg.to_radians();
             let pos = cd.evaluate(a, 0.0);
             let neg = cd.evaluate(-a, 0.0);
-            assert!((pos - neg).abs() < 0.01,
-                "CD should be symmetric at {deg} deg: CD(+)={pos:.3}, CD(-)={neg:.3}");
+            assert!(
+                (pos - neg).abs() < 0.01,
+                "CD should be symmetric at {deg} deg: CD(+)={pos:.3}, CD(-)={neg:.3}"
+            );
         }
     }
 
@@ -1166,7 +1265,11 @@ mod tests {
         };
         let extended = cl.with_post_stall_lift(3.0);
         if let AeroCoeff::Table1D { breakpoints, .. } = extended {
-            assert_eq!(breakpoints.len(), 3, "should not add points to full-range table");
+            assert_eq!(
+                breakpoints.len(),
+                3,
+                "should not add points to full-range table"
+            );
         }
     }
 
@@ -1176,13 +1279,16 @@ mod tests {
             rows: vec![-0.35, 0.0, 0.35],
             cols: vec![1e6, 3e6],
             data: vec![
-                -2.0, -2.5,  // alpha=-0.35
-                 0.0,  0.0,  // alpha=0
-                 2.0,  2.5,  // alpha=0.35
+                -2.0, -2.5, // alpha=-0.35
+                0.0, 0.0, // alpha=0
+                2.0, 2.5, // alpha=0.35
             ],
         };
         let extended = cl.with_post_stall_lift(3.0);
-        if let AeroCoeff::Table2D { ref rows, ref cols, .. } = extended {
+        if let AeroCoeff::Table2D {
+            ref rows, ref cols, ..
+        } = extended
+        {
             assert_eq!(cols.len(), 2, "Re columns unchanged");
             assert!(*rows.first().unwrap() <= -PI + 0.01);
             assert!(*rows.last().unwrap() >= PI - 0.01);
