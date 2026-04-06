@@ -66,7 +66,7 @@
 //!         Transform::from_xyz(0.0, 300.0, 0.0)
 //!             .with_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
 //!     );
-//!     // Give it cruise airspeed so it doesn't fall before lift builds up.
+//!     // Override the default zero velocity to start at cruise airspeed.
 //!     commands.entity(root).insert(LinearVelocity(Vec3::new(27.0, 0.0, 0.0)));
 //! }
 //! ```

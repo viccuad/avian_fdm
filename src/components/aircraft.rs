@@ -1,7 +1,7 @@
 //! Aircraft-level components: geometry and the core spawn bundle.
 
 use crate::_bevy::*;
-use avian3d::prelude::{ConstantForce, ConstantTorque, RigidBody};
+use avian3d::prelude::{AngularVelocity, ConstantForce, ConstantTorque, LinearVelocity, RigidBody};
 use serde::{Deserialize, Serialize};
 
 /// Whole-aircraft angular-rate damping derivatives (LOD = Level of Detail
@@ -118,6 +118,10 @@ pub struct AircraftGeometry {
 /// [`ConstantForce`] and [`ConstantTorque`] components, which Avian then
 /// applies natively via `ForceSystems::ApplyConstantForces`.
 ///
+/// [`LinearVelocity`] and [`AngularVelocity`] are present on a RigidBody::Dynamic
+/// and included with zero defaults. Override them after spawning to set an
+/// initial velocity.
+///
 /// # Optional components (add to the same entity after spawning)
 ///
 /// - [`InducedDrag`], add for conventional lifting aircraft (most fixed-wing).
@@ -153,6 +157,11 @@ pub struct AircraftCoreBundle {
     /// Accumulated aerodynamic + propulsive torque (written by the library each
     /// frame). Avian applies this natively via `ForceSystems::ApplyConstantForces`.
     pub constant_torque: ConstantTorque,
+    /// Linear velocity in world space. Required by `update_flight_state`.
+    /// Set a non-zero value after spawning to start with an initial airspeed.
+    pub linear_velocity: LinearVelocity,
+    /// Angular velocity in world space. Required by `update_flight_state`.
+    pub angular_velocity: AngularVelocity,
     /// World-space transform.
     pub transform: Transform,
     /// Required by Bevy for transform propagation.
