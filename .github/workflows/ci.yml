@@ -40,6 +40,16 @@ jobs:
         with:
           cache-key: test
       - run: make test
+      
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-key: fmt
+      - run: make fmt
 
   doc:
     name: Doc

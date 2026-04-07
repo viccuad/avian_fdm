@@ -16,6 +16,10 @@ test:
 	cargo test --workspace --features "f32"
 	cargo test --workspace --features "f64"
 	cargo test --workspace --features "f32,debug-plugin"
+	
+.PHONY: fmt
+fmt:
+	cargo fmt
 
 .PHONY: doc
 doc:
