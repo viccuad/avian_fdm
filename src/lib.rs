@@ -799,7 +799,7 @@ pub(crate) mod atmosphere;
 pub mod components;
 pub(crate) mod math;
 pub mod plugin;
-pub mod propulsion;
+pub(crate) mod propulsion;
 pub mod systems;
 
 #[cfg(feature = "debug-plugin")]
