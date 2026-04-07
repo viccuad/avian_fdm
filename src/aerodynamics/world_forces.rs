@@ -69,6 +69,7 @@ pub(crate) struct ZoneWorldForce {
 ///            CM    · q̄ · S_zone · c̄_zone,
 ///            Cn    · q̄ · S_zone · b )
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn zone_force_world(
     coeffs: &ZoneCoefficients,
     qbar: f64,

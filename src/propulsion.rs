@@ -37,6 +37,7 @@ use crate::components::{
 const RHO_0: f64 = 1.225;
 
 /// Phase 1: compute engine thrust and write `ZoneForce` + update `PropwashState`.
+#[allow(clippy::type_complexity)]
 pub fn compute_engine_zone_forces(
     mut engine_query: Query<(
         &EngineZone,

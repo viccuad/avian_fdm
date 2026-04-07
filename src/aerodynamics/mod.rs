@@ -77,6 +77,7 @@ fn accumulate_engine_force(
 //
 
 /// Bevy system that orchestrates the aerodynamic pipeline each physics step.
+#[allow(clippy::type_complexity)]
 pub fn compute_aero_forces(
     mut root_query: Query<(
         &mut ConstantForce,
