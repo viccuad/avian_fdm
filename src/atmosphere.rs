@@ -165,7 +165,6 @@ pub fn update_flight_state(
         &avian3d::prelude::LinearVelocity,
         &avian3d::prelude::AngularVelocity,
         &AtmosphereState,
-        &crate::components::AircraftGeometry,
         &mut FlightState,
     )>,
     wind: Option<Res<WindResource>>,
@@ -174,7 +173,7 @@ pub fn update_flight_state(
 
     let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vector::ZERO);
 
-    for (transform, lin_vel, ang_vel, atm, geom, mut fs) in &mut query {
+    for (transform, lin_vel, ang_vel, atm, mut fs) in &mut query {
         let altitude_m = transform.translation().y as Scalar;
 
         // Body angular rates, rotate world AngularVelocity to body frame.
@@ -214,8 +213,6 @@ pub fn update_flight_state(
         let beta_rad = v.atan2((u * u + w * w).sqrt());
 
         let dynamic_pressure_pa = 0.5 * atm.density_kgm3 * airspeed_ms * airspeed_ms;
-        let mu = sutherland_viscosity(atm.temperature_k);
-        let reynolds_number = atm.density_kgm3 * airspeed_ms * geom.chord_m / mu;
         let mach = airspeed_ms / atm.speed_of_sound_ms;
 
         *fs = FlightState {
@@ -224,7 +221,6 @@ pub fn update_flight_state(
             airspeed_ms,
             mach,
             dynamic_pressure_pa,
-            reynolds_number,
             altitude_m,
             p_rads,
             q_rads,

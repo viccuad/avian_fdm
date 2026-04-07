@@ -393,10 +393,9 @@ fn update_hud(
         "t   = {t:.1} s\n\
          alt = {alt:.0} m\n\
          TAS = {tas:.1} m/s\n\
-         AoA = {aoa:+.2}  beta = {beta:+.2}°\n\
-         yaw = {yaw:+.1}°\n\
-         q̄   = {q:.0} Pa\n\
-         Re  = {re:.2e}\n\
+         AoA = {aoa:+.2}  beta = {beta:+.2}deg\n\
+         yaw = {yaw:+.1}deg\n\
+         q   = {q:.0} Pa\n\
          thr = {thr:.0}%  elv = {elv:+.2}  ail = {ail:+.2}  rud = {rud:+.2}\n\
          net = ({nx:+.0}, {ny:+.0}, {nz:+.0}) N",
         alt = fs.altitude_m,
@@ -405,7 +404,6 @@ fn update_hud(
         beta = fs.beta_rad.to_degrees(),
         yaw = yaw_deg,
         q = fs.dynamic_pressure_pa,
-        re = fs.reynolds_number,
         thr = ctrl.throttle * 100.0,
         elv = ctrl.elevator,
         ail = ctrl.aileron,

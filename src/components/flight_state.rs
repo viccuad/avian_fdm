@@ -22,11 +22,6 @@ pub struct FlightState {
     pub mach: Scalar,
     /// Dynamic pressure, q-bar = half * density * airspeed^2 (Pa).
     pub dynamic_pressure_pa: Scalar,
-    /// Reynolds number (dimensionless). Ratio of inertial to viscous forces
-    /// in the airflow; determines whether the boundary layer is laminar or
-    /// turbulent.
-    /// Re = ρVc̄/μ (dimensionless).
-    pub reynolds_number: Scalar,
     /// Geometric altitude above sea level (m).
     pub altitude_m: Scalar,
     /// Roll rate p in body frame (rad/s). Written by `update_flight_state`.

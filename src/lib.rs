@@ -591,11 +591,10 @@
 //! fn print_flight_state(query: Query<&FlightState, With<AircraftGeometry>>) {
 //!     for fs in &query {
 //!         println!(
-//!             "alt={:.0}m  TAS={:.1}m/s  AoA={:.2}°  Re={:.2e}",
+//!             "alt={:.0}m  TAS={:.1}m/s  AoA={:.2}deg",
 //!             fs.altitude_m,
 //!             fs.airspeed_ms,
 //!             fs.alpha_rad.to_degrees(),
-//!             fs.reynolds_number,
 //!         );
 //!     }
 //! }
@@ -607,9 +606,8 @@
 //! | `airspeed_ms` | m/s | True airspeed (TAS) = body-frame velocity magnitude |
 //! | `alpha_rad` | rad | Angle of attack; positive = nose above velocity vector |
 //! | `beta_rad` | rad | Sideslip angle; positive = wind from starboard |
-//! | `dynamic_pressure_pa` | Pa | q̄ = ½ρV² |
-//! | `reynolds_number` |, | Re = ρVc̄/μ; drives C_L/C_D table column |
-//! | `mach` |, | V / speed of sound; informational (no compressibility yet) |
+//! | `dynamic_pressure_pa` | Pa | q-bar = 0.5 * rho * V^2 |
+//! | `mach` | - | V / speed of sound; informational (no compressibility yet) |
 //! | `p_rads`, `q_rads`, `r_rads` | rad/s | Body-frame roll/pitch/yaw rates |
 //!
 //! **Interpreting trim quality:**

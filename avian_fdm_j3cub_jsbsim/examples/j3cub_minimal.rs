@@ -77,12 +77,11 @@ fn print_state(
 
     for state in &query {
         println!(
-            "t={t:5.1}s  alt={alt:6.1}m  TAS={tas:5.1}m/s  AoA={aoa:+5.2}°  q={q:.0}Pa  Re={re:.2e}",
+            "t={t:5.1}s  alt={alt:6.1}m  TAS={tas:5.1}m/s  AoA={aoa:+5.2}deg  q={q:.0}Pa",
             alt = state.altitude_m,
             tas = state.airspeed_ms,
             aoa = state.alpha_rad.to_degrees(),
             q   = state.dynamic_pressure_pa,
-            re  = state.reynolds_number,
         );
     }
 }
