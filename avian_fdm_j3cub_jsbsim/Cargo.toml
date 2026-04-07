@@ -9,8 +9,18 @@ license = "GPL-3.0-only"
 # Exactly one of `f32` or `f64` must be enabled; mirrors the avian_fdm feature of
 # the same name. The visual example and JSBSim comparison test require `f32` since
 # Bevy rendering and JSBSim both operate at f32 precision.
-f32 = ["avian_fdm/f32", "avian3d/f32", "avian3d/parry-f32", "avian3d/default-collider"]
-f64 = ["avian_fdm/f64", "avian3d/f64", "avian3d/parry-f64", "avian3d/default-collider"]
+f32 = [
+    "avian_fdm/f32",
+    "avian3d/f32",
+    "avian3d/parry-f32",
+    "avian3d/default-collider",
+]
+f64 = [
+    "avian_fdm/f64",
+    "avian3d/f64",
+    "avian3d/parry-f64",
+    "avian3d/default-collider",
+]
 debug-plugin = ["avian_fdm/debug-plugin"]
 
 [dependencies]

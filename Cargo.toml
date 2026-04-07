@@ -3,8 +3,8 @@ name = "avian_fdm"
 version = "0.1.0"
 edition = "2021"
 description = "6-DoF Flight Dynamics Model for Bevy + Avian 0.6"
-exclude = ["/assets/", "/docs/", "/.github/"]
 license = "LGPL-3.0-or-later"
+exclude = ["/.github/"]
 
 [workspace]
 members = [".", "avian_fdm_j3cub_jsbsim"]
@@ -20,23 +20,26 @@ members = [".", "avian_fdm_j3cub_jsbsim"]
 #          Bevy rendering integration, e.g. pure headless FDM or large-world sims.
 f32 = ["avian3d/default-collider", "avian3d/f32", "avian3d/parry-f32"]
 f64 = ["avian3d/default-collider", "avian3d/f64", "avian3d/parry-f64"]
-debug-plugin = ["dep:bevy_color", "dep:bevy_gizmos", "avian3d/f32", "avian3d/parry-f32"]
+debug-plugin = [
+    "dep:bevy_color",
+    "dep:bevy_gizmos",
+    "avian3d/f32",
+    "avian3d/parry-f32",
+]
 
 [dependencies]
 # collider-from-mesh is excluded: avian_fdm uses only analytic shapes (boxes, spheres,
 # capsules) for AeroZone colliders. Mesh-based colliders would require AssetPlugin +
 # MeshPlugin in headless apps, and are never needed for a flight dynamics library.
-avian3d = { version = "0.6", default-features = false, features = [
-    "3d",
-] }
-bevy_app     = { version = "0.18", default-features = false }
-bevy_ecs     = { version = "0.18", default-features = false }
-bevy_math    = { version = "0.18", default-features = false }
+avian3d = { version = "0.6", default-features = false, features = ["3d"] }
+bevy_app = { version = "0.18", default-features = false }
+bevy_ecs = { version = "0.18", default-features = false }
+bevy_math = { version = "0.18", default-features = false }
 bevy_transform = { version = "0.18", default-features = false }
 bevy_reflect = { version = "0.18", default-features = false }
-bevy_color   = { version = "0.18", default-features = false, optional = true }
-bevy_gizmos  = { version = "0.18", default-features = false, optional = true }
-bevy_log     = { version = "0.18", default-features = false }
+bevy_color = { version = "0.18", default-features = false, optional = true }
+bevy_gizmos = { version = "0.18", default-features = false, optional = true }
+bevy_log = { version = "0.18", default-features = false }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
