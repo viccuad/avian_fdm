@@ -6,11 +6,15 @@
 //!
 //! [`AircraftFdmDebugPlugin`]: super::AircraftFdmDebugPlugin
 
-use avian3d::prelude::{ComputedCenterOfMass, ComputedMass, ConstantForce, ConstantTorque, Rotation};
 use crate::_bevy::*;
+use avian3d::prelude::{
+    ComputedCenterOfMass, ComputedMass, ConstantForce, ConstantTorque, Rotation,
+};
 
-use crate::components::{AeroZone, AircraftGeometry, Failure, FlightState, GizmoContours, GizmoShape, ZoneForce};
 use super::configuration::{FdmDebugRender, FdmGizmos};
+use crate::components::{
+    AeroZone, AircraftGeometry, Failure, FlightState, GizmoContours, GizmoShape, ZoneForce,
+};
 
 //
 // Centre of gravity
@@ -30,7 +34,11 @@ pub(super) fn debug_render_cg(
 
     for (gt, rot, com) in &query {
         let cg = gt.translation() + rot.0 * com.0;
-        gizmos.sphere(Isometry3d::from_translation(cg), config.marker_radius, color);
+        gizmos.sphere(
+            Isometry3d::from_translation(cg),
+            config.marker_radius,
+            color,
+        );
     }
 }
 
@@ -78,7 +86,9 @@ pub(super) fn debug_render_zone_forces(
     query: Query<(&ZoneForce, &GlobalTransform, &AeroZone)>,
 ) {
     let config = store.config::<FdmGizmos>().1;
-    let Some(color) = config.lift_color else { return };
+    let Some(color) = config.lift_color else {
+        return;
+    };
 
     for (zf, zone_gt, zone) in &query {
         if zf.force.length_squared() < 100.0 {
@@ -96,7 +106,9 @@ pub(super) fn debug_render_thrust(
     query: Query<(&ZoneForce, &GlobalTransform), With<crate::components::EngineZone>>,
 ) {
     let config = store.config::<FdmGizmos>().1;
-    let Some(color) = config.thrust_color else { return };
+    let Some(color) = config.thrust_color else {
+        return;
+    };
 
     for (zf, zone_gt) in &query {
         if zf.force.length_squared() < 1.0 {
@@ -112,7 +124,13 @@ pub(super) fn debug_render_resultant(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
     query: Query<
-        (&Transform, &Rotation, &ConstantForce, &ComputedMass, &ComputedCenterOfMass),
+        (
+            &Transform,
+            &Rotation,
+            &ConstantForce,
+            &ComputedMass,
+            &ComputedCenterOfMass,
+        ),
         With<AircraftGeometry>,
     >,
 ) {
@@ -155,7 +173,12 @@ pub(super) fn debug_render_moments(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
     query: Query<
-        (&Transform, &Rotation, &ComputedCenterOfMass, &ConstantTorque),
+        (
+            &Transform,
+            &Rotation,
+            &ComputedCenterOfMass,
+            &ConstantTorque,
+        ),
         With<AircraftGeometry>,
     >,
 ) {
@@ -177,9 +200,9 @@ pub(super) fn debug_render_moments(
         let body_y = rot.0 * Vec3::Y; // pitch axis
         let body_z = rot.0 * Vec3::Z; // yaw axis
 
-        let t_roll  = t.dot(body_x);
+        let t_roll = t.dot(body_x);
         let t_pitch = t.dot(body_y);
-        let t_yaw   = t.dot(body_z);
+        let t_yaw = t.dot(body_z);
 
         if let Some(color) = config.roll_moment_color {
             if t_roll.abs() > 0.1 {
@@ -222,14 +245,17 @@ pub(super) fn debug_render_moments(
 pub(super) fn debug_render_zones(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
-    query: Query<(
-        &GlobalTransform,
-        Option<&AeroZone>,
-        Option<&GizmoContours>,
-        Option<&GizmoShape>,
-        Option<&FdmDebugRender>,
-        Option<&Failure>,
-    ), Or<(With<GizmoShape>, With<GizmoContours>)>>,
+    query: Query<
+        (
+            &GlobalTransform,
+            Option<&AeroZone>,
+            Option<&GizmoContours>,
+            Option<&GizmoShape>,
+            Option<&FdmDebugRender>,
+            Option<&Failure>,
+        ),
+        Or<(With<GizmoShape>, With<GizmoContours>)>,
+    >,
 ) {
     let config = store.config::<FdmGizmos>().1;
     if config.zone_color.is_none() {
@@ -245,9 +271,7 @@ pub(super) fn debug_render_zones(
 
         let wt = zone_gt.compute_transform();
         let zone_to_world = |local: Vec3| wt.translation + wt.rotation * local;
-        let iso_at = |extra_rot: Quat| {
-            Isometry3d::new(wt.translation, wt.rotation * extra_rot)
-        };
+        let iso_at = |extra_rot: Quat| Isometry3d::new(wt.translation, wt.rotation * extra_rot);
 
         if let Some(contour_data) = contours {
             for line in &contour_data.lines {
@@ -300,7 +324,11 @@ fn draw_zone_shape(
         GizmoShape::Box { x, y, z } => {
             gizmos.primitive_3d(&Cuboid::new(*x, *y, *z), iso_at(Quat::IDENTITY), color);
         }
-        GizmoShape::Cylinder { radius, length, axis } => {
+        GizmoShape::Cylinder {
+            radius,
+            length,
+            axis,
+        } => {
             gizmos
                 .primitive_3d(
                     &Cylinder::new(*radius, *length),
@@ -311,7 +339,10 @@ fn draw_zone_shape(
         }
         GizmoShape::Cone { radius, length } => {
             gizmos.primitive_3d(
-                &Cone { radius: *radius, height: *length },
+                &Cone {
+                    radius: *radius,
+                    height: *length,
+                },
                 iso_at(Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)),
                 color,
             );
@@ -361,7 +392,9 @@ pub(super) fn debug_render_wind(
     >,
 ) {
     let config = store.config::<FdmGizmos>().1;
-    let Some(color) = config.wind_color else { return };
+    let Some(color) = config.wind_color else {
+        return;
+    };
 
     for (tf, rot, com, fs) in &query {
         if fs.airspeed_ms < 1.0 {
@@ -378,7 +411,7 @@ pub(super) fn debug_render_wind(
         // rotate to world. Body-frame velocity components from AoA / sideslip:
         // u = cos(alpha)*cos(beta), v = sin(beta), w = sin(alpha)*cos(beta)
         let (sa, ca) = (fs.alpha_rad.sin() as f32, fs.alpha_rad.cos() as f32);
-        let (sb, cb) = (fs.beta_rad.sin() as f32,  fs.beta_rad.cos() as f32);
+        let (sb, cb) = (fs.beta_rad.sin() as f32, fs.beta_rad.cos() as f32);
         let vel_body_dir = Vec3::new(ca * cb, sb, sa * cb); // unit vector
         let vel_world_dir = rot.0 * vel_body_dir;
 

@@ -1,7 +1,7 @@
 //! [`FdmGizmos`] configuration group and per-entity [`FdmDebugRender`] component.
 
-use bevy_color::palettes::css::*;
 use crate::_bevy::*;
+use bevy_color::palettes::css::*;
 
 /// Gizmo configuration group for FDM debug rendering. See [`AircraftFdmDebugPlugin`].
 ///
@@ -117,13 +117,13 @@ impl FdmGizmos {
     /// Only force arrows (lift, drag, side force, thrust, resultant) enabled.
     pub fn forces() -> Self {
         Self {
-            lift_color:        Some(LIME.into()),
-            drag_color:        Some(RED.into()),
-            side_force_color:  Some(YELLOW.into()),
-            thrust_color:      Some(AQUA.into()),
+            lift_color: Some(LIME.into()),
+            drag_color: Some(RED.into()),
+            side_force_color: Some(YELLOW.into()),
+            thrust_color: Some(AQUA.into()),
             total_force_color: Some(YELLOW.into()),
-            weight_color:      Some(RED.into()),
-            resultant_color:   Some(WHITE.into()),
+            weight_color: Some(RED.into()),
+            resultant_color: Some(WHITE.into()),
             ..Self::none()
         }
     }
@@ -132,8 +132,8 @@ impl FdmGizmos {
     pub fn moments() -> Self {
         Self {
             pitch_moment_color: Some(ORANGE.into()),
-            roll_moment_color:  Some(PINK.into()),
-            yaw_moment_color:   Some(VIOLET.into()),
+            roll_moment_color: Some(PINK.into()),
+            yaw_moment_color: Some(VIOLET.into()),
             ..Self::none()
         }
     }

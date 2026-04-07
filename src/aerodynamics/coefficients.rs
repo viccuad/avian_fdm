@@ -1,7 +1,7 @@
 //! Step 1: coefficient evaluation — table lookup, control-surface scaling, damage.
 
-use avian3d::math::Scalar;
 use crate::components::{AeroZone, ControlInputs, ControlSurfaceRole};
+use avian3d::math::Scalar;
 
 /// Six non-dimensional aerodynamic coefficients, fully scaled and ready to be
 /// multiplied by dynamic pressure and reference area to produce forces.
@@ -72,11 +72,11 @@ pub(crate) fn evaluate_zone_coefficients(
     let cn_base = zone.cn.evaluate(alpha_local, re);
 
     let (scale, cd_scale) = match &zone.control_role {
-        Some(ControlSurfaceRole::Elevator)     => (ctrl.elevator,  ctrl.elevator.abs()),
-        Some(ControlSurfaceRole::AileronLeft)  => (ctrl.aileron,   ctrl.aileron.abs()),
-        Some(ControlSurfaceRole::AileronRight) => (-ctrl.aileron,  ctrl.aileron.abs()),
-        Some(ControlSurfaceRole::Rudder)       => (ctrl.rudder,    ctrl.rudder.abs()),
-        None                                   => (1.0,            1.0),
+        Some(ControlSurfaceRole::Elevator) => (ctrl.elevator, ctrl.elevator.abs()),
+        Some(ControlSurfaceRole::AileronLeft) => (ctrl.aileron, ctrl.aileron.abs()),
+        Some(ControlSurfaceRole::AileronRight) => (-ctrl.aileron, ctrl.aileron.abs()),
+        Some(ControlSurfaceRole::Rudder) => (ctrl.rudder, ctrl.rudder.abs()),
+        None => (1.0, 1.0),
     };
 
     let extra_cd = zone
@@ -85,12 +85,12 @@ pub(crate) fn evaluate_zone_coefficients(
         .unwrap_or(0.0);
 
     ZoneCoefficients {
-        cl:    cl_base    * scale    * remaining,
-        cd:    (cd_base * cd_scale + extra_cd) * remaining,
-        cy:    cy_base    * scale    * remaining,
-        cm:    cm_base    * scale    * remaining,
-        croll: croll_base * scale    * remaining,
-        cn:    cn_base    * scale    * remaining,
+        cl: cl_base * scale * remaining,
+        cd: (cd_base * cd_scale + extra_cd) * remaining,
+        cy: cy_base * scale * remaining,
+        cm: cm_base * scale * remaining,
+        croll: croll_base * scale * remaining,
+        cn: cn_base * scale * remaining,
     }
 }
 
@@ -101,11 +101,20 @@ mod tests {
     use crate::components::{AeroZone, ControlInputs, ControlSurfaceRole};
 
     fn neutral() -> ControlInputs {
-        ControlInputs { elevator: 0.0, aileron: 0.0, rudder: 0.0, throttle: 0.0 }
+        ControlInputs {
+            elevator: 0.0,
+            aileron: 0.0,
+            rudder: 0.0,
+            throttle: 0.0,
+        }
     }
 
     fn simple_zone(cl: Scalar, cd: Scalar) -> AeroZone {
-        AeroZone { cl: AeroCoeff::Scalar(cl), cd: AeroCoeff::Scalar(cd), ..Default::default() }
+        AeroZone {
+            cl: AeroCoeff::Scalar(cl),
+            cd: AeroCoeff::Scalar(cd),
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -130,15 +139,40 @@ mod tests {
         zone.damage_drag_coeff = Some(500.0);
         let full = evaluate_zone_coefficients(&zone, &neutral(), 0.0, 0.0, 1e6, 1000.0, 1.0);
         let half = evaluate_zone_coefficients(&zone, &neutral(), 0.0, 0.0, 1e6, 1000.0, 0.5);
-        assert!(half.cd > full.cd * 0.5, "damage drag should add extra at intermediate remaining");
+        assert!(
+            half.cd > full.cd * 0.5,
+            "damage drag should add extra at intermediate remaining"
+        );
     }
 
     #[test]
     fn elevator_scales_lift_by_input() {
         let mut zone = simple_zone(1.0, 0.0);
         zone.control_role = Some(ControlSurfaceRole::Elevator);
-        let half = evaluate_zone_coefficients(&zone, &ControlInputs { elevator: 0.5, ..neutral() }, 0.1, 0.0, 1e6, 1000.0, 1.0);
-        let full = evaluate_zone_coefficients(&zone, &ControlInputs { elevator: 1.0, ..neutral() }, 0.1, 0.0, 1e6, 1000.0, 1.0);
+        let half = evaluate_zone_coefficients(
+            &zone,
+            &ControlInputs {
+                elevator: 0.5,
+                ..neutral()
+            },
+            0.1,
+            0.0,
+            1e6,
+            1000.0,
+            1.0,
+        );
+        let full = evaluate_zone_coefficients(
+            &zone,
+            &ControlInputs {
+                elevator: 1.0,
+                ..neutral()
+            },
+            0.1,
+            0.0,
+            1e6,
+            1000.0,
+            1.0,
+        );
         assert!((half.cl - full.cl * 0.5).abs() < 1e-12);
     }
 
@@ -148,10 +182,16 @@ mod tests {
         zone_l.control_role = Some(ControlSurfaceRole::AileronLeft);
         let mut zone_r = simple_zone(0.8, 0.0);
         zone_r.control_role = Some(ControlSurfaceRole::AileronRight);
-        let ctrl = ControlInputs { aileron: 0.6, ..neutral() };
+        let ctrl = ControlInputs {
+            aileron: 0.6,
+            ..neutral()
+        };
         let cl_l = evaluate_zone_coefficients(&zone_l, &ctrl, 0.1, 0.0, 1e6, 1000.0, 1.0).cl;
         let cl_r = evaluate_zone_coefficients(&zone_r, &ctrl, 0.1, 0.0, 1e6, 1000.0, 1.0).cl;
-        assert!((cl_l + cl_r).abs() < 1e-12, "ailerons should produce opposite CL");
+        assert!(
+            (cl_l + cl_r).abs() < 1e-12,
+            "ailerons should produce opposite CL"
+        );
     }
 
     #[test]
@@ -159,16 +199,55 @@ mod tests {
         let mut zone = simple_zone(0.0, 0.05);
         zone.control_role = Some(ControlSurfaceRole::Elevator);
         let n = evaluate_zone_coefficients(&zone, &neutral(), 0.0, 0.0, 1e6, 1000.0, 1.0);
-        let d = evaluate_zone_coefficients(&zone, &ControlInputs { elevator: 0.8, ..neutral() }, 0.0, 0.0, 1e6, 1000.0, 1.0);
-        assert!(d.cd >= n.cd * 0.8 - 1e-12, "deflection should not reduce drag");
+        let d = evaluate_zone_coefficients(
+            &zone,
+            &ControlInputs {
+                elevator: 0.8,
+                ..neutral()
+            },
+            0.0,
+            0.0,
+            1e6,
+            1000.0,
+            1.0,
+        );
+        assert!(
+            d.cd >= n.cd * 0.8 - 1e-12,
+            "deflection should not reduce drag"
+        );
     }
 
     #[test]
     fn rudder_scales_side_force() {
-        let mut zone = AeroZone { cy: AeroCoeff::Scalar(1.0), ..Default::default() };
+        let mut zone = AeroZone {
+            cy: AeroCoeff::Scalar(1.0),
+            ..Default::default()
+        };
         zone.control_role = Some(ControlSurfaceRole::Rudder);
-        let full = evaluate_zone_coefficients(&zone, &ControlInputs { rudder: 1.0, ..neutral() }, 0.0, 0.0, 1e6, 1000.0, 1.0);
-        let half = evaluate_zone_coefficients(&zone, &ControlInputs { rudder: 0.5, ..neutral() }, 0.0, 0.0, 1e6, 1000.0, 1.0);
+        let full = evaluate_zone_coefficients(
+            &zone,
+            &ControlInputs {
+                rudder: 1.0,
+                ..neutral()
+            },
+            0.0,
+            0.0,
+            1e6,
+            1000.0,
+            1.0,
+        );
+        let half = evaluate_zone_coefficients(
+            &zone,
+            &ControlInputs {
+                rudder: 0.5,
+                ..neutral()
+            },
+            0.0,
+            0.0,
+            1e6,
+            1000.0,
+            1.0,
+        );
         assert!((full.cy - 1.0).abs() < 1e-12, "full rudder -> CY=1");
         assert!((half.cy - 0.5).abs() < 1e-12, "half rudder -> CY=0.5");
         assert_eq!(full.cl, 0.0, "rudder must not affect CL");
@@ -178,11 +257,17 @@ mod tests {
     fn combined_damage_and_control_deflection() {
         let mut zone = simple_zone(1.0, 0.1);
         zone.control_role = Some(ControlSurfaceRole::Elevator);
-        let ctrl = ControlInputs { elevator: 0.5, ..neutral() };
-        let intact  = evaluate_zone_coefficients(&zone, &ctrl, 0.0, 0.0, 1e6, 1000.0, 1.0);
+        let ctrl = ControlInputs {
+            elevator: 0.5,
+            ..neutral()
+        };
+        let intact = evaluate_zone_coefficients(&zone, &ctrl, 0.0, 0.0, 1e6, 1000.0, 1.0);
         let damaged = evaluate_zone_coefficients(&zone, &ctrl, 0.0, 0.0, 1e6, 1000.0, 0.5);
-        assert!((intact.cl  - 0.5).abs()  < 1e-12, "intact CL");
-        assert!((damaged.cl - 0.25).abs() < 1e-12, "half-remaining halves CL further");
+        assert!((intact.cl - 0.5).abs() < 1e-12, "intact CL");
+        assert!(
+            (damaged.cl - 0.25).abs() < 1e-12,
+            "half-remaining halves CL further"
+        );
         assert!(damaged.cl < intact.cl);
     }
 
@@ -194,10 +279,10 @@ mod tests {
             ..Default::default() // cy/cm/croll/cn = Absent
         };
         let c = evaluate_zone_coefficients(&zone, &neutral(), 0.2, 0.0, 1e6, 1000.0, 1.0);
-        assert_eq!(c.cy,    0.0, "Absent cy -> 0");
-        assert_eq!(c.cm,    0.0, "Absent cm -> 0");
+        assert_eq!(c.cy, 0.0, "Absent cy -> 0");
+        assert_eq!(c.cm, 0.0, "Absent cm -> 0");
         assert_eq!(c.croll, 0.0, "Absent croll -> 0");
-        assert_eq!(c.cn,    0.0, "Absent cn -> 0");
+        assert_eq!(c.cn, 0.0, "Absent cn -> 0");
     }
 
     //
