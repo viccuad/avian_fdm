@@ -769,7 +769,7 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
 /// `x_m` is the entity and collider center along the chord axis (physical
 /// position, used for mass distribution). `ac_x_m` is the aerodynamic center
 /// where lift forces are applied; for all wing panels this should be
-/// [`WING_AC_X`] regardless of how the chord is partitioned. When
+/// `WING_AC_X` regardless of how the chord is partitioned. When
 /// `ac_x_m == x_m` the `ac_offset` inside [`AeroZone`] is zero.
 ///
 /// `fraction` is the fraction of the total wing area this panel represents.

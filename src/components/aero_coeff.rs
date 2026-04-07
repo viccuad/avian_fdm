@@ -369,13 +369,13 @@ impl AeroCoeff {
     /// - [`AeroCoeff::Placeholder`]: emits `warn_once!` and returns `0.0`.
     /// - [`AeroCoeff::Scalar`]: returns the constant; ignores both inputs.
     /// - [`AeroCoeff::Table1D`]: linearly interpolates on `angle_rad`; `re` is ignored.
-    ///   Clamps to the first/last breakpoint with a [`bevy::log::warn_once`] if
+    ///   Clamps to the first/last breakpoint with a `warn_once!` if
     ///   out of range.
     /// - [`AeroCoeff::Table2D`]: bilinearly interpolates on `(angle_rad, re)`.
     ///   Clamps both axes independently with a `warn_once!` if out of range.
     ///
     /// Never panics in release builds. Returns `0.0` on a degenerate table
-    /// (empty breakpoints) after a [`bevy::log::warn`].
+    /// (empty breakpoints) after a `warn!`.
     pub fn evaluate(&self, angle_rad: f64, re: f64) -> f64 {
         match self {
             AeroCoeff::Absent => 0.0,

@@ -124,7 +124,7 @@
 //! Drag  = C_D(alpha, Re) * q-bar * S
 //! ```
 //!
-//! This is the same method used by [JSBSim], [FlightGear], and most
+//! This is the same method used by [JSBSim], FlightGear, and most
 //! fixed-wing game simulators. It captures realistic stall behaviour,
 //! Reynolds-number effects, and control-surface authority without requiring a
 //! full CFD solver.
@@ -172,7 +172,7 @@
 //! force_world     = q_root  · force_body
 //! ```
 //!
-//! See [`aerodynamics`] for the full derivation.
+//! See the `aerodynamics` module for the full derivation.
 //!
 //! ### World frame (Bevy / Avian, Y-up right-handed)
 //!
@@ -240,7 +240,7 @@
 //!
 //! ## The Atmosphere
 //!
-//! See [`atmosphere`] for the full implementation.
+//! See the `atmosphere` module for the full implementation.
 //!
 //! Every aerodynamic force scales with dynamic pressure, which is the
 //! kinetic energy of the airflow per unit volume. Dynamic pressure =
@@ -266,16 +266,16 @@
 //! number governs boundary-layer behaviour: at low Re the flow separates
 //! earlier (sharper stall, higher C_D₀), so the FDM uses Re as the second
 //! dimension of its C_L/C_D lookup tables.
-//! The [`atmosphere`] module implements the International Standard Atmosphere
+//! The `atmosphere` module implements the International Standard Atmosphere
 //! (ICAO Doc 7488) for 0-20 km. Each frame,
-//! [`atmosphere::update_atmosphere`] writes a fresh
+//! `atmosphere::update_atmosphere` writes a fresh
 //! [`components::AtmosphereState`] to the root entity.
 //!
 //! ---
 //!
 //! ## Aerodynamic Forces and Moments
 //!
-//! See [`aerodynamics`] for the full implementation.
+//! See the `aerodynamics` module for the full implementation.
 //!
 //! The aircraft is decomposed into zones. For each [`components::AeroZone`]
 //! child, the system evaluates coefficient tables at the current flight
@@ -534,7 +534,7 @@
 //! Each zone owns:
 //! - A [`avian3d::prelude::Collider`] that gives it physical volume and mass
 //!   (via [`avian3d::prelude::ColliderDensity`])
-//! - A [`avian3d::prelude::Transform`] that places it in body-frame coordinates
+//! - A `Transform` that places it in body-frame coordinates
 //! - An [`components::AeroZone`] that describes its aerodynamic contribution
 //! - Optionally a [`components::Failure`] for degraded-performance tracking
 //!
@@ -710,7 +710,7 @@
 //!   (McGraw-Hill, 1998).**
 //!   The clearest introduction to the stability-derivative approach. Table B1
 //!   lists J3Cub-like GA derivatives used for the damping coefficients in
-//!   [`aerodynamics`]. Chapters 2–4 cover the EoM derivation in body frame.
+//!   the `aerodynamics` module. Chapters 2–4 cover the EoM derivation in body frame.
 //!
 //! - **John D. Anderson, *Introduction to Flight*, 8th ed. (McGraw-Hill, 2015).**
 //!   Excellent coverage of aerodynamics fundamentals (lift, drag, Reynolds
@@ -723,7 +723,7 @@
 //!   Control*, 3rd ed. (Wiley, 1996).**
 //!   Rigorous derivation of the 6-DoF Newton-Euler equations in body frame.
 //!   The stability axis transformation (body to stability to wind axes) used in
-//!   [`aerodynamics`] follows Etkin & Reid Chapter 4.
+//!   the `aerodynamics` module follows Etkin & Reid Chapter 4.
 //!
 //! - **Brian L. Stevens, Frank L. Lewis & Eric N. Johnson,
 //!   *Aircraft Simulation and Control*, 3rd ed. (Wiley, 2016).**
@@ -736,7 +736,7 @@
 //! - **ICAO Doc 7488/3, *Manual of the ICAO Standard Atmosphere*, 3rd ed.
 //!   (International Civil Aviation Organization, 1993).**
 //!   The authoritative definition of the International Standard Atmosphere
-//!   implemented in [`atmosphere`]. Free download from the ICAO store.
+//!   implemented in the `atmosphere` module. Free download from the ICAO store.
 //!
 //! [Avian]: https://crates.io/crates/avian3d
 //! [JSBSim]: https://jsbsim.sourceforge.net/

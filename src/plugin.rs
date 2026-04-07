@@ -77,7 +77,7 @@ impl Plugin for AircraftFdmPlugin {
     }
 }
 
-/// Startup validation system: warns if any [`AircraftGeometry`] root entity
+/// Startup validation system: warns if any [`crate::components::AircraftGeometry`] root entity
 /// does not have `RigidBody::Dynamic`.
 ///
 /// A `RigidBody::Static` or `RigidBody::Kinematic` root will silently ignore
@@ -99,11 +99,11 @@ pub fn validate_rigid_bodies(
     }
 }
 
-/// Startup validation system: checks every [`AeroZone`] for table structure
+/// Startup validation system: checks every [`crate::components::AeroZone`] for table structure
 /// errors and placeholder coefficients.
 ///
 /// Runs in `PostStartup` (after all `Startup` systems have spawned entities).
-/// Logs warnings via [`bevy::log::warn`] for each problem found. Does not
+/// Logs warnings via `warn!` for each problem found. Does not
 /// panic; the aircraft will still run, but broken tables will produce garbage.
 ///
 /// Registered automatically by [`AircraftFdmPlugin`] when

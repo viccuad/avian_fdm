@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 /// geometry alone (e.g. single-zone missiles, low-fidelity aircraft).
 ///
 /// **Mutually exclusive with per-zone local α/β**, when this component is
-/// present, [`compute_aero_forces`](crate::aerodynamics::compute_aero_forces)
+/// present, `compute_aero_forces`
 /// evaluates all zones at the global α/β (no rate corrections) and uses these
 /// derivatives as the sole source of angular damping.  When absent, per-zone
 /// local angles run and damping emerges naturally from zone geometry.
