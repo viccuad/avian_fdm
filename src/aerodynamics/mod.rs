@@ -247,7 +247,6 @@ pub fn compute_aero_forces(
                     + body_to_world * vec3_to_vector(zone_transform.translation + zone.ac_offset);
 
                 zone_force.force = vector_to_vec3(force);
-                zone_force.torque = vector_to_vec3(torque);
                 zone_force.world_point = vector_to_vec3(ac_world);
 
                 cf.0 += force;
@@ -297,7 +296,6 @@ mod tests {
         let zf = ZoneForce {
             force: Vec3::new(500.0, 0.0, 0.0),
             world_point: Vec3::ZERO,
-            torque: Vec3::ZERO,
         };
         let (mut f, mut t) = (Vector::ZERO, Vector::ZERO);
         accumulate_engine_force(&zf, Vector::ZERO, &mut f, &mut t);
@@ -311,7 +309,6 @@ mod tests {
         let zf = ZoneForce {
             force: Vec3::new(500.0, 0.0, 0.0),
             world_point: Vec3::new(0.0, 2.0, 0.0),
-            torque: Vec3::ZERO,
         };
         let (mut f, mut t) = (Vector::ZERO, Vector::ZERO);
         accumulate_engine_force(&zf, Vector::ZERO, &mut f, &mut t);
@@ -329,7 +326,6 @@ mod tests {
         let zf = ZoneForce {
             force: Vec3::ZERO,
             world_point: Vec3::new(0.0, 5.0, 0.0),
-            torque: Vec3::ZERO,
         };
         let (mut f, mut t) = (Vector::new(100.0, 0.0, 0.0), Vector::new(0.0, 50.0, 0.0));
         accumulate_engine_force(&zf, Vector::ZERO, &mut f, &mut t);
