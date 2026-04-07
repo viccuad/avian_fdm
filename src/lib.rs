@@ -317,9 +317,7 @@
 //! T = T_max * throttle_fraction * (rho / rho_0)^0.7
 //! ```
 //!
-//! Propeller-induced velocity is estimated with actuator disk theory for
-//! future propwash coupling. Each [`components::EngineZone`] specifies a
-//! thrust direction in body frame.
+//! Each [`components::EngineZone`] specifies a thrust direction in body frame.
 //!
 //! ---
 //!
@@ -636,7 +634,7 @@
 //! |                                                                         |
 //! |  3. compute_engine_zone_forces  reads: FlightState, AtmosphereState,    |
 //! |                                 ControlInputs, EngineZone               |
-//! |                          writes: ZoneForce(engine), PropwashState       |
+//! |                          writes: ZoneForce(engine)                      |
 //! |                                                                         |
 //! |  4. compute_aero_forces                                                 |
 //! |                          reads: FlightState, AircraftGeometry,          |
@@ -821,5 +819,5 @@ pub mod prelude {
         AircraftFdmDebugPlugin, FdmDebugRender, FdmGizmos, ShowColliders,
     };
 
-    pub use crate::components::{EngineZone, PropwashState};
+    pub use crate::components::EngineZone;
 }

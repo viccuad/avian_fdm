@@ -117,7 +117,7 @@ use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
 use avian_fdm::sourced;
 use avian_fdm::components::{
     AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
-    ControlSurfaceRole, EngineZone, GizmoContours, InducedDrag, PropwashState, ZoneForce,
+    ControlSurfaceRole, EngineZone, GizmoContours, InducedDrag, ZoneForce,
 };
 
 // ── Aircraft reference constants ─────────────────────────────────────────────
@@ -1051,13 +1051,11 @@ pub fn engine_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
                 vec![[0.0, 0.0], [0.5, 0.42], [0.75, 0.64], [1.0, 1.0]],
                 "Calibration:JSBSim: nonlinear throttle response matching JSBSim thrust vs throttle setting (prop efficiency drop at low opening)"
             ),
-            prop_diameter_m: sourced!(1.880, "JSBSim:J3Cub_FlightGear.xml: prop_74in_2f_NACA; 74 in × 0.0254 m/in = 1.880 m"),
             thrust_axis_body: Vector::X, // +X = forward
             // prop_74in_2f_NACA, fixed-pitch ~22° cruise setting, maxrpm 2300.
             // J_zero ≈ 1.1 at 22° pitch: V_zero = J × n × D ≈ 1.1 × (2300/60) × 1.880 ≈ 79 m/s.
             zero_thrust_speed_ms: Some(sourced!(80.0, "Estimate:J3Cub FlightGear: prop_74in_2f_NACA; J_zero ≈ 1.1 at 22° pitch, maxrpm 2300 -> V = 1.1 × (2300/60) × 1.880 ≈ 79 m/s, rounded to 80")),
         },
-        PropwashState::default(),
         ZoneForce::default(),
         collider,
         density,

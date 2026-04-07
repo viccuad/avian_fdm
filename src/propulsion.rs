@@ -2,26 +2,18 @@
 //!
 //! # Overview
 //!
-//! Gagg–Ferrar altitude correction, **thrust = max thrust × health fraction ×
-//! throttle position × air density ratio raised to the 0.7 power. The 0.7
+//! Gagg-Ferrar altitude correction: thrust = max thrust x health fraction x
+//! throttle position x air density ratio raised to the 0.7 power. The 0.7
 //! exponent is empirical for naturally-aspirated piston engines: thrust falls
-//! with altitude as air thins. See: Gagg-Ferrar piston engine model.**
+//! with altitude as air thins.
 //!
 //! ```text
-//! T = T_max · remaining · throttle_fraction · (ρ / ρ₀)^0.7
+//! T = T_max * remaining * throttle_fraction * (rho / rho_0)^0.7
 //! ```
 //!
-//! Propeller induced velocity via **actuator disk theory**, **induced airspeed
-//! behind the propeller = square root of (thrust ÷ (2 × air density × disk area)).
-//! Disk area = π × propeller radius². See: actuator disk theory,
-//! momentum theory propeller.**
-//!
-//! ```text
-//! V_ind = √(T / (2 · ρ · A))    A = π · (d/2)²
-//! ```
-//!
-//! `V_ind` is stored in [`PropwashState`] on the root entity and read by
-//! `compute_aero_forces` for propwash effects (Group A, post-v1).
+//! An optional speed-dependent factor models fixed-pitch propeller efficiency
+//! drop: thrust scales by max(0, 1 - (V / V_zero)^2), reaching zero at the
+//! windmilling speed.
 
 use avian3d::math::Scalar;
 use crate::_bevy::*;
@@ -29,17 +21,14 @@ use crate::math::{quat_to_quaternion, vector_to_vec3};
 use avian3d::prelude::ColliderOf;
 
 use crate::components::{
-    AtmosphereState, ControlInputs, Failure, EngineZone, FlightState, PropwashState, ZoneForce,
+    AtmosphereState, ControlInputs, Failure, EngineZone, FlightState, ZoneForce,
     get_remaining,
 };
-
-#[allow(clippy::unnecessary_cast)]
-const PI_VAL: Scalar = std::f64::consts::PI as Scalar;
 
 /// Sea-level standard density (kg/m³).
 const RHO_0: Scalar = 1.225;
 
-/// Phase 1: compute engine thrust and write `ZoneForce` + update `PropwashState`.
+/// Phase 1: compute engine thrust and write `ZoneForce`.
 #[allow(clippy::type_complexity)]
 pub fn compute_engine_zone_forces(
     mut engine_query: Query<(
@@ -47,7 +36,6 @@ pub fn compute_engine_zone_forces(
         &GlobalTransform,
         &ColliderOf,
         &mut ZoneForce,
-        &mut PropwashState,
         Option<&Failure>,
     )>,
     mut root_query: Query<(
@@ -57,7 +45,7 @@ pub fn compute_engine_zone_forces(
         &GlobalTransform,
     )>,
 ) {
-    for (engine, engine_gt, col_of, mut zone_force, mut propwash, opt_failure) in engine_query.iter_mut() {
+    for (engine, engine_gt, col_of, mut zone_force, opt_failure) in engine_query.iter_mut() {
         *zone_force = ZoneForce::default();
 
         let remaining = get_remaining(opt_failure);
@@ -88,18 +76,7 @@ pub fn compute_engine_zone_forces(
             * density_ratio.powf(0.7)
             * speed_factor;
 
-        // 3. Actuator disk induced velocity.
-        let radius = engine.prop_diameter_m * 0.5;
-        let disk_area = PI_VAL * radius * radius;
-        let v_ind = if thrust_n > 0.0 && rho > 0.0 {
-            (thrust_n / (2.0 * rho * disk_area)).sqrt()
-        } else {
-            0.0
-        };
-        propwash.induced_velocity_ms = v_ind;
-        propwash.direction_body = engine.thrust_axis_body.normalize_or_zero();
-
-        // 4. Rotate thrust axis body to world and write ZoneForce.
+        // 3. Rotate thrust axis body to world and write ZoneForce.
         let q = quat_to_quaternion(root_gt.rotation());
         let thrust_world = q * (engine.thrust_axis_body.normalize_or_zero() * thrust_n);
 
@@ -161,16 +138,6 @@ mod tests {
         let rho_alt = 0.9;
         let ratio = (rho_alt / RHO_0).powf(0.7);
         assert!(ratio < 1.0);
-    }
-
-    #[test]
-    fn induced_velocity_positive_at_nonzero_thrust() {
-        let thrust = 400.0;
-        let rho = 1.225;
-        let radius = 0.9;
-        let disk_area = PI_VAL * radius * radius;
-        let v_ind = (thrust / (2.0 * rho * disk_area)).sqrt();
-        assert!(v_ind > 0.0);
     }
 
     #[test]

@@ -20,4 +20,4 @@ pub use flight_state::{AtmosphereState, FlightState, WindResource};
 pub use gizmo_shape::{GizmoContours, GizmoShape};
 pub use zone_force::ZoneForce;
 
-pub use engine_zone::{EngineZone, PropwashState};
+pub use engine_zone::EngineZone;

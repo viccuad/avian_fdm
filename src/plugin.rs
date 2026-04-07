@@ -65,9 +65,8 @@ impl Plugin for AircraftFdmPlugin {
            .register_type::<InducedDrag>()
            .register_type::<LodDamping>();
 
-        use crate::components::{EngineZone, PropwashState};
-        app.register_type::<EngineZone>()
-           .register_type::<PropwashState>();
+        use crate::components::EngineZone;
+        app.register_type::<EngineZone>();
 
         crate::systems::register_fdm_systems(app);
 

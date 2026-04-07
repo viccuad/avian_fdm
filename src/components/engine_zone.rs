@@ -1,4 +1,4 @@
-//! Engine zone component and propwash state.
+//! Engine zone component.
 
 use crate::_bevy::*;
 use avian3d::math::{Scalar, Vector};
@@ -23,9 +23,6 @@ pub struct EngineZone {
     /// Throttle-to-thrust-fraction lookup table. Each entry is `[throttle, fraction]`.
     /// `throttle` in [0, 1]. Must be strictly increasing in throttle.
     pub throttle_curve: Vec<[Scalar; 2]>,
-    /// Propeller diameter (m). Used to compute induced velocity:
-    /// V_ind = √(T / (2ρA)).
-    pub prop_diameter_m: Scalar,
     /// Thrust direction in body frame (unit vector). Usually `Vector::X` (forward).
     pub thrust_axis_body: Vector,
 
@@ -47,25 +44,8 @@ impl Default for EngineZone {
         Self {
             max_thrust_n: 0.0,
             throttle_curve: vec![[0.0, 0.0], [1.0, 1.0]],
-            prop_diameter_m: 1.0,
             thrust_axis_body: Vector::X,
             zero_thrust_speed_ms: None,
         }
     }
-}
-
-/// Propwash state, propeller-induced velocity over the wing root.
-///
-/// Written each frame by `compute_propulsion`. Read by `compute_aerodynamics`
-/// to apply a propwash lift increment on nearby `AeroZone` children.
-///
-/// Lives on the **aircraft root entity** (nearest `RigidBody` ancestor).
-#[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
-#[reflect(Component, Serialize, Deserialize)]
-pub struct PropwashState {
-    /// Axial induced velocity from actuator disk theory (m/s).
-    /// V_ind = √(T / (2 · ρ · A)), where A = π(d/2)².
-    pub induced_velocity_ms: Scalar,
-    /// Propwash direction in body frame (unit vector; usually = thrust_axis_body).
-    pub direction_body: Vector,
 }
