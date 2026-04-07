@@ -5,6 +5,8 @@
 //! so any discrepancy between the simulation and the analytical value is a
 //! bug in avian_fdm, not a data problem.
 //!
+//! Development aided by LLM.
+//!
 //! Geometry (all rectangular, no sweep/taper/twist):
 //!   Wing:   b=10m, c=1.5m, S=15m^2, AR=6.667
 //!   H-stab: bt=3m, ct=1.0m, St=3m^2, ARt=3.0, arm lt=4.0m
@@ -15,11 +17,11 @@
 
 #![cfg(feature = "f32")]
 
+use avian3d::math::Scalar;
+use avian3d::prelude::*;
 use avian_fdm::components::*;
 use avian_fdm::plugin::AircraftFdmPlugin;
-use avian3d::prelude::*;
 use bevy::prelude::*;
-use avian3d::math::Scalar;
 
 use bevy::time::TimeUpdateStrategy;
 use std::time::Duration;
@@ -68,8 +70,8 @@ const VSTAB_CHORD: Scalar = 1.0;
 const VSTAB_AREA: Scalar = VSTAB_SPAN * VSTAB_CHORD; // 1.5 m^2
 #[allow(clippy::unnecessary_cast)]
 const VSTAB_AR: Scalar = VSTAB_SPAN / VSTAB_CHORD; // 1.5
-// Fin lift slope (magnitude). CY_beta on the aircraft is NEGATIVE because
-// positive beta (wind from starboard) produces a port-ward side force.
+                                                   // Fin lift slope (magnitude). CY_beta on the aircraft is NEGATIVE because
+                                                   // positive beta (wind from starboard) produces a port-ward side force.
 #[allow(clippy::unnecessary_cast)]
 const VSTAB_FIN_SLOPE: Scalar = A0 * VSTAB_AR / (VSTAB_AR + 2.0); // 2.693 /rad
 #[allow(clippy::unnecessary_cast)]
@@ -110,7 +112,8 @@ const TARGET_CM_Q: Scalar = -2.0 * HSTAB_CL_ALPHA * V_H * (HSTAB_ARM / WING_CHOR
 #[allow(clippy::unnecessary_cast)]
 const WING_ZONE_Y: Scalar = WING_SPAN / 4.0; // 2.5 m, center of each half-wing
 #[allow(clippy::unnecessary_cast)]
-const TARGET_CL_P: Scalar = -WING_CL_ALPHA * 2.0 * WING_ZONE_Y * WING_ZONE_Y / (WING_SPAN * WING_SPAN);
+const TARGET_CL_P: Scalar =
+    -WING_CL_ALPHA * 2.0 * WING_ZONE_Y * WING_ZONE_Y / (WING_SPAN * WING_SPAN);
 
 // Weathercock stability:
 //   The vtail has CY_beta = -a_v (negative: positive beta -> port force).
@@ -220,7 +223,9 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
                 transform,
                 ..Default::default()
             },
-            InducedDrag { oswald_factor: 0.85 },
+            InducedDrag {
+                oswald_factor: 0.85,
+            },
         ))
         .id();
 
@@ -272,7 +277,8 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
                     area_m2: HSTAB_AREA,
                     chord_m: HSTAB_CHORD,
                     ..Default::default()
-                }.with_post_stall_extension(),
+                }
+                .with_post_stall_extension(),
                 collider: Collider::cuboid(0.5, 1.5, 0.03),
                 transform: Transform::from_xyz(-HSTAB_ARM as f32, 0.0, 0.0),
                 ..Default::default()
@@ -294,7 +300,8 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
                     area_m2: VSTAB_AREA,
                     chord_m: VSTAB_CHORD,
                     ..Default::default()
-                }.with_post_stall_extension(),
+                }
+                .with_post_stall_extension(),
                 collider: Collider::cuboid(0.5, 0.03, 0.75),
                 transform: Transform::from_xyz(-VSTAB_ARM as f32, 0.0, -0.75),
                 ..Default::default()
@@ -357,9 +364,9 @@ fn run_plank_app(n_frames: u32, spawn_fn: fn(Commands)) -> App {
         .add_plugins(bevy::asset::AssetPlugin::default())
         .add_plugins(PhysicsPlugins::default())
         .add_plugins(AircraftFdmPlugin::default());
-    app.insert_resource(TimeUpdateStrategy::ManualDuration(
-        Duration::from_secs_f64(PHYSICS_DT as f64),
-    ));
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(
+        PHYSICS_DT as f64,
+    )));
     app.insert_resource(Gravity(Vec3::ZERO));
     app.add_systems(Startup, spawn_fn);
     app.finish();
@@ -407,21 +414,17 @@ fn isa_density(alt_m: Scalar) -> Scalar {
 #[test]
 fn plank_inertia() {
     fn spawn(mut commands: Commands) {
-        let root = spawn_plank(
-            &mut commands,
-            plank_transform(500.0, 50.0),
-        );
-        commands.entity(root).insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+        let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
     }
 
     let mut app = run_plank_app(2, spawn);
 
     let world = app.world_mut();
     let mut query = world.query::<(&ComputedMass, &ComputedCenterOfMass)>();
-    let (mass, com) = query
-        .iter(world)
-        .next()
-        .expect("no aircraft found");
+    let (mass, com) = query.iter(world).next().expect("no aircraft found");
 
     let total_mass = mass.value() as Scalar;
     let cg_x = com.x as Scalar;
@@ -435,10 +438,7 @@ fn plank_inertia() {
     );
 
     // CG should be at x ~ 0.0 (wing AC)
-    assert!(
-        cg_x.abs() < 0.05,
-        "CG_x = {cg_x:.4} m, expected ~0.0"
-    );
+    assert!(cg_x.abs() < 0.05, "CG_x = {cg_x:.4} m, expected ~0.0");
 
     eprintln!("Plank: mass = {total_mass:.1} kg, CG_x = {cg_x:.4} m");
 }
@@ -458,7 +458,9 @@ fn plank_cl_alpha() {
 
     fn spawn_alpha0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
-        commands.entity(root).insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
     }
 
     fn spawn_alpha2(mut commands: Commands) {
@@ -473,7 +475,9 @@ fn plank_cl_alpha() {
             ),
         );
         // Velocity still along world +X (unchanged freestream).
-        commands.entity(root).insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
     }
 
     let mut app0 = run_plank_app(2, spawn_alpha0);
@@ -520,7 +524,9 @@ fn plank_cm_alpha() {
 
     fn spawn_alpha0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
-        commands.entity(root).insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
     }
 
     fn spawn_alpha2(mut commands: Commands) {
@@ -531,7 +537,9 @@ fn plank_cm_alpha() {
                     * Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
             ),
         );
-        commands.entity(root).insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
     }
 
     let mut app0 = run_plank_app(2, spawn_alpha0);
@@ -575,7 +583,9 @@ fn plank_cm_q() {
 
     fn spawn_q0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
-        commands.entity(root).insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
     }
 
     fn spawn_q5(mut commands: Commands) {
@@ -625,7 +635,9 @@ fn plank_cl_p() {
 
     fn spawn_p0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
-        commands.entity(root).insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
     }
 
     fn spawn_p10(mut commands: Commands) {
@@ -677,7 +689,9 @@ fn plank_cn_beta() {
 
     fn spawn_beta0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
-        commands.entity(root).insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
     }
 
     fn spawn_beta3(mut commands: Commands) {
@@ -694,7 +708,9 @@ fn plank_cn_beta() {
             ),
         );
         // Velocity still along world +X (unchanged freestream).
-        commands.entity(root).insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
     }
 
     let mut app0 = run_plank_app(2, spawn_beta0);
@@ -737,7 +753,9 @@ fn plank_cn_r() {
 
     fn spawn_r0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
-        commands.entity(root).insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
     }
 
     fn spawn_r5(mut commands: Commands) {

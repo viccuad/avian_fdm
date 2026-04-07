@@ -39,7 +39,10 @@ impl Default for AircraftFdmPlugin {
 
 impl Plugin for AircraftFdmPlugin {
     fn build(&self, app: &mut App) {
-        if app.get_schedule(avian3d::prelude::PhysicsSchedule).is_none() {
+        if app
+            .get_schedule(avian3d::prelude::PhysicsSchedule)
+            .is_none()
+        {
             panic!(
                 "Failed to build `AircraftFdmPlugin`: \
                 Avian's `PhysicsSchedule` was not found. \
@@ -48,22 +51,21 @@ impl Plugin for AircraftFdmPlugin {
         }
 
         use crate::components::{
-            AeroZone, AircraftGeometry, AtmosphereState, ControlInputs,
-            Failure, FlightState, GizmoShape, GizmoContours, InducedDrag,
-            LodDamping, ZoneForce,
+            AeroZone, AircraftGeometry, AtmosphereState, ControlInputs, Failure, FlightState,
+            GizmoContours, GizmoShape, InducedDrag, LodDamping, ZoneForce,
         };
 
         app.register_type::<AircraftGeometry>()
-           .register_type::<ControlInputs>()
-           .register_type::<FlightState>()
-           .register_type::<AtmosphereState>()
-           .register_type::<AeroZone>()
-           .register_type::<ZoneForce>()
-           .register_type::<GizmoShape>()
-           .register_type::<GizmoContours>()
-           .register_type::<Failure>()
-           .register_type::<InducedDrag>()
-           .register_type::<LodDamping>();
+            .register_type::<ControlInputs>()
+            .register_type::<FlightState>()
+            .register_type::<AtmosphereState>()
+            .register_type::<AeroZone>()
+            .register_type::<ZoneForce>()
+            .register_type::<GizmoShape>()
+            .register_type::<GizmoContours>()
+            .register_type::<Failure>()
+            .register_type::<InducedDrag>()
+            .register_type::<LodDamping>();
 
         use crate::components::EngineZone;
         app.register_type::<EngineZone>();

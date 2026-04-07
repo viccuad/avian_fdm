@@ -17,10 +17,10 @@
 //! }
 //! ```
 
-use avian3d::prelude::Collider;
-use bevy_transform::TransformSystems;
 use crate::_bevy::*;
 use crate::components::{AeroZone, AircraftGeometry, EngineZone};
+use avian3d::prelude::Collider;
+use bevy_transform::TransformSystems;
 
 use super::configuration::FdmGizmos;
 
@@ -65,15 +65,16 @@ pub(super) fn debug_render_colliders(
 ) {
     use avian3d::parry::shape::TypedShape;
 
-    let Ok(root_tf) = root_query.single() else { return };
+    let Ok(root_tf) = root_query.single() else {
+        return;
+    };
     let t = root_tf.translation;
     let r = root_tf.rotation;
 
     let iso_at = |zone_tf: &Transform| {
         Isometry3d::new(
             t + r * zone_tf.translation,
-            Quat::from_array(r.to_array())
-                * Quat::from_array(zone_tf.rotation.to_array()),
+            Quat::from_array(r.to_array()) * Quat::from_array(zone_tf.rotation.to_array()),
         )
     };
 
@@ -91,11 +92,7 @@ pub(super) fn debug_render_colliders(
             }
             TypedShape::Ball(b) => {
                 gizmos
-                    .primitive_3d(
-                        &Sphere::new(b.radius as f32),
-                        iso,
-                        COLLIDER_COLOR,
-                    )
+                    .primitive_3d(&Sphere::new(b.radius as f32), iso, COLLIDER_COLOR)
                     .resolution(32);
             }
             TypedShape::Cylinder(c) => {

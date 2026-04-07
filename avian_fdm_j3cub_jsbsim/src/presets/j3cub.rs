@@ -5,6 +5,8 @@
 //! model (USA-35B airfoil, Du Y stability derivatives). Unit conversions
 //! applied throughout: ft² to m², lb to kg, SLUG·ft² to kg·m², inches to metres.
 //!
+//! Extraction of this preset aided by LLM.
+//!
 //! ## Coordinate frame
 //!
 //! Positions are in the **body frame** with the aircraft root origin at the CG:
@@ -108,39 +110,52 @@
 //!
 //! All zones are tiled without collider overlap. No double-counted mass.
 
+use avian3d::math::{Scalar, Vector};
+use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
 use bevy_ecs::prelude::*;
 use bevy_math::prelude::*;
 use bevy_transform::prelude::*;
-use avian3d::math::{Scalar, Vector};
-use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
 
-use avian_fdm::sourced;
 use avian_fdm::components::{
-    AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
-    ControlSurfaceRole, EngineZone, GizmoContours, InducedDrag, ZoneForce,
+    AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry, ControlSurfaceRole,
+    EngineZone, GizmoContours, InducedDrag, ZoneForce,
 };
+use avian_fdm::sourced;
 
 // ── Aircraft reference constants ─────────────────────────────────────────────
 
 /// JSBSim J3Cub reference wing area (m²): 178.50 ft² × 0.0929.
-pub const WING_AREA_M2: Scalar = sourced!(16.584, "JSBSim:J3Cub.xml: wing_area 178.50 ft² × 0.0929 m²/ft²");
+pub const WING_AREA_M2: Scalar = sourced!(
+    16.584,
+    "JSBSim:J3Cub.xml: wing_area 178.50 ft² × 0.0929 m²/ft²"
+);
 
 /// JSBSim J3Cub wingspan (m): 35.25 ft × 0.3048.
-pub const WING_SPAN_M: Scalar = sourced!(10.742, "JSBSim:J3Cub.xml: wingspan 35.25 ft × 0.3048 m/ft");
+pub const WING_SPAN_M: Scalar =
+    sourced!(10.742, "JSBSim:J3Cub.xml: wingspan 35.25 ft × 0.3048 m/ft");
 
 /// JSBSim J3Cub mean aerodynamic chord (m): 5.25 ft × 0.3048.
 pub const CHORD_M: Scalar = sourced!(1.600, "JSBSim:J3Cub.xml: chord 5.25 ft × 0.3048 m/ft");
 
 /// Horizontal tail moment arm (m): 13.20 ft from J3Cub FlightGear repo (rev 1.26).
-const H_TAIL_ARM_M: Scalar = sourced!(4.023, "JSBSim:J3Cub_FlightGear.xml: htailarm = 13.20 ft × 0.3048 m/ft");
+const H_TAIL_ARM_M: Scalar = sourced!(
+    4.023,
+    "JSBSim:J3Cub_FlightGear.xml: htailarm = 13.20 ft × 0.3048 m/ft"
+);
 
 // ── Horizontal tail geometry ─────────────────────────────────────────────────
 
 /// H-stab span (m): ~10 ft measured from J3 Cub three-view drawings.
-const HSTAB_SPAN_M: Scalar = sourced!(3.05, "Geometry: J3 Cub h-stab span, approx 10 ft from type certificate drawings");
+const HSTAB_SPAN_M: Scalar = sourced!(
+    3.05,
+    "Geometry: J3 Cub h-stab span, approx 10 ft from type certificate drawings"
+);
 
 /// H-stab chord (m): ~2 ft constant chord.
-const HSTAB_CHORD_M: Scalar = sourced!(0.61, "Geometry: J3 Cub h-stab chord, approx 2 ft from type certificate drawings");
+const HSTAB_CHORD_M: Scalar = sourced!(
+    0.61,
+    "Geometry: J3 Cub h-stab chord, approx 2 ft from type certificate drawings"
+);
 
 /// H-stab planform area (m2): span * chord.
 const HSTAB_AREA_M2: Scalar = HSTAB_SPAN_M * HSTAB_CHORD_M; // 1.86 m2
@@ -171,7 +186,10 @@ const HSTAB_CL_ALPHA: Scalar = sourced!(
 );
 
 /// Elevator chord (m): ~1.15 ft, trailing edge of h-stab.
-const ELEVATOR_CHORD_M: Scalar = sourced!(0.35, "Geometry: J3 Cub elevator chord, approx 1.15 ft from type certificate drawings");
+const ELEVATOR_CHORD_M: Scalar = sourced!(
+    0.35,
+    "Geometry: J3 Cub elevator chord, approx 1.15 ft from type certificate drawings"
+);
 
 /// Elevator planform area (m2): same span as h-stab times elevator chord.
 const ELEVATOR_AREA_M2: Scalar = HSTAB_SPAN_M * ELEVATOR_CHORD_M; // 1.07 m2
@@ -194,17 +212,26 @@ const ELEVATOR_CL_DELTA: Scalar = sourced!(
 // ── Vertical tail geometry ───────────────────────────────────────────────────
 
 /// Vertical fin height (m): from three-view drawings, root to tip.
-const VFIN_HEIGHT_M: Scalar = sourced!(0.85, "Geometry: J3 Cub vertical fin height from three-view drawings");
+const VFIN_HEIGHT_M: Scalar = sourced!(
+    0.85,
+    "Geometry: J3 Cub vertical fin height from three-view drawings"
+);
 
 /// Vertical fin mean chord (m): average of root (~0.65m) and tip (~0.35m).
-const VFIN_MEAN_CHORD_M: Scalar = sourced!(0.50, "Geometry: J3 Cub vertical fin mean chord, (root 0.65 + tip 0.35) / 2");
+const VFIN_MEAN_CHORD_M: Scalar = sourced!(
+    0.50,
+    "Geometry: J3 Cub vertical fin mean chord, (root 0.65 + tip 0.35) / 2"
+);
 
 /// Vertical fin planform area (m2): height * mean chord.
 const VFIN_AREA_M2: Scalar = VFIN_HEIGHT_M * VFIN_MEAN_CHORD_M; // 0.425 m2
 
 /// Vertical fin moment arm from CG (m). The fin AC is roughly at 25% of the
 /// mean chord, which places it at about x = -3.6 m in body frame.
-const VFIN_ARM_M: Scalar = sourced!(3.6, "Geometry: J3 Cub vertical fin aerodynamic center, approx 25% mean chord aft of fin LE");
+const VFIN_ARM_M: Scalar = sourced!(
+    3.6,
+    "Geometry: J3 Cub vertical fin aerodynamic center, approx 25% mean chord aft of fin LE"
+);
 
 /// Vertical fin CY per radian of sideslip.
 ///
@@ -223,10 +250,16 @@ const VFIN_CY_BETA: Scalar = sourced!(
 );
 
 /// Rudder height (m): extends slightly beyond the fin (horn balance).
-const RUDDER_HEIGHT_M: Scalar = sourced!(0.95, "Geometry: J3 Cub rudder height from three-view drawings");
+const RUDDER_HEIGHT_M: Scalar = sourced!(
+    0.95,
+    "Geometry: J3 Cub rudder height from three-view drawings"
+);
 
 /// Rudder mean chord (m): average of root (~0.45m) and tip (~0.30m).
-const RUDDER_MEAN_CHORD_M: Scalar = sourced!(0.375, "Geometry: J3 Cub rudder mean chord, (root 0.45 + tip 0.30) / 2");
+const RUDDER_MEAN_CHORD_M: Scalar = sourced!(
+    0.375,
+    "Geometry: J3 Cub rudder mean chord, (root 0.45 + tip 0.30) / 2"
+);
 
 /// Rudder planform area (m2): height * mean chord.
 const RUDDER_AREA_M2: Scalar = RUDDER_HEIGHT_M * RUDDER_MEAN_CHORD_M; // 0.356 m2
@@ -249,7 +282,10 @@ const RUDDER_CY_DELTA: Scalar = sourced!(
 // ── Aileron geometry ─────────────────────────────────────────────────────────
 
 /// Aileron span per side (m): occupies the outboard wing tip region.
-const AILERON_SPAN_M: Scalar = sourced!(0.86, "Geometry: J3 Cub aileron span per side, from wing zone layout");
+const AILERON_SPAN_M: Scalar = sourced!(
+    0.86,
+    "Geometry: J3 Cub aileron span per side, from wing zone layout"
+);
 
 /// Aileron effective area (m2): aileron_span * wing_chord.
 ///
@@ -275,7 +311,10 @@ const AILERON_CL_DELTA: Scalar = sourced!(
 // ── Landing gear geometry ────────────────────────────────────────────────────
 
 /// Gear leg frontal area (m2): exposed axle/bungee strut, approx 0.6m long * 0.04m diameter.
-const GEAR_LEG_AREA_M2: Scalar = sourced!(0.024, "Geometry: J3 Cub gear leg frontal area, 0.6 m × 0.04 m exposed axle + bungee");
+const GEAR_LEG_AREA_M2: Scalar = sourced!(
+    0.024,
+    "Geometry: J3 Cub gear leg frontal area, 0.6 m × 0.04 m exposed axle + bungee"
+);
 
 /// Gear leg drag coefficient (based on frontal area).
 ///
@@ -288,7 +327,10 @@ const GEAR_LEG_CD: Scalar = sourced!(
 );
 
 /// Wheel frontal area (m2): circle with radius 0.15m (8-inch tyre).
-const WHEEL_AREA_M2: Scalar = sourced!(0.0707, "Geometry: J3 Cub main wheel frontal area, pi × 0.15^2");
+const WHEEL_AREA_M2: Scalar = sourced!(
+    0.0707,
+    "Geometry: J3 Cub main wheel frontal area, pi × 0.15^2"
+);
 
 /// Wheel drag coefficient (based on frontal area).
 ///
@@ -304,11 +346,17 @@ const WHEEL_CD: Scalar = sourced!(
 /// The Avian-computed CG lands at ≈ −0.172 m (fuselage centroid at −0.45 m),
 /// so the wing AC is ≈ 0.072 m **forward** of the CG. This is 4.5 % MAC, matching
 /// the J3Cub's documented forward-of-neutral-point CG range.
-const WING_AC_X: Scalar = sourced!(-0.10, "Geometry: AC at 25% MAC; tuned so Avian CG sits 4.5% MAC forward of AC");
+const WING_AC_X: Scalar = sourced!(
+    -0.10,
+    "Geometry: AC at 25% MAC; tuned so Avian CG sits 4.5% MAC forward of AC"
+);
 
 /// Wing height above CG in body frame (m, negative = up since +Z = down).
 /// JSBSim: CG at z = −23.23 in, wing datum at z = 0 in: 23.23 in = 0.590 m above CG.
-const WING_Z: Scalar = sourced!(-0.590, "JSBSim:J3Cub_FlightGear.xml: CG z = −23.23 in; wing datum z = 0 -> 23.23 in = 0.590 m");
+const WING_Z: Scalar = sourced!(
+    -0.590,
+    "JSBSim:J3Cub_FlightGear.xml: CG z = −23.23 in; wing datum z = 0 -> 23.23 in = 0.590 m"
+);
 
 /// Geometric dihedral of each wing panel (radians).
 /// The J3 Cub has approximately 4 degrees of dihedral. Each wing zone's
@@ -325,9 +373,10 @@ const WING_DIHEDRAL_RAD: Scalar = sourced!(
 /// Alpha breakpoints (radians) shared by wing CL and CD tables.
 /// Sourced directly from the `tableData` in `J3Cub.xml` (USA-35B airfoil).
 const ALPHA_BP: [Scalar; 14] = sourced!(
-    [-1.5700, -0.3491, -0.2443, -0.1745, -0.0873,
-      0.0000,  0.0873,  0.1309,  0.1745,  0.2182,
-      0.2618,  0.3054,  0.3491,  1.5700],
+    [
+        -1.5700, -0.3491, -0.2443, -0.1745, -0.0873, 0.0000, 0.0873, 0.1309, 0.1745, 0.2182,
+        0.2618, 0.3054, 0.3491, 1.5700
+    ],
     "JSBSim:J3Cub.xml: alpha breakpoints from Lift_alpha and Drag_basic tableData"
 );
 
@@ -342,20 +391,20 @@ const RE_BP: [Scalar; 2] = sourced!(
 // From J3Cub.xml `Lift_alpha` table. Rows correspond to ALPHA_BP, columns to RE_BP.
 const CL_DATA: [Scalar; 28] = sourced!(
     [
-         0.0000,  0.0000,   // alpha = −1.5700
-        -0.0085, -0.5085,   // alpha = −0.3491
-        -0.5085, -0.8136,   // alpha = −0.2443
-        -0.5085, -0.5085,   // alpha = −0.1745
-         0.1017,  0.1017,   // alpha = −0.0873
-         0.5339,  0.5339,   // alpha =  0.0000
-         1.2204,  1.2204,   // alpha =  0.0873
-         1.4746,  1.4746,   // alpha =  0.1309
-         1.5000,  1.6272,   // alpha =  0.1745
-         1.6201,  1.7797,   // alpha =  0.2182
-         1.5645,  1.8306,   // alpha =  0.2618
-         1.4272,  1.6272,   // alpha =  0.3054
-         1.3138,  1.4238,   // alpha =  0.3491
-         0.0000,  0.0000,   // alpha =  1.5700
+        0.0000, 0.0000, // alpha = −1.5700
+        -0.0085, -0.5085, // alpha = −0.3491
+        -0.5085, -0.8136, // alpha = −0.2443
+        -0.5085, -0.5085, // alpha = −0.1745
+        0.1017, 0.1017, // alpha = −0.0873
+        0.5339, 0.5339, // alpha =  0.0000
+        1.2204, 1.2204, // alpha =  0.0873
+        1.4746, 1.4746, // alpha =  0.1309
+        1.5000, 1.6272, // alpha =  0.1745
+        1.6201, 1.7797, // alpha =  0.2182
+        1.5645, 1.8306, // alpha =  0.2618
+        1.4272, 1.6272, // alpha =  0.3054
+        1.3138, 1.4238, // alpha =  0.3491
+        0.0000, 0.0000, // alpha =  1.5700
     ],
     "JSBSim:J3Cub.xml: Lift_alpha table (USA-35B airfoil); whole-aircraft CL"
 );
@@ -366,20 +415,20 @@ const CL_DATA: [Scalar; 28] = sourced!(
 // in lift distribution). Columns correspond to RE_BP.
 const CD_DATA: [Scalar; 28] = sourced!(
     [
-        1.4091, 1.4091,   // alpha = −1.5700
-        0.1898, 0.1736,   // alpha = −0.3491
-        0.1567, 0.0494,   // alpha = −0.2443
-        0.0307, 0.0290,   // alpha = −0.1745
-        0.0216, 0.0208,   // alpha = −0.0873
-        0.0189, 0.0187,   // alpha =  0.0000
-        0.0216, 0.0208,   // alpha =  0.0873
-        0.0289, 0.0279,   // alpha =  0.1309
-        0.0332, 0.0315,   // alpha =  0.1745
-        0.0435, 0.0402,   // alpha =  0.2182
-        0.0757, 0.0707,   // alpha =  0.2618
-        0.1408, 0.1125,   // alpha =  0.3054
-        0.1898, 0.1736,   // alpha =  0.3491
-        1.4091, 1.4091,   // alpha =  1.5700
+        1.4091, 1.4091, // alpha = −1.5700
+        0.1898, 0.1736, // alpha = −0.3491
+        0.1567, 0.0494, // alpha = −0.2443
+        0.0307, 0.0290, // alpha = −0.1745
+        0.0216, 0.0208, // alpha = −0.0873
+        0.0189, 0.0187, // alpha =  0.0000
+        0.0216, 0.0208, // alpha =  0.0873
+        0.0289, 0.0279, // alpha =  0.1309
+        0.0332, 0.0315, // alpha =  0.1745
+        0.0435, 0.0402, // alpha =  0.2182
+        0.0757, 0.0707, // alpha =  0.2618
+        0.1408, 0.1125, // alpha =  0.3054
+        0.1898, 0.1736, // alpha =  0.3491
+        1.4091, 1.4091, // alpha =  1.5700
     ],
     "JSBSim:J3Cub.xml: Drag_basic table (profile drag only, parasite; no induced drag)"
 );
@@ -747,18 +796,16 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
 /// drag.  No [`LodDamping`](avian_fdm::components::LodDamping). Roll/pitch/yaw
 /// damping emerges from per-zone local α/β physics.
 pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
-    (
-        AircraftCoreBundle {
-            geometry: AircraftGeometry {
-                wing_area_m2: WING_AREA_M2,
-                wing_span_m:  WING_SPAN_M,
-                chord_m:      CHORD_M,
-            },
-            rigid_body: RigidBody::Dynamic,
-            transform,
-            ..Default::default()
+    (AircraftCoreBundle {
+        geometry: AircraftGeometry {
+            wing_area_m2: WING_AREA_M2,
+            wing_span_m: WING_SPAN_M,
+            chord_m: CHORD_M,
         },
-    )
+        rigid_body: RigidBody::Dynamic,
+        transform,
+        ..Default::default()
+    },)
 }
 
 // ── Zone builder functions (pub for testing / custom assemblies) ──────────────
@@ -802,7 +849,8 @@ pub fn wing_zone(
                 area_m2: fraction * WING_AREA_M2,
                 chord_m: CHORD_M,
                 ..Default::default()
-            }.with_post_stall_extension(),
+            }
+            .with_post_stall_extension(),
             zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(x_m as f32, y_m as f32, z_m as f32)
@@ -896,24 +944,20 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
             zone: AeroZone {
                 cl: AeroCoeff::Table1D {
                     breakpoints: vec![-0.35, 0.0, 0.35],
-                    values: vec![
-                        -0.35 * HSTAB_CL_ALPHA,
-                         0.0,
-                         0.35 * HSTAB_CL_ALPHA,
-                    ],
+                    values: vec![-0.35 * HSTAB_CL_ALPHA, 0.0, 0.35 * HSTAB_CL_ALPHA],
                 },
-                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low alpha")),
+                cd: AeroCoeff::Scalar(sourced!(
+                    0.01,
+                    "Estimate: symmetric airfoil profile drag at low alpha"
+                )),
                 area_m2: HSTAB_AREA_M2,
                 chord_m: HSTAB_CHORD_M,
                 ..Default::default()
-            }.with_post_stall_extension(),
+            }
+            .with_post_stall_extension(),
             zone_force: ZoneForce::default(),
             collider,
-            transform: Transform::from_xyz(
-                -(H_TAIL_ARM_M as f32),
-                0.0,
-                -0.10,
-            ),
+            transform: Transform::from_xyz(-(H_TAIL_ARM_M as f32), 0.0, -0.10),
             global_transform: GlobalTransform::default(),
         },
         density,
@@ -968,13 +1012,12 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
         AeroZoneBundle {
             zone: AeroZone {
                 cl: AeroCoeff::Scalar(0.0),
-                cd: AeroCoeff::Scalar(sourced!(0.01, "Estimate: symmetric airfoil profile drag at low beta")),
+                cd: AeroCoeff::Scalar(sourced!(
+                    0.01,
+                    "Estimate: symmetric airfoil profile drag at low beta"
+                )),
                 cy: AeroCoeff::Table1D {
-                    breakpoints: vec![
-                        -avian3d::math::FRAC_PI_2,
-                        0.0,
-                        avian3d::math::FRAC_PI_2,
-                    ],
+                    breakpoints: vec![-avian3d::math::FRAC_PI_2, 0.0, avian3d::math::FRAC_PI_2],
                     values: vec![
                         -VFIN_CY_BETA * avian3d::math::FRAC_PI_2,
                         0.0,
@@ -984,14 +1027,11 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                 area_m2: VFIN_AREA_M2,
                 chord_m: VFIN_MEAN_CHORD_M,
                 ..Default::default()
-            }.with_post_stall_extension(),
+            }
+            .with_post_stall_extension(),
             zone_force: ZoneForce::default(),
             collider,
-            transform: Transform::from_xyz(
-                -(VFIN_ARM_M as f32),
-                0.0,
-                -0.60,
-            ),
+            transform: Transform::from_xyz(-(VFIN_ARM_M as f32), 0.0, -0.60),
             global_transform: GlobalTransform::default(),
         },
         density,
@@ -1090,28 +1130,28 @@ fn ellipse_ring(x: f32, hw: f32, hh: f32) -> Vec<Vec3> {
 fn fuse_fwd_contours() -> GizmoContours {
     // Side profiles (one per side, y = ±half_width at that station).
     let top_profile: Vec<Vec3> = vec![
-        Vec3::new(1.00, 0.0, -0.30),   // firewall top
-        Vec3::new(0.60, 0.0, -0.34),   // cowl/windshield transition
-        Vec3::new(0.20, 0.0, -0.38),   // windshield base
-        Vec3::new(-0.20, 0.0, -0.40),  // cabin peak
-        Vec3::new(-0.60, 0.0, -0.38),  // rear cabin
-        Vec3::new(-1.00, 0.0, -0.34),  // rear seat
+        Vec3::new(1.00, 0.0, -0.30),  // firewall top
+        Vec3::new(0.60, 0.0, -0.34),  // cowl/windshield transition
+        Vec3::new(0.20, 0.0, -0.38),  // windshield base
+        Vec3::new(-0.20, 0.0, -0.40), // cabin peak
+        Vec3::new(-0.60, 0.0, -0.38), // rear cabin
+        Vec3::new(-1.00, 0.0, -0.34), // rear seat
     ];
     let bot_profile: Vec<Vec3> = vec![
-        Vec3::new(1.00, 0.0, 0.35),    // firewall bottom
-        Vec3::new(0.60, 0.0, 0.34),    // lower cowl
-        Vec3::new(0.20, 0.0, 0.32),    // belly
-        Vec3::new(-0.20, 0.0, 0.28),   // belly taper
-        Vec3::new(-0.60, 0.0, 0.24),   // rear belly
-        Vec3::new(-1.00, 0.0, 0.20),   // rear seat
+        Vec3::new(1.00, 0.0, 0.35),  // firewall bottom
+        Vec3::new(0.60, 0.0, 0.34),  // lower cowl
+        Vec3::new(0.20, 0.0, 0.32),  // belly
+        Vec3::new(-0.20, 0.0, 0.28), // belly taper
+        Vec3::new(-0.60, 0.0, 0.24), // rear belly
+        Vec3::new(-1.00, 0.0, 0.20), // rear seat
     ];
 
     // Cross-section rings at key stations.
     let rings = vec![
-        ellipse_ring(1.00, 0.28, 0.32),   // firewall
-        ellipse_ring(0.20, 0.30, 0.35),    // cabin front
-        ellipse_ring(-0.60, 0.28, 0.31),   // rear cabin
-        ellipse_ring(-1.00, 0.24, 0.27),   // rear seat (fwd/aft boundary)
+        ellipse_ring(1.00, 0.28, 0.32),  // firewall
+        ellipse_ring(0.20, 0.30, 0.35),  // cabin front
+        ellipse_ring(-0.60, 0.28, 0.31), // rear cabin
+        ellipse_ring(-1.00, 0.24, 0.27), // rear seat (fwd/aft boundary)
     ];
 
     let mut lines = vec![top_profile, bot_profile];
@@ -1125,12 +1165,12 @@ fn fuse_fwd_contours() -> GizmoContours {
 /// Local x: +1.35 = fwd end (−1.00 aircraft), −1.35 = aft end (−3.70 aircraft).
 fn fuse_aft_contours() -> GizmoContours {
     let top_profile: Vec<Vec3> = vec![
-        Vec3::new(1.35, 0.0, -0.27),   // fwd end (matches fuse_fwd rear)
+        Vec3::new(1.35, 0.0, -0.27), // fwd end (matches fuse_fwd rear)
         Vec3::new(0.65, 0.0, -0.22),
         Vec3::new(0.00, 0.0, -0.18),
         Vec3::new(-0.65, 0.0, -0.14),
         Vec3::new(-1.10, 0.0, -0.10),
-        Vec3::new(-1.35, 0.0, -0.08),  // tail end
+        Vec3::new(-1.35, 0.0, -0.08), // tail end
     ];
     let bot_profile: Vec<Vec3> = vec![
         Vec3::new(1.35, 0.0, 0.20),
@@ -1142,10 +1182,10 @@ fn fuse_aft_contours() -> GizmoContours {
     ];
 
     let rings = vec![
-        ellipse_ring(1.35, 0.20, 0.24),   // fwd end
-        ellipse_ring(0.00, 0.14, 0.15),    // mid boom
-        ellipse_ring(-1.00, 0.08, 0.08),   // near tail
-        ellipse_ring(-1.35, 0.06, 0.06),   // tail tip
+        ellipse_ring(1.35, 0.20, 0.24),  // fwd end
+        ellipse_ring(0.00, 0.14, 0.15),  // mid boom
+        ellipse_ring(-1.00, 0.08, 0.08), // near tail
+        ellipse_ring(-1.35, 0.06, 0.06), // tail tip
     ];
 
     let mut lines = vec![top_profile, bot_profile];
@@ -1165,15 +1205,16 @@ fn cabin_contours() -> GizmoContours {
         Vec3::new(-0.50, -0.30, -0.15), // rear window top
         Vec3::new(-0.60, -0.30, 0.10),  // rear window base
     ];
-    let windshield_r: Vec<Vec3> = windshield_l.iter()
+    let windshield_r: Vec<Vec3> = windshield_l
+        .iter()
         .map(|p| Vec3::new(p.x, -p.y, p.z))
         .collect();
 
     // Roof spine (centerline).
     let roof: Vec<Vec3> = vec![
-        Vec3::new(0.30, 0.0, -0.22),   // front
-        Vec3::new(-0.10, 0.0, -0.25),  // peak
-        Vec3::new(-0.50, 0.0, -0.18),  // rear
+        Vec3::new(0.30, 0.0, -0.22),  // front
+        Vec3::new(-0.10, 0.0, -0.25), // peak
+        Vec3::new(-0.50, 0.0, -0.18), // rear
     ];
 
     GizmoContours {
@@ -1188,9 +1229,9 @@ fn cabin_contours() -> GizmoContours {
 fn engine_contours() -> GizmoContours {
     // Spinner cone (linestrip profile, one side).
     let spinner: Vec<Vec3> = vec![
-        Vec3::new(0.25, 0.0, 0.12),   // cylinder front bottom
-        Vec3::new(0.50, 0.0, 0.00),   // spinner tip
-        Vec3::new(0.25, 0.0, -0.12),  // cylinder front top
+        Vec3::new(0.25, 0.0, 0.12),  // cylinder front bottom
+        Vec3::new(0.50, 0.0, 0.00),  // spinner tip
+        Vec3::new(0.25, 0.0, -0.12), // cylinder front top
     ];
 
     // Propeller disc (circle at spinner tip, in YZ plane).
@@ -1215,9 +1256,9 @@ fn hstab_contours() -> GizmoContours {
     GizmoContours {
         lines: vec![vec![
             Vec3::new(-hc, -hs, 0.0),
-            Vec3::new(-hc,  hs, 0.0),
-            Vec3::new( hc,  hs, 0.0),
-            Vec3::new( hc, -hs, 0.0),
+            Vec3::new(-hc, hs, 0.0),
+            Vec3::new(hc, hs, 0.0),
+            Vec3::new(hc, -hs, 0.0),
             Vec3::new(-hc, -hs, 0.0),
         ]],
     }
@@ -1231,9 +1272,9 @@ fn elevator_contours() -> GizmoContours {
     GizmoContours {
         lines: vec![vec![
             Vec3::new(-hc, -hs, 0.0),
-            Vec3::new(-hc,  hs, 0.0),
-            Vec3::new( hc,  hs, 0.0),
-            Vec3::new( hc, -hs, 0.0),
+            Vec3::new(-hc, hs, 0.0),
+            Vec3::new(hc, hs, 0.0),
+            Vec3::new(hc, -hs, 0.0),
             Vec3::new(-hc, -hs, 0.0),
         ]],
     }
@@ -1269,14 +1310,13 @@ mod tests {
     fn hstab_cl_zero_at_zero_alpha() {
         let coeff = AeroCoeff::Table1D {
             breakpoints: vec![-0.35, 0.0, 0.35],
-            values: vec![
-                -0.35 * HSTAB_CL_ALPHA,
-                 0.0,
-                 0.35 * HSTAB_CL_ALPHA,
-            ],
+            values: vec![-0.35 * HSTAB_CL_ALPHA, 0.0, 0.35 * HSTAB_CL_ALPHA],
         };
         let cl = coeff.evaluate(0.0, RE_BP[0]);
-        assert!(cl.abs() < 1e-10, "h-stab CL at alpha=0 should be 0, got {cl}");
+        assert!(
+            cl.abs() < 1e-10,
+            "h-stab CL at alpha=0 should be 0, got {cl}"
+        );
     }
 
     /// H-stab CL is **positive** at positive alpha -> upward tail force -> pitch-down restoring moment.
@@ -1284,14 +1324,13 @@ mod tests {
     fn hstab_cl_positive_at_positive_alpha() {
         let coeff = AeroCoeff::Table1D {
             breakpoints: vec![-0.35, 0.0, 0.35],
-            values: vec![
-                -0.35 * HSTAB_CL_ALPHA,
-                 0.0,
-                 0.35 * HSTAB_CL_ALPHA,
-            ],
+            values: vec![-0.35 * HSTAB_CL_ALPHA, 0.0, 0.35 * HSTAB_CL_ALPHA],
         };
         let cl = coeff.evaluate(0.1, RE_BP[0]);
-        assert!(cl > 0.0, "h-stab CL at positive alpha should be positive (upward force at tail), got {cl}");
+        assert!(
+            cl > 0.0,
+            "h-stab CL at positive alpha should be positive (upward force at tail), got {cl}"
+        );
     }
 
     /// Aileron roll moment magnitude matches JSBSim Roll_aileron at full deflection.
@@ -1305,8 +1344,10 @@ mod tests {
         let our_coeff = 2.0 * AILERON_CL_DELTA * AILERON_AREA_M2 * y_arm;
 
         let jsbsim_coeff = 0.3498 * WING_SPAN_M * WING_AREA_M2;
-        assert!((our_coeff - jsbsim_coeff).abs() / jsbsim_coeff < 0.01,
-            "aileron moment mismatch: ours={our_coeff:.2}, jsbsim={jsbsim_coeff:.2}");
+        assert!(
+            (our_coeff - jsbsim_coeff).abs() / jsbsim_coeff < 0.01,
+            "aileron moment mismatch: ours={our_coeff:.2}, jsbsim={jsbsim_coeff:.2}"
+        );
     }
 
     /// Elevator pitch moment matches JSBSim CM_de at full deflection.
@@ -1319,8 +1360,10 @@ mod tests {
 
         let cm_de: Scalar = -1.2004;
         let jsbsim_moment = cm_de * WING_AREA_M2 * CHORD_M;
-        assert!((our_moment - jsbsim_moment).abs() / jsbsim_moment.abs() < 0.01,
-            "elevator moment: ours={our_moment:.2}, jsbsim={jsbsim_moment:.2}");
+        assert!(
+            (our_moment - jsbsim_moment).abs() / jsbsim_moment.abs() < 0.01,
+            "elevator moment: ours={our_moment:.2}, jsbsim={jsbsim_moment:.2}"
+        );
     }
 
     /// Emergent pitch-damping derivative Cmq from h-stab zone geometry.
@@ -1341,22 +1384,30 @@ mod tests {
     /// the full kinematic alpha increment.
     #[test]
     fn emergent_cmq_from_hstab_geometry() {
-        let cmq = -2.0 * HSTAB_CL_ALPHA * (HSTAB_AREA_M2 / WING_AREA_M2)
+        let cmq = -2.0
+            * HSTAB_CL_ALPHA
+            * (HSTAB_AREA_M2 / WING_AREA_M2)
             * (H_TAIL_ARM_M / CHORD_M).powi(2);
 
         let datcom_cmq: Scalar = -6.0;
 
         // Our emergent value should be more negative than Datcom (no downwash lag).
         // Factor of ~1.7 is expected.
-        assert!(cmq < datcom_cmq,
-            "emergent Cmq ({cmq:.1}) should be more negative than Datcom ({datcom_cmq})");
-        assert!(cmq > datcom_cmq * 3.0,
-            "emergent Cmq ({cmq:.1}) should not exceed 3x Datcom ({datcom_cmq})");
+        assert!(
+            cmq < datcom_cmq,
+            "emergent Cmq ({cmq:.1}) should be more negative than Datcom ({datcom_cmq})"
+        );
+        assert!(
+            cmq > datcom_cmq * 3.0,
+            "emergent Cmq ({cmq:.1}) should not exceed 3x Datcom ({datcom_cmq})"
+        );
 
         // The ratio tells us what downwash lag factor would reconcile the two.
         // expected: (1 - d_epsilon/d_alpha) ~ Datcom / emergent ~ 0.6
         let downwash_factor = datcom_cmq / cmq;
-        assert!(downwash_factor > 0.4 && downwash_factor < 0.8,
-            "implied downwash factor {downwash_factor:.2} outside [0.4, 0.8]");
+        assert!(
+            downwash_factor > 0.4 && downwash_factor < 0.8,
+            "implied downwash factor {downwash_factor:.2} outside [0.4, 0.8]"
+        );
     }
 }

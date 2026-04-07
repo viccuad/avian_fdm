@@ -20,7 +20,9 @@ except ImportError:
           file=sys.stderr)
     sys.exit(1)
 
-# ── Constants matching avian_fdm j3cub ───────────────────────────────────────
+#
+# Constants matching avian_fdm j3cub
+# 
 INITIAL_ALT_M = 300.0
 INITIAL_TAS_MS = 27.0
 SIM_DURATION_S = 60.0
@@ -71,7 +73,10 @@ def main():
         )
         sys.exit(1)
 
-    # ── Initial conditions ───────────────────────────────────────────────
+    #
+    # Initial conditions
+    # 
+     
     fdm["ic/h-agl-ft"] = INITIAL_ALT_M * FT_PER_M
     fdm["ic/vt-fps"] = INITIAL_TAS_MS * FT_PER_M
     fdm["ic/theta-rad"] = 0.0
@@ -85,7 +90,10 @@ def main():
     fdm["fcs/throttle-cmd-norm[0]"] = 0.0
     fdm["fcs/mixture-cmd-norm[0]"] = 0.0
 
-    # ── Simulation loop ──────────────────────────────────────────────────
+    #
+    # Simulation loop
+    # 
+     
     print("time_s,altitude_m,airspeed_ms,alpha_deg")
 
     dt = fdm.get_delta_t()

@@ -93,12 +93,17 @@ mod tests {
     use super::*;
     use crate::aerodynamics::coefficients::evaluate_zone_coefficients;
     use crate::aerodynamics::world_forces::zone_force_world;
-    use crate::components::{AeroZone, ControlInputs};
     use crate::components::aero_coeff::AeroCoeff;
+    use crate::components::{AeroZone, ControlInputs};
     use avian3d::math::{Quaternion, Vector};
 
     fn neutral_controls() -> ControlInputs {
-        ControlInputs { elevator: 0.0, aileron: 0.0, rudder: 0.0, throttle: 0.0 }
+        ControlInputs {
+            elevator: 0.0,
+            aileron: 0.0,
+            rudder: 0.0,
+            throttle: 0.0,
+        }
     }
 
     #[cfg(feature = "f32")]
@@ -111,7 +116,10 @@ mod tests {
     fn roll_rate_increases_alpha_at_positive_y() {
         let (alpha_l, beta_l) = zone_local_angles(0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 4.0, 50.0);
         let expected = 0.1 + 4.0 / 50.0;
-        assert!((alpha_l - expected).abs() < EPS, "Δα_roll should be p·y/V, got {alpha_l}");
+        assert!(
+            (alpha_l - expected).abs() < EPS,
+            "Δα_roll should be p·y/V, got {alpha_l}"
+        );
         assert!((beta_l - 0.0).abs() < EPS, "roll rate should not affect β");
     }
 
@@ -120,7 +128,10 @@ mod tests {
     fn roll_rate_decreases_alpha_at_negative_y() {
         let (alpha_l, _) = zone_local_angles(0.1, 0.0, 1.0, 0.0, 0.0, 0.0, -4.0, 50.0);
         let expected = 0.1 - 4.0 / 50.0;
-        assert!((alpha_l - expected).abs() < EPS, "port tip should see reduced α under positive roll");
+        assert!(
+            (alpha_l - expected).abs() < EPS,
+            "port tip should see reduced α under positive roll"
+        );
     }
 
     /// Layer 2: tail (x < 0) sees increased α during pull (q > 0) — pitch damping.
@@ -128,7 +139,10 @@ mod tests {
     fn pitch_rate_increases_alpha_at_tail() {
         let (alpha_l, _) = zone_local_angles(0.1, 0.0, 0.0, 1.0, 0.0, -4.0, 0.0, 50.0);
         let expected = 0.1 + 4.0 / 50.0;
-        assert!((alpha_l - expected).abs() < EPS, "tail should see increased α during pull, got {alpha_l}");
+        assert!(
+            (alpha_l - expected).abs() < EPS,
+            "tail should see increased α during pull, got {alpha_l}"
+        );
     }
 
     /// Layer 2: nose (x > 0) sees reduced α during pull — canard effect.
@@ -136,7 +150,10 @@ mod tests {
     fn pitch_rate_decreases_alpha_at_nose() {
         let (alpha_l, _) = zone_local_angles(0.1, 0.0, 0.0, 1.0, 0.0, 4.0, 0.0, 50.0);
         let expected = 0.1 - 4.0 / 50.0;
-        assert!((alpha_l - expected).abs() < EPS, "nose should see reduced α during pull, got {alpha_l}");
+        assert!(
+            (alpha_l - expected).abs() < EPS,
+            "nose should see reduced α during pull, got {alpha_l}"
+        );
     }
 
     /// Layer 3: aft zone (x < 0) sees reduced sideslip during right yaw (r > 0).
@@ -144,7 +161,10 @@ mod tests {
     fn yaw_rate_shifts_beta_at_longitudinal_station() {
         let (alpha_l, beta_l) = zone_local_angles(0.0, 0.05, 0.0, 0.0, 1.0, -3.0, 0.0, 50.0);
         let expected_beta = 0.05 + (-3.0) / 50.0;
-        assert!((beta_l - expected_beta).abs() < EPS, "Δβ_yaw should be r·x/V, got {beta_l}");
+        assert!(
+            (beta_l - expected_beta).abs() < EPS,
+            "Δβ_yaw should be r·x/V, got {beta_l}"
+        );
         assert!((alpha_l - 0.0).abs() < EPS, "yaw rate should not affect α");
     }
 
@@ -152,7 +172,10 @@ mod tests {
     #[test]
     fn yaw_rate_does_not_shift_beta_at_spanwise_zone() {
         let (_, beta_l) = zone_local_angles(0.0, 0.05, 0.0, 0.0, 1.0, 0.0, 3.0, 50.0);
-        assert!((beta_l - 0.05).abs() < EPS, "purely spanwise zone should see no β change from yaw rate, got {beta_l}");
+        assert!(
+            (beta_l - 0.05).abs() < EPS,
+            "purely spanwise zone should see no β change from yaw rate, got {beta_l}"
+        );
     }
 
     /// Zero body rates: local angles equal global angles.
@@ -248,7 +271,12 @@ mod tests {
         let (al_l, bl_l) = zone_local_angles(alpha, 0.0, p, 0.0, 0.0, 0.0, -4.0, v);
         let cl_coeffs = evaluate_zone_coefficients(&zone, &ctrl, al_l, bl_l, re, qbar, 1.0);
 
-        assert!(cr.cl > cl_coeffs.cl, "starboard tip should have higher CL: {:.3} vs {:.3}", cr.cl, cl_coeffs.cl);
+        assert!(
+            cr.cl > cl_coeffs.cl,
+            "starboard tip should have higher CL: {:.3} vs {:.3}",
+            cr.cl,
+            cl_coeffs.cl
+        );
 
         let b2w = Quaternion::IDENTITY;
         let vel_r = Vector::new(al_r.cos() * bl_r.cos(), bl_r.sin(), al_r.sin() * bl_r.cos());
@@ -260,6 +288,9 @@ mod tests {
         let arm_l = Vector::new(0.0, -4.0, 0.0);
         let net_roll = arm_r.cross(wf_r.force).x + arm_l.cross(wf_l.force).x;
 
-        assert!(net_roll < 0.0, "emergent roll damping should oppose p>0, net = {net_roll:.2} N·m");
+        assert!(
+            net_roll < 0.0,
+            "emergent roll damping should oppose p>0, net = {net_roll:.2} N·m"
+        );
     }
 }

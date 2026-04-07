@@ -66,9 +66,18 @@ mod tests {
     /// a pure quaternion rotation with no hidden transform.
     #[test]
     fn identity_rotation_is_passthrough() {
-        assert!(approx_eq(body_to_world(Quaternion::IDENTITY, Vector::X), Vector::X));
-        assert!(approx_eq(body_to_world(Quaternion::IDENTITY, Vector::Y), Vector::Y));
-        assert!(approx_eq(body_to_world(Quaternion::IDENTITY, Vector::Z), Vector::Z));
+        assert!(approx_eq(
+            body_to_world(Quaternion::IDENTITY, Vector::X),
+            Vector::X
+        ));
+        assert!(approx_eq(
+            body_to_world(Quaternion::IDENTITY, Vector::Y),
+            Vector::Y
+        ));
+        assert!(approx_eq(
+            body_to_world(Quaternion::IDENTITY, Vector::Z),
+            Vector::Z
+        ));
     }
 
     /// `world_to_body` is the exact inverse of `body_to_world`.
@@ -85,7 +94,10 @@ mod tests {
     fn rotation_y_90_x_to_neg_z() {
         let rot = Quaternion::from_rotation_y(FRAC_PI_2);
         let result = body_to_world(rot, Vector::X);
-        assert!(approx_eq(result, -Vector::Z), "expected (0,0,-1), got {result:?}");
+        assert!(
+            approx_eq(result, -Vector::Z),
+            "expected (0,0,-1), got {result:?}"
+        );
     }
 
     /// Rotating 90° about world +X takes body +Y to world +Z (right-hand rule).
@@ -93,7 +105,10 @@ mod tests {
     fn rotation_x_90_y_to_z() {
         let rot = Quaternion::from_rotation_x(FRAC_PI_2);
         let result = body_to_world(rot, Vector::Y);
-        assert!(approx_eq(result, Vector::Z), "expected (0,0,1), got {result:?}");
+        assert!(
+            approx_eq(result, Vector::Z),
+            "expected (0,0,1), got {result:?}"
+        );
     }
 
     /// `world_to_body` correctly inverts a known rotation.
@@ -102,6 +117,9 @@ mod tests {
         let rot = Quaternion::from_rotation_y(FRAC_PI_2);
         // After 90° +Y rotation, world −Z is body +X.
         let result = world_to_body(rot, -Vector::Z);
-        assert!(approx_eq(result, Vector::X), "expected (1,0,0), got {result:?}");
+        assert!(
+            approx_eq(result, Vector::X),
+            "expected (1,0,0), got {result:?}"
+        );
     }
 }

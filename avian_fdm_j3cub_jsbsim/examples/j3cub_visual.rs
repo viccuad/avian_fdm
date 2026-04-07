@@ -29,9 +29,9 @@
 //!
 //! Press **Escape** to quit.
 
+use avian3d::math::Scalar;
 use avian3d::prelude::{AngularVelocity, LinearVelocity, PhysicsPlugins, Rotation};
 use avian_fdm::prelude::*;
-use avian3d::math::Scalar;
 use avian_fdm_j3cub_jsbsim::presets::j3cub;
 use bevy::input::gamepad::{Gamepad, GamepadAxis};
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};

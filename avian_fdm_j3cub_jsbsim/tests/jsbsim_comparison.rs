@@ -36,12 +36,10 @@
 //!     2>/dev/null | grep -E '^[0-9t]' > tests/fixtures/jsbsim_j3cub_glide_60s.csv
 //! ```
 
-
-
 use std::time::Duration;
 
-use avian3d::prelude::*;
 use avian3d::math::Scalar;
+use avian3d::prelude::*;
 use avian_fdm::prelude::*;
 use avian_fdm_j3cub_jsbsim::presets::j3cub;
 use bevy::prelude::*;
@@ -178,9 +176,9 @@ fn run_avian_fdm() -> Vec<Sample> {
         .add_plugins(PhysicsPlugins::default())
         .add_plugins(AircraftFdmPlugin::default());
 
-    app.insert_resource(TimeUpdateStrategy::ManualDuration(
-        Duration::from_secs_f64(PHYSICS_DT),
-    ));
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(
+        PHYSICS_DT,
+    )));
 
     app.init_resource::<SampleCollector>();
     app.add_systems(Startup, spawn_aircraft);
@@ -241,9 +239,15 @@ fn jsbsim_j3cub_comparison() {
         println!(
             "{:6.1} │ {:9.2} {:9.2} {:+6.1}% │ {:9.2} {:9.2} {:+6.1}% │ {:+6.2} {:+6.2} {:+5.2}°",
             js.time,
-            js.altitude_m, av.altitude_m, alt_err,
-            js.airspeed_ms, av.airspeed_ms, tas_err,
-            js.alpha_deg, av.alpha_deg, aoa_err,
+            js.altitude_m,
+            av.altitude_m,
+            alt_err,
+            js.airspeed_ms,
+            av.airspeed_ms,
+            tas_err,
+            js.alpha_deg,
+            av.alpha_deg,
+            aoa_err,
         );
     }
 
@@ -281,10 +285,7 @@ fn jsbsim_j3cub_comparison() {
 
 // ── Glide runner (engine disabled via Failure) ───────────────────────────────
 
-fn disable_engine(
-    mut commands: Commands,
-    query: Query<Entity, With<EngineZone>>,
-) {
+fn disable_engine(mut commands: Commands, query: Query<Entity, With<EngineZone>>) {
     for entity in &query {
         commands.entity(entity).insert(Failure { remaining: 0.0 });
     }
@@ -299,9 +300,9 @@ fn run_avian_fdm_glide() -> Vec<Sample> {
         .add_plugins(PhysicsPlugins::default())
         .add_plugins(AircraftFdmPlugin::default());
 
-    app.insert_resource(TimeUpdateStrategy::ManualDuration(
-        Duration::from_secs_f64(PHYSICS_DT),
-    ));
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(
+        PHYSICS_DT,
+    )));
 
     app.init_resource::<SampleCollector>();
     app.add_systems(Startup, (spawn_aircraft, disable_engine).chain());
@@ -328,7 +329,10 @@ fn jsbsim_j3cub_glide_comparison() {
     );
 
     let avian_data = run_avian_fdm_glide();
-    assert!(!avian_data.is_empty(), "avian_fdm glide produced no samples");
+    assert!(
+        !avian_data.is_empty(),
+        "avian_fdm glide produced no samples"
+    );
 
     let n = jsbsim_data.len().min(avian_data.len());
 
@@ -360,9 +364,15 @@ fn jsbsim_j3cub_glide_comparison() {
         println!(
             "{:6.1} | {:9.2} {:9.2} {:+6.1}% | {:9.2} {:9.2} {:+6.1}% | {:+6.2} {:+6.2} {:+5.2}",
             js.time,
-            js.altitude_m, av.altitude_m, alt_err,
-            js.airspeed_ms, av.airspeed_ms, tas_err,
-            js.alpha_deg, av.alpha_deg, aoa_err,
+            js.altitude_m,
+            av.altitude_m,
+            alt_err,
+            js.airspeed_ms,
+            av.airspeed_ms,
+            tas_err,
+            js.alpha_deg,
+            av.alpha_deg,
+            aoa_err,
         );
     }
 
@@ -411,7 +421,11 @@ fn jsbsim_regenerate_glide_reference() {
     let output = std::process::Command::new(&python)
         .arg(&script)
         .env("JSBSIM_DATA_PATH", &data_path)
-        .envs(std::env::var("J3CUB_AIRCRAFT_PATH").ok().map(|v| ("J3CUB_AIRCRAFT_PATH", v)))
+        .envs(
+            std::env::var("J3CUB_AIRCRAFT_PATH")
+                .ok()
+                .map(|v| ("J3CUB_AIRCRAFT_PATH", v)),
+        )
         .output();
 
     let Ok(output) = output else {
@@ -472,7 +486,11 @@ fn jsbsim_regenerate_reference() {
     let output = std::process::Command::new(&python)
         .arg(&script)
         .env("JSBSIM_DATA_PATH", &data_path)
-        .envs(std::env::var("J3CUB_AIRCRAFT_PATH").ok().map(|v| ("J3CUB_AIRCRAFT_PATH", v)))
+        .envs(
+            std::env::var("J3CUB_AIRCRAFT_PATH")
+                .ok()
+                .map(|v| ("J3CUB_AIRCRAFT_PATH", v)),
+        )
         .output();
 
     let Ok(output) = output else {
@@ -544,9 +562,9 @@ fn j3cub_inertia_comparison() {
         .add_plugins(PhysicsPlugins::default())
         .add_plugins(AircraftFdmPlugin::default());
 
-    app.insert_resource(TimeUpdateStrategy::ManualDuration(
-        Duration::from_secs_f64(1.0 / 60.0),
-    ));
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(
+        1.0 / 60.0,
+    )));
 
     app.add_systems(Startup, |mut commands: Commands| {
         let initial_rot = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
@@ -596,11 +614,38 @@ fn j3cub_inertia_comparison() {
         let izz = ib[2][2];
 
         println!("\n-- J3 Cub Inertia Comparison (body frame) -------------------");
-        println!("  {:>20} {:>10} {:>10} {:>8}", "", "Avian", "JSBSim", "Ratio");
-        println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Mass (kg)", m, JSBSIM_MASS_KG, m / JSBSIM_MASS_KG);
-        println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Ixx (kg*m2)", ixx, JSBSIM_IXX, ixx / JSBSIM_IXX);
-        println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Iyy (kg*m2)", iyy, JSBSIM_IYY, iyy / JSBSIM_IYY);
-        println!("  {:>20} {:10.1} {:10.1} {:8.2}", "Izz (kg*m2)", izz, JSBSIM_IZZ, izz / JSBSIM_IZZ);
+        println!(
+            "  {:>20} {:>10} {:>10} {:>8}",
+            "", "Avian", "JSBSim", "Ratio"
+        );
+        println!(
+            "  {:>20} {:10.1} {:10.1} {:8.2}",
+            "Mass (kg)",
+            m,
+            JSBSIM_MASS_KG,
+            m / JSBSIM_MASS_KG
+        );
+        println!(
+            "  {:>20} {:10.1} {:10.1} {:8.2}",
+            "Ixx (kg*m2)",
+            ixx,
+            JSBSIM_IXX,
+            ixx / JSBSIM_IXX
+        );
+        println!(
+            "  {:>20} {:10.1} {:10.1} {:8.2}",
+            "Iyy (kg*m2)",
+            iyy,
+            JSBSIM_IYY,
+            iyy / JSBSIM_IYY
+        );
+        println!(
+            "  {:>20} {:10.1} {:10.1} {:8.2}",
+            "Izz (kg*m2)",
+            izz,
+            JSBSIM_IZZ,
+            izz / JSBSIM_IZZ
+        );
         println!("  {:>20} {:?}", "CG offset (m)", com.0);
         println!("------------------------------------------------------------");
 
@@ -614,12 +659,18 @@ fn j3cub_inertia_comparison() {
         let ixx_ratio = ixx / JSBSIM_IXX;
         let iyy_ratio = iyy / JSBSIM_IYY;
         let izz_ratio = izz / JSBSIM_IZZ;
-        assert!(ixx_ratio > 0.85 && ixx_ratio < 1.15,
-            "Ixx off: {ixx:.0} (target: {JSBSIM_IXX:.0}, ratio: {ixx_ratio:.2})");
-        assert!(iyy_ratio > 0.85 && iyy_ratio < 1.15,
-            "Iyy off: {iyy:.0} (target: {JSBSIM_IYY:.0}, ratio: {iyy_ratio:.2})");
-        assert!(izz_ratio > 0.85 && izz_ratio < 1.15,
-            "Izz off: {izz:.0} (target: {JSBSIM_IZZ:.0}, ratio: {izz_ratio:.2})");
+        assert!(
+            ixx_ratio > 0.85 && ixx_ratio < 1.15,
+            "Ixx off: {ixx:.0} (target: {JSBSIM_IXX:.0}, ratio: {ixx_ratio:.2})"
+        );
+        assert!(
+            iyy_ratio > 0.85 && iyy_ratio < 1.15,
+            "Iyy off: {iyy:.0} (target: {JSBSIM_IYY:.0}, ratio: {iyy_ratio:.2})"
+        );
+        assert!(
+            izz_ratio > 0.85 && izz_ratio < 1.15,
+            "Izz off: {izz:.0} (target: {JSBSIM_IZZ:.0}, ratio: {izz_ratio:.2})"
+        );
     }
 
     assert!(found, "No aircraft entity found with mass properties");
@@ -647,9 +698,9 @@ fn j3cub_emergent_cmq() {
             .add_plugins(bevy::asset::AssetPlugin::default())
             .add_plugins(PhysicsPlugins::default())
             .add_plugins(AircraftFdmPlugin::default());
-        app.insert_resource(TimeUpdateStrategy::ManualDuration(
-            Duration::from_secs_f64(1.0 / 60.0),
-        ));
+        app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(
+            1.0 / 60.0,
+        )));
         let q = pitch_rate_world_z;
         app.add_systems(Startup, move |mut commands: Commands| {
             let initial_rot = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
@@ -657,7 +708,8 @@ fn j3cub_emergent_cmq() {
                 &mut commands,
                 Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(initial_rot),
             );
-            commands.entity(root)
+            commands
+                .entity(root)
                 .insert(LinearVelocity(Vec3::new(27.0, 0.0, 0.0)))
                 // Body pitch rate q maps to world Z due to spawn rotation_x(PI/2).
                 .insert(AngularVelocity(Vec3::new(0.0, 0.0, q)));
@@ -671,14 +723,22 @@ fn j3cub_emergent_cmq() {
     let mut perturbed = build_app(q_rads_f32);
 
     // Run 5 frames: Avian init + flight_state update + aero forces.
-    for _ in 0..5 { baseline.update(); }
-    for _ in 0..5 { perturbed.update(); }
+    for _ in 0..5 {
+        baseline.update();
+    }
+    for _ in 0..5 {
+        perturbed.update();
+    }
 
     // Read ConstantTorque (total aero torque on the root body, world frame).
     let read_torque = |app: &mut App| -> Vec3 {
         let world = app.world_mut();
         let mut query = world.query::<&ConstantTorque>();
-        query.iter(&world).next().expect("no ConstantTorque found").0
+        query
+            .iter(&world)
+            .next()
+            .expect("no ConstantTorque found")
+            .0
     };
 
     let t_base = read_torque(&mut baseline);
@@ -704,20 +764,33 @@ fn j3cub_emergent_cmq() {
     println!("  Baseline pitch torque (q=0):     {:.1} N*m", t_base.z);
     println!("  Perturbed pitch torque (q=5d/s): {:.1} N*m", t_pert.z);
     println!("  Delta pitch torque:              {:.1} N*m", delta_mz);
-    println!("  Measured Cmq:                    {:.2} /rad", cmq_measured);
+    println!(
+        "  Measured Cmq:                    {:.2} /rad",
+        cmq_measured
+    );
     println!("  Datcom target:                   {:.1} /rad", datcom_cmq);
-    println!("  Ratio (measured/Datcom):          {:.2}", cmq_measured / datcom_cmq);
+    println!(
+        "  Ratio (measured/Datcom):          {:.2}",
+        cmq_measured / datcom_cmq
+    );
     println!("------------------------------------------------------------");
 
     // Cmq should be negative (restoring).
-    assert!(cmq_measured < 0.0,
-        "Cmq should be negative (restoring), got {cmq_measured:.2}");
+    assert!(
+        cmq_measured < 0.0,
+        "Cmq should be negative (restoring), got {cmq_measured:.2}"
+    );
 
     // Should be between 1x and 3x the Datcom value (more negative, no downwash lag).
-    assert!(cmq_measured < datcom_cmq,
-        "Cmq ({cmq_measured:.1}) should be more negative than Datcom ({datcom_cmq})");
-    assert!(cmq_measured > datcom_cmq * 3.0,
-        "Cmq ({cmq_measured:.1}) should not exceed 3x Datcom ({:.0})", datcom_cmq * 3.0);
+    assert!(
+        cmq_measured < datcom_cmq,
+        "Cmq ({cmq_measured:.1}) should be more negative than Datcom ({datcom_cmq})"
+    );
+    assert!(
+        cmq_measured > datcom_cmq * 3.0,
+        "Cmq ({cmq_measured:.1}) should not exceed 3x Datcom ({:.0})",
+        datcom_cmq * 3.0
+    );
 }
 
 /// Verify the startup validation system detects a deliberately broken zone.
@@ -730,21 +803,21 @@ fn startup_validation_catches_bad_zone() {
         .add_plugins(bevy::transform::TransformPlugin)
         .add_plugins(bevy::asset::AssetPlugin::default())
         .add_plugins(PhysicsPlugins::default())
-        .add_plugins(AircraftFdmPlugin { validate_on_startup: true });
+        .add_plugins(AircraftFdmPlugin {
+            validate_on_startup: true,
+        });
 
-    app.insert_resource(TimeUpdateStrategy::ManualDuration(
-        Duration::from_secs_f64(1.0 / 60.0),
-    ));
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(
+        1.0 / 60.0,
+    )));
 
     // Spawn an aircraft root with a broken child zone.
     app.add_systems(Startup, |mut commands: Commands| {
         commands
-            .spawn(
-                AircraftCoreBundle {
-                    transform: Transform::from_xyz(0.0, 100.0, 0.0),
-                    ..Default::default()
-                },
-            )
+            .spawn(AircraftCoreBundle {
+                transform: Transform::from_xyz(0.0, 100.0, 0.0),
+                ..Default::default()
+            })
             .with_children(|parent| {
                 parent.spawn(AeroZoneBundle {
                     zone: AeroZone {

@@ -1,10 +1,10 @@
 //! [`AeroZone`] and related types for the per-zone aerodynamic model.
 
+use crate::_bevy::*;
 use crate::components::aero_coeff::AeroCoeff;
 use crate::components::zone_force::ZoneForce;
-use avian3d::prelude::Collider;
 use avian3d::math::Scalar;
-use crate::_bevy::*;
+use avian3d::prelude::Collider;
 use serde::{Deserialize, Serialize};
 
 /// Per-zone aerodynamic coefficient contributions.
@@ -179,10 +179,16 @@ impl AeroZone {
             problems.extend(coeff.validate(&label));
         }
         if self.area_m2 < 0.0 {
-            problems.push(format!("{zone_name}: area_m2 is negative ({:.4})", self.area_m2));
+            problems.push(format!(
+                "{zone_name}: area_m2 is negative ({:.4})",
+                self.area_m2
+            ));
         }
         if self.chord_m < 0.0 {
-            problems.push(format!("{zone_name}: chord_m is negative ({:.4})", self.chord_m));
+            problems.push(format!(
+                "{zone_name}: chord_m is negative ({:.4})",
+                self.chord_m
+            ));
         }
         problems
     }

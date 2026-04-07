@@ -66,8 +66,8 @@ pub fn damping_torque(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use avian3d::math::Scalar;
     use crate::components::LodDamping;
+    use avian3d::math::Scalar;
 
     fn geo() -> AircraftGeometry {
         AircraftGeometry {
@@ -137,9 +137,21 @@ mod tests {
             &geo(),
             Quaternion::IDENTITY,
         );
-        assert!(damp.x < 0.0, "roll damping should oppose p>0, got x={}", damp.x);
-        assert!(damp.y < 0.0, "pitch damping should oppose q>0, got y={}", damp.y);
-        assert!(damp.z < 0.0, "yaw damping should oppose r>0, got z={}", damp.z);
+        assert!(
+            damp.x < 0.0,
+            "roll damping should oppose p>0, got x={}",
+            damp.x
+        );
+        assert!(
+            damp.y < 0.0,
+            "pitch damping should oppose q>0, got y={}",
+            damp.y
+        );
+        assert!(
+            damp.z < 0.0,
+            "yaw damping should oppose r>0, got z={}",
+            damp.z
+        );
         assert!(
             damp.z.abs() < damp.x.abs(),
             "yaw damp weaker than roll (|cn_r| < |cl_p|), z={}, x={}",

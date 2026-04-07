@@ -13,10 +13,10 @@
 //! mode), and gradually converges on trim. AoA remains bounded near −2°,
 //! demonstrating pitch stability from the horizontal stabiliser.
 
-use avian_fdm::prelude::*;
-use avian_fdm_j3cub_jsbsim::presets::j3cub;
 use avian3d::math::{Scalar, Vector};
 use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
+use avian_fdm::prelude::*;
+use avian_fdm_j3cub_jsbsim::presets::j3cub;
 use bevy::ecs::message::MessageWriter;
 use bevy::prelude::*;
 
@@ -46,16 +46,15 @@ fn spawn_aircraft(mut commands: Commands) {
         &mut commands,
         Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(level),
     );
-    commands.entity(root).insert(LinearVelocity(Vector::new(27.0, 0.0, 0.0)));
+    commands
+        .entity(root)
+        .insert(LinearVelocity(Vector::new(27.0, 0.0, 0.0)));
 }
 
 /// Linearly ramp throttle from 50% → 75% over the first 12.5 seconds.
 /// Starting at 50% avoids the zoom-climb that occurs at zero throttle.
 #[allow(clippy::unnecessary_cast)]
-fn ramp_throttle(
-    mut query: Query<&mut ControlInputs, With<AircraftGeometry>>,
-    time: Res<Time>,
-) {
+fn ramp_throttle(mut query: Query<&mut ControlInputs, With<AircraftGeometry>>, time: Res<Time>) {
     let t = time.elapsed_secs_f64();
     let throttle = (0.5 + t / 50.0).min(0.75) as Scalar;
     for mut ctrl in &mut query {
@@ -66,7 +65,7 @@ fn ramp_throttle(
 /// Print a one-line flight summary every 0.5 s of simulation time.
 fn print_state(
     query: Query<&FlightState, With<AircraftGeometry>>,
-    time:  Res<Time>,
+    time: Res<Time>,
     mut last_print: Local<f64>,
 ) {
     let t = time.elapsed_secs_f64();
@@ -81,7 +80,7 @@ fn print_state(
             alt = state.altitude_m,
             tas = state.airspeed_ms,
             aoa = state.alpha_rad.to_degrees(),
-            q   = state.dynamic_pressure_pa,
+            q = state.dynamic_pressure_pa,
         );
     }
 }

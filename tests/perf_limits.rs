@@ -9,10 +9,12 @@
 use std::hint::black_box;
 use std::time::Instant;
 
-use avian_fdm::components::aero_coeff::AeroCoeff;
 use avian3d::math::Scalar;
+use avian_fdm::components::aero_coeff::AeroCoeff;
 
-// ── Shared test data ──────────────────────────────────────────────────────────
+//
+// Shared test data
+//
 
 const ALPHA_BP: [Scalar; 14] = [
     -1.5700, -0.3491, -0.2443, -0.1745, -0.0873, 0.0000, 0.0873, 0.1309, 0.1745, 0.2182, 0.2618,
@@ -20,9 +22,9 @@ const ALPHA_BP: [Scalar; 14] = [
 ];
 const RE_BP: [Scalar; 2] = [1_668_183.0, 3_707_224.0];
 const CL_DATA: [Scalar; 28] = [
-    0.0000, 0.0000, -0.0085, -0.5085, -0.5085, -0.8136, -0.5085, -0.5085, 0.1017, 0.1017,
-    0.5339, 0.5339, 1.2204, 1.2204, 1.4746, 1.4746, 1.5000, 1.6272, 1.6201, 1.7797, 1.5645,
-    1.8306, 1.4272, 1.6272, 1.3138, 1.4238, 0.0000, 0.0000,
+    0.0000, 0.0000, -0.0085, -0.5085, -0.5085, -0.8136, -0.5085, -0.5085, 0.1017, 0.1017, 0.5339,
+    0.5339, 1.2204, 1.2204, 1.4746, 1.4746, 1.5000, 1.6272, 1.6201, 1.7797, 1.5645, 1.8306, 1.4272,
+    1.6272, 1.3138, 1.4238, 0.0000, 0.0000,
 ];
 
 /// Returns the median elapsed time in nanoseconds over `n` calls to `f`.
@@ -52,7 +54,9 @@ fn check(name: &str, ns: u64, limit_ns: u64) {
     assert!(ns < limit_ns, "{name}: {ns} ns >= {limit_ns} ns limit");
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+//
+// Tests
+//
 
 #[test]
 fn scalar_lookup_under_100ns() {
@@ -136,7 +140,12 @@ fn aggregate_zones_15x100_under_500000ns() {
         .take(15)
         .collect();
     let states: Vec<(Scalar, Scalar)> = (0..100)
-        .map(|i| (0.05 + i as Scalar * 0.001, 1_500_000.0 + i as Scalar * 5_000.0))
+        .map(|i| {
+            (
+                0.05 + i as Scalar * 0.001,
+                1_500_000.0 + i as Scalar * 5_000.0,
+            )
+        })
         .collect();
 
     let ns = median_ns(100, || {
@@ -150,4 +159,3 @@ fn aggregate_zones_15x100_under_500000ns() {
     });
     check("aggregate_zones_15x100_aircraft", ns, 500_000);
 }
-

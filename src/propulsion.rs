@@ -15,14 +15,13 @@
 //! drop: thrust scales by max(0, 1 - (V / V_zero)^2), reaching zero at the
 //! windmilling speed.
 
-use avian3d::math::Scalar;
 use crate::_bevy::*;
 use crate::math::{quat_to_quaternion, vector_to_vec3};
+use avian3d::math::Scalar;
 use avian3d::prelude::ColliderOf;
 
 use crate::components::{
-    AtmosphereState, ControlInputs, Failure, EngineZone, FlightState, ZoneForce,
-    get_remaining,
+    get_remaining, AtmosphereState, ControlInputs, EngineZone, Failure, FlightState, ZoneForce,
 };
 
 /// Sea-level standard density (kg/m³).
@@ -53,8 +52,9 @@ pub fn compute_engine_zone_forces(
             continue;
         }
 
-        let Ok((ctrl, atmos, flight, root_gt)) =
-            root_query.get_mut(col_of.body) else { continue };
+        let Ok((ctrl, atmos, flight, root_gt)) = root_query.get_mut(col_of.body) else {
+            continue;
+        };
 
         // 1. Throttle to thrust fraction.
         let throttle = ctrl.throttle.clamp(0.0, 1.0);
@@ -72,7 +72,9 @@ pub fn compute_engine_zone_forces(
             1.0
         };
 
-        let thrust_n = engine.max_thrust_n * remaining * thrust_fraction
+        let thrust_n = engine.max_thrust_n
+            * remaining
+            * thrust_fraction
             * density_ratio.powf(0.7)
             * speed_factor;
 
@@ -95,8 +97,12 @@ pub fn compute_engine_zone_forces(
 /// Clamps to the boundary values when `x` is outside the table range.
 pub(crate) fn interp_curve(curve: &[[Scalar; 2]], x: Scalar) -> Scalar {
     use crate::components::aero_coeff::lerp_1d;
-    if curve.is_empty() { return 0.0; }
-    if curve.len() == 1 { return curve[0][1]; }
+    if curve.is_empty() {
+        return 0.0;
+    }
+    if curve.len() == 1 {
+        return curve[0][1];
+    }
     // Clamp to table bounds (lerp_1d assumes in-range input).
     let x = x.clamp(curve[0][0], curve[curve.len() - 1][0]);
     let bp: Vec<Scalar> = curve.iter().map(|p| p[0]).collect();
@@ -165,17 +171,38 @@ mod tests {
     fn interp_curve_three_breakpoints() {
         // Idle to mid: 0.0 to 0.5 maps to 0.0 to 0.6; mid to full: 0.5 to 1.0 maps to 0.6 to 1.0
         let curve = vec![[0.0, 0.0], [0.5, 0.6], [1.0, 1.0]];
-        assert!((interp_curve(&curve, 0.0)  - 0.0).abs() < 1e-12, "lower clamp");
-        assert!((interp_curve(&curve, 0.25) - 0.3).abs() < 1e-12, "lower segment mid");
-        assert!((interp_curve(&curve, 0.5)  - 0.6).abs() < 1e-12, "breakpoint");
-        assert!((interp_curve(&curve, 0.75) - 0.8).abs() < 1e-12, "upper segment mid");
-        assert!((interp_curve(&curve, 1.0)  - 1.0).abs() < 1e-12, "upper clamp");
+        assert!(
+            (interp_curve(&curve, 0.0) - 0.0).abs() < 1e-12,
+            "lower clamp"
+        );
+        assert!(
+            (interp_curve(&curve, 0.25) - 0.3).abs() < 1e-12,
+            "lower segment mid"
+        );
+        assert!(
+            (interp_curve(&curve, 0.5) - 0.6).abs() < 1e-12,
+            "breakpoint"
+        );
+        assert!(
+            (interp_curve(&curve, 0.75) - 0.8).abs() < 1e-12,
+            "upper segment mid"
+        );
+        assert!(
+            (interp_curve(&curve, 1.0) - 1.0).abs() < 1e-12,
+            "upper clamp"
+        );
     }
 
     #[test]
     fn interp_curve_clamps_outside_range() {
         let curve = vec![[0.2, 0.1], [0.8, 0.9]];
-        assert!((interp_curve(&curve, 0.0) - 0.1).abs() < 1e-12, "below range clamps to first value");
-        assert!((interp_curve(&curve, 1.0) - 0.9).abs() < 1e-12, "above range clamps to last value");
+        assert!(
+            (interp_curve(&curve, 0.0) - 0.1).abs() < 1e-12,
+            "below range clamps to first value"
+        );
+        assert!(
+            (interp_curve(&curve, 1.0) - 0.9).abs() < 1e-12,
+            "above range clamps to last value"
+        );
     }
 }
