@@ -19,7 +19,7 @@ use avian_fdm::components::*;
 use avian_fdm::plugin::AircraftFdmPlugin;
 use avian3d::prelude::*;
 use bevy::prelude::*;
-use std::f64::consts::PI;
+use avian3d::math::Scalar;
 
 use bevy::time::TimeUpdateStrategy;
 use std::time::Duration;
@@ -28,40 +28,61 @@ use std::time::Duration;
 // Geometry constants
 // ---------------------------------------------------------------------------
 
-const A0: f64 = 2.0 * PI; // 2D thin-airfoil lift slope
+#[allow(clippy::unnecessary_cast)]
+const A0: Scalar = 2.0 * std::f64::consts::PI as Scalar; // 2D thin-airfoil lift slope
 
 // Wing
-const WING_SPAN: f64 = 10.0; // m
-const WING_CHORD: f64 = 1.5; // m
-const WING_AREA: f64 = WING_SPAN * WING_CHORD; // 15.0 m^2
-const WING_AR: f64 = WING_SPAN / WING_CHORD; // 6.667
-const WING_CL_ALPHA: f64 = A0 * WING_AR / (WING_AR + 2.0); // 4.833 /rad
-const WING_CD0: f64 = 0.008;
+#[allow(clippy::unnecessary_cast)]
+const WING_SPAN: Scalar = 10.0; // m
+#[allow(clippy::unnecessary_cast)]
+const WING_CHORD: Scalar = 1.5; // m
+#[allow(clippy::unnecessary_cast)]
+const WING_AREA: Scalar = WING_SPAN * WING_CHORD; // 15.0 m^2
+#[allow(clippy::unnecessary_cast)]
+const WING_AR: Scalar = WING_SPAN / WING_CHORD; // 6.667
+#[allow(clippy::unnecessary_cast)]
+const WING_CL_ALPHA: Scalar = A0 * WING_AR / (WING_AR + 2.0); // 4.833 /rad
+#[allow(clippy::unnecessary_cast)]
+const WING_CD0: Scalar = 0.008;
 
 // Horizontal stabilizer
-const HSTAB_SPAN: f64 = 3.0;
-const HSTAB_CHORD: f64 = 1.0;
-const HSTAB_AREA: f64 = HSTAB_SPAN * HSTAB_CHORD; // 3.0 m^2
-const HSTAB_AR: f64 = HSTAB_SPAN / HSTAB_CHORD; // 3.0
-const HSTAB_CL_ALPHA: f64 = A0 * HSTAB_AR / (HSTAB_AR + 2.0); // 3.770 /rad
-const HSTAB_ARM: f64 = 4.0; // m aft of wing AC
+#[allow(clippy::unnecessary_cast)]
+const HSTAB_SPAN: Scalar = 3.0;
+#[allow(clippy::unnecessary_cast)]
+const HSTAB_CHORD: Scalar = 1.0;
+#[allow(clippy::unnecessary_cast)]
+const HSTAB_AREA: Scalar = HSTAB_SPAN * HSTAB_CHORD; // 3.0 m^2
+#[allow(clippy::unnecessary_cast)]
+const HSTAB_AR: Scalar = HSTAB_SPAN / HSTAB_CHORD; // 3.0
+#[allow(clippy::unnecessary_cast)]
+const HSTAB_CL_ALPHA: Scalar = A0 * HSTAB_AR / (HSTAB_AR + 2.0); // 3.770 /rad
+#[allow(clippy::unnecessary_cast)]
+const HSTAB_ARM: Scalar = 4.0; // m aft of wing AC
 
 // Vertical stabilizer
-const VSTAB_SPAN: f64 = 1.5;
-const VSTAB_CHORD: f64 = 1.0;
-const VSTAB_AREA: f64 = VSTAB_SPAN * VSTAB_CHORD; // 1.5 m^2
-const VSTAB_AR: f64 = VSTAB_SPAN / VSTAB_CHORD; // 1.5
+#[allow(clippy::unnecessary_cast)]
+const VSTAB_SPAN: Scalar = 1.5;
+#[allow(clippy::unnecessary_cast)]
+const VSTAB_CHORD: Scalar = 1.0;
+#[allow(clippy::unnecessary_cast)]
+const VSTAB_AREA: Scalar = VSTAB_SPAN * VSTAB_CHORD; // 1.5 m^2
+#[allow(clippy::unnecessary_cast)]
+const VSTAB_AR: Scalar = VSTAB_SPAN / VSTAB_CHORD; // 1.5
 // Fin lift slope (magnitude). CY_beta on the aircraft is NEGATIVE because
 // positive beta (wind from starboard) produces a port-ward side force.
-const VSTAB_FIN_SLOPE: f64 = A0 * VSTAB_AR / (VSTAB_AR + 2.0); // 2.693 /rad
-const VSTAB_ARM: f64 = 4.0;
+#[allow(clippy::unnecessary_cast)]
+const VSTAB_FIN_SLOPE: Scalar = A0 * VSTAB_AR / (VSTAB_AR + 2.0); // 2.693 /rad
+#[allow(clippy::unnecessary_cast)]
+const VSTAB_ARM: Scalar = 4.0;
 
 // Derived non-dimensional parameters
 //
 // Tail volume ratio: VH = lt * St / (c * S)
-const V_H: f64 = HSTAB_ARM * HSTAB_AREA / (WING_CHORD * WING_AREA);
+#[allow(clippy::unnecessary_cast)]
+const V_H: Scalar = HSTAB_ARM * HSTAB_AREA / (WING_CHORD * WING_AREA);
 // Vertical tail volume: VV = lv * Sv / (b * S)
-const V_V: f64 = VSTAB_ARM * VSTAB_AREA / (WING_SPAN * WING_AREA);
+#[allow(clippy::unnecessary_cast)]
+const V_V: Scalar = VSTAB_ARM * VSTAB_AREA / (WING_SPAN * WING_AREA);
 
 // ---------------------------------------------------------------------------
 // Analytical targets (Nelson 1998 formulas, no downwash)
@@ -69,40 +90,47 @@ const V_V: f64 = VSTAB_ARM * VSTAB_AREA / (WING_SPAN * WING_AREA);
 
 // Total lift curve slope:
 //   CL_alpha = aw + at * (St/S) = 4.833 + 3.770 * 0.2 = 5.587 /rad
-const TARGET_CL_ALPHA: f64 = WING_CL_ALPHA + HSTAB_CL_ALPHA * (HSTAB_AREA / WING_AREA);
+#[allow(clippy::unnecessary_cast)]
+const TARGET_CL_ALPHA: Scalar = WING_CL_ALPHA + HSTAB_CL_ALPHA * (HSTAB_AREA / WING_AREA);
 
 // Pitch stiffness (CG at wing AC, no wing pitching moment contribution):
 //   Cm_alpha = -at * VH = -3.770 * 0.533 = -2.010 /rad
-const TARGET_CM_ALPHA: f64 = -HSTAB_CL_ALPHA * V_H;
+#[allow(clippy::unnecessary_cast)]
+const TARGET_CM_ALPHA: Scalar = -HSTAB_CL_ALPHA * V_H;
 
 // Pitch damping:
 //   Cm_q = -2 * at * VH * (lt/c) = -2 * 3.770 * 0.533 * 2.667 = -10.72 /rad
-const TARGET_CM_Q: f64 = -2.0 * HSTAB_CL_ALPHA * V_H * (HSTAB_ARM / WING_CHORD);
+#[allow(clippy::unnecessary_cast)]
+const TARGET_CM_Q: Scalar = -2.0 * HSTAB_CL_ALPHA * V_H * (HSTAB_ARM / WING_CHORD);
 
 // Roll damping (discrete: 2 zones at y = +/-WING_SPAN/4):
 //   For n discrete zones, Cl_p = -CL_alpha * 2 * sum(S_i * y_i^2) / (S * b^2).
 //   With 2 zones at y = +/-2.5, each S/2:
 //   Cl_p = -aw * 2 * (2 * (S/2) * (b/4)^2) / (S * b^2) = -aw * 2 * y^2 / b^2 = -aw/8
-const WING_ZONE_Y: f64 = WING_SPAN / 4.0; // 2.5 m, center of each half-wing
-const TARGET_CL_P: f64 = -WING_CL_ALPHA * 2.0 * WING_ZONE_Y * WING_ZONE_Y / (WING_SPAN * WING_SPAN);
+#[allow(clippy::unnecessary_cast)]
+const WING_ZONE_Y: Scalar = WING_SPAN / 4.0; // 2.5 m, center of each half-wing
+#[allow(clippy::unnecessary_cast)]
+const TARGET_CL_P: Scalar = -WING_CL_ALPHA * 2.0 * WING_ZONE_Y * WING_ZONE_Y / (WING_SPAN * WING_SPAN);
 
 // Weathercock stability:
 //   The vtail has CY_beta = -a_v (negative: positive beta -> port force).
 //   The cross product at x = -l_v gives positive (restoring) yaw torque.
 //   Cn_beta = a_v * VV = 2.693 * 0.04 = 0.1077 /rad
-const TARGET_CN_BETA: f64 = VSTAB_FIN_SLOPE * V_V;
+#[allow(clippy::unnecessary_cast)]
+const TARGET_CN_BETA: Scalar = VSTAB_FIN_SLOPE * V_V;
 
 // Yaw damping:
 //   Cn_r = -2 * a_v * VV * (lv/b) = -2 * 2.693 * 0.04 * 0.4 = -0.0862 /rad
-const TARGET_CN_R: f64 = -2.0 * VSTAB_FIN_SLOPE * V_V * (VSTAB_ARM / WING_SPAN);
+#[allow(clippy::unnecessary_cast)]
+const TARGET_CN_R: Scalar = -2.0 * VSTAB_FIN_SLOPE * V_V * (VSTAB_ARM / WING_SPAN);
 
 // ---------------------------------------------------------------------------
 // AeroCoeff helpers (linear Table1D from slope)
 // ---------------------------------------------------------------------------
 
 /// Build a symmetric linear Table1D from a slope over +/-20 degrees.
-fn linear_cl(slope: f64) -> AeroCoeff {
-    let alpha_max: f64 = 20.0_f64.to_radians();
+fn linear_cl(slope: Scalar) -> AeroCoeff {
+    let alpha_max: Scalar = (20.0 as Scalar).to_radians();
     AeroCoeff::Table1D {
         breakpoints: vec![-alpha_max, 0.0, alpha_max],
         values: vec![-alpha_max * slope, 0.0, alpha_max * slope],
@@ -160,11 +188,16 @@ fn linear_cl(slope: f64) -> AeroCoeff {
 //   Fuselage mass: 400 - 30 - 15 - 30 = 325 kg.
 //   Density = 325 / 0.15625 = 2080.
 
-const WING_PANEL_DENSITY: f64 = 160.0;
-const HSTAB_DENSITY: f64 = 444.0;
-const VSTAB_DENSITY: f64 = 444.0;
-const FUSELAGE_DENSITY: f64 = 2080.0;
-const ENGINE_DENSITY: f64 = 1920.0;
+#[allow(clippy::unnecessary_cast)]
+const WING_PANEL_DENSITY: Scalar = 160.0;
+#[allow(clippy::unnecessary_cast)]
+const HSTAB_DENSITY: Scalar = 444.0;
+#[allow(clippy::unnecessary_cast)]
+const VSTAB_DENSITY: Scalar = 444.0;
+#[allow(clippy::unnecessary_cast)]
+const FUSELAGE_DENSITY: Scalar = 2080.0;
+#[allow(clippy::unnecessary_cast)]
+const ENGINE_DENSITY: Scalar = 1920.0;
 
 // ---------------------------------------------------------------------------
 // Spawn helper
@@ -362,7 +395,7 @@ fn read_torque(app: &mut App) -> Vec3 {
 }
 
 /// ISA density at altitude (m).
-fn isa_density(alt_m: f64) -> f64 {
+fn isa_density(alt_m: Scalar) -> Scalar {
     1.225 * (1.0 - 0.0065 * alt_m / 288.15).powf(4.2561)
 }
 
@@ -390,8 +423,8 @@ fn plank_inertia() {
         .next()
         .expect("no aircraft found");
 
-    let total_mass = mass.value() as f64;
-    let cg_x = com.x as f64;
+    let total_mass = mass.value() as Scalar;
+    let cg_x = com.x as Scalar;
 
     // Mass should be ~400 kg
     let mass_error = (total_mass - 400.0).abs() / 400.0;
@@ -419,9 +452,9 @@ fn plank_cl_alpha() {
     // We test by reading the ConstantForce after one physics step at two
     // different angles of attack. At alpha=0 the symmetric airfoil produces
     // zero lift, at alpha=2deg it produces CL_alpha * alpha.
-    let alpha_deg = 2.0_f64;
-    let alpha_rad = alpha_deg.to_radians();
-    let v = 50.0_f64;
+    let alpha_deg: Scalar = 2.0;
+    let alpha_rad: Scalar = alpha_deg.to_radians();
+    let v: Scalar = 50.0;
 
     fn spawn_alpha0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
@@ -450,8 +483,8 @@ fn plank_cl_alpha() {
     let force2 = read_force(&mut app2);
 
     // Lift is world +Y (upward). At alpha=0 symmetric airfoil gives ~0 lift.
-    let lift0 = force0.y as f64;
-    let lift2 = force2.y as f64;
+    let lift0 = force0.y as Scalar;
+    let lift2 = force2.y as Scalar;
     let delta_lift = lift2 - lift0;
 
     let rho = isa_density(500.0);
@@ -481,9 +514,9 @@ fn plank_cl_alpha() {
 /// Cm_alpha = delta_M / (q * S * c * delta_alpha).
 #[test]
 fn plank_cm_alpha() {
-    let alpha_deg = 2.0_f64;
-    let alpha_rad = alpha_deg.to_radians();
-    let v = 50.0_f64;
+    let alpha_deg: Scalar = 2.0;
+    let alpha_rad: Scalar = alpha_deg.to_radians();
+    let v: Scalar = 50.0;
 
     fn spawn_alpha0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
@@ -508,8 +541,8 @@ fn plank_cm_alpha() {
     let torque0 = read_torque(&mut app0);
     let torque2 = read_torque(&mut app2);
 
-    let pitch0 = torque0.z as f64;
-    let pitch2 = torque2.z as f64;
+    let pitch0 = torque0.z as Scalar;
+    let pitch2 = torque2.z as Scalar;
     let delta_pitch = pitch2 - pitch0;
 
     let rho = isa_density(500.0);
@@ -537,8 +570,8 @@ fn plank_cm_alpha() {
 /// Cm_q = delta_M / (q_bar * S * c * (q_rate * c / (2V))).
 #[test]
 fn plank_cm_q() {
-    let v = 50.0_f64;
-    let q_rate = 5.0_f64.to_radians(); // 5 deg/s pitch rate
+    let v: Scalar = 50.0;
+    let q_rate: Scalar = (5.0 as Scalar).to_radians(); // 5 deg/s pitch rate
 
     fn spawn_q0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
@@ -560,7 +593,7 @@ fn plank_cm_q() {
     let torque0 = read_torque(&mut app0);
     let torque5 = read_torque(&mut app5);
 
-    let delta_pitch = (torque5.z - torque0.z) as f64;
+    let delta_pitch = (torque5.z - torque0.z) as Scalar;
 
     let rho = isa_density(500.0);
     let q_bar = 0.5 * rho * v * v;
@@ -587,8 +620,8 @@ fn plank_cm_q() {
 /// Cl_p = delta_L / (q_bar * S * b * (p * b / (2V))).
 #[test]
 fn plank_cl_p() {
-    let v = 50.0_f64;
-    let p_rate = 10.0_f64.to_radians(); // 10 deg/s roll rate
+    let v: Scalar = 50.0;
+    let p_rate: Scalar = (10.0 as Scalar).to_radians(); // 10 deg/s roll rate
 
     fn spawn_p0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
@@ -611,7 +644,7 @@ fn plank_cl_p() {
     let torque10 = read_torque(&mut app10);
 
     // Roll torque is around body X (forward) = world X after rotation_x(PI/2).
-    let delta_roll = (torque10.x - torque0.x) as f64;
+    let delta_roll = (torque10.x - torque0.x) as Scalar;
 
     let rho = isa_density(500.0);
     let q_bar = 0.5 * rho * v * v;
@@ -638,9 +671,9 @@ fn plank_cl_p() {
 /// Cn_beta = delta_N / (q_bar * S * b * delta_beta).
 #[test]
 fn plank_cn_beta() {
-    let beta_deg = 3.0_f64;
+    let beta_deg: Scalar = 3.0;
     let beta_rad = beta_deg.to_radians();
-    let v = 50.0_f64;
+    let v: Scalar = 50.0;
 
     fn spawn_beta0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
@@ -671,8 +704,8 @@ fn plank_cn_beta() {
     let torque3 = read_torque(&mut app3);
 
     // Yaw torque is around body Z (down) = world -Y after rotation_x(PI/2).
-    let yaw0 = -torque0.y as f64;
-    let yaw3 = -torque3.y as f64;
+    let yaw0 = -torque0.y as Scalar;
+    let yaw3 = -torque3.y as Scalar;
     let delta_yaw = yaw3 - yaw0;
 
     let rho = isa_density(500.0);
@@ -699,8 +732,8 @@ fn plank_cn_beta() {
 /// Cn_r = delta_N / (q_bar * S * b * (r * b / (2V))).
 #[test]
 fn plank_cn_r() {
-    let v = 50.0_f64;
-    let r_rate = 5.0_f64.to_radians(); // 5 deg/s yaw rate
+    let v: Scalar = 50.0;
+    let r_rate: Scalar = (5.0 as Scalar).to_radians(); // 5 deg/s yaw rate
 
     fn spawn_r0(mut commands: Commands) {
         let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
@@ -723,7 +756,7 @@ fn plank_cn_r() {
     let torque5 = read_torque(&mut app5);
 
     // Yaw torque around body Z (down) = world -Y.
-    let delta_yaw = (-(torque5.y - torque0.y)) as f64;
+    let delta_yaw = (-(torque5.y - torque0.y)) as Scalar;
 
     let rho = isa_density(500.0);
     let q_bar = 0.5 * rho * v * v;

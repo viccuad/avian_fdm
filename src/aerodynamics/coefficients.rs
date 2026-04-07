@@ -1,22 +1,23 @@
 //! Step 1: coefficient evaluation — table lookup, control-surface scaling, damage.
 
+use avian3d::math::Scalar;
 use crate::components::{AeroZone, ControlInputs, ControlSurfaceRole};
 
 /// Six non-dimensional aerodynamic coefficients, fully scaled and ready to be
 /// multiplied by dynamic pressure and reference area to produce forces.
 pub(crate) struct ZoneCoefficients {
     /// Lift coefficient (positive = upward in stability frame).
-    pub cl: f64,
+    pub cl: Scalar,
     /// Drag coefficient (positive = opposing motion).
-    pub cd: f64,
+    pub cd: Scalar,
     /// Side-force coefficient (positive = starboard).
-    pub cy: f64,
+    pub cy: Scalar,
     /// Pitching-moment coefficient (positive = nose up).
-    pub cm: f64,
+    pub cm: Scalar,
     /// Rolling-moment coefficient (positive = starboard wing down).
-    pub croll: f64,
+    pub croll: Scalar,
     /// Yawing-moment coefficient (positive = nose right).
-    pub cn: f64,
+    pub cn: Scalar,
 }
 
 /// Evaluate an [`AeroZone`]'s coefficient tables and apply control-surface
@@ -57,11 +58,11 @@ pub(crate) struct ZoneCoefficients {
 pub(crate) fn evaluate_zone_coefficients(
     zone: &AeroZone,
     ctrl: &ControlInputs,
-    alpha_local: f64,
-    beta_local: f64,
-    re: f64,
-    qbar: f64,
-    remaining: f64,
+    alpha_local: Scalar,
+    beta_local: Scalar,
+    re: Scalar,
+    qbar: Scalar,
+    remaining: Scalar,
 ) -> ZoneCoefficients {
     let cl_base = zone.cl.evaluate(alpha_local, re);
     let cd_base = zone.cd.evaluate(alpha_local, re);
@@ -103,7 +104,7 @@ mod tests {
         ControlInputs { elevator: 0.0, aileron: 0.0, rudder: 0.0, throttle: 0.0 }
     }
 
-    fn simple_zone(cl: f64, cd: f64) -> AeroZone {
+    fn simple_zone(cl: Scalar, cd: Scalar) -> AeroZone {
         AeroZone { cl: AeroCoeff::Scalar(cl), cd: AeroCoeff::Scalar(cd), ..Default::default() }
     }
 

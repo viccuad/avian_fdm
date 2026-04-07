@@ -1,6 +1,7 @@
 //! Control input component. Written each frame by the game's input system.
 
 use crate::_bevy::*;
+use avian3d::math::Scalar;
 use serde::{Deserialize, Serialize};
 
 /// Pilot or autopilot control surface positions.
@@ -16,11 +17,11 @@ use serde::{Deserialize, Serialize};
 #[reflect(Component, Serialize, Deserialize)]
 pub struct ControlInputs {
     /// Engine throttle: 0.0 = idle, 1.0 = full power.
-    pub throttle: f64,
+    pub throttle: Scalar,
     /// Elevator deflection: +1.0 = full nose-up, −1.0 = full nose-down.
-    pub elevator: f64,
+    pub elevator: Scalar,
     /// Aileron deflection: +1.0 = right wing down (roll right), −1.0 = roll left.
-    pub aileron: f64,
+    pub aileron: Scalar,
     /// Rudder deflection: +1.0 = nose right (yaw right), −1.0 = nose left.
-    pub rudder: f64,
+    pub rudder: Scalar,
 }

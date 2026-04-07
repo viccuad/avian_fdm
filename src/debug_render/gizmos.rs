@@ -218,6 +218,7 @@ pub(super) fn debug_render_moments(
 /// The global [`FdmGizmos::zone_color`] acts as an on/off gate; set to `None`
 /// to disable. Per-entity [`FdmDebugRender::zone_color`] overrides the color
 /// (damage tint still applies on top).
+#[allow(clippy::unnecessary_cast)]
 pub(super) fn debug_render_zones(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
@@ -350,6 +351,7 @@ fn draw_zone_shape(
 /// - A short body-axis forward arrow showing where the nose points.
 /// - A label line showing the AoA angle between the two (no text; the angle
 ///   between nose-arrow and wind-arrow is the visual AoA).
+#[allow(clippy::unnecessary_cast)]
 pub(super) fn debug_render_wind(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,

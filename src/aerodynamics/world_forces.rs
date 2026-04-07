@@ -1,20 +1,20 @@
 //! Step 2: stability-frame forces and pure torques to world coordinates.
 
-use bevy_math::{DQuat, DVec3};
+use avian3d::math::{Quaternion, Scalar, Vector};
 
 use super::coefficients::ZoneCoefficients;
 
 /// World-space force and torque produced by a single zone.
 pub(crate) struct ZoneWorldForce {
     /// Aerodynamic force in world coordinates (N).
-    pub force: DVec3,
+    pub force: Vector,
     /// Pure aerodynamic torque in world coordinates (N·m).
     ///
     /// This is the couple that exists independently of the zone's position
     /// (e.g. an airfoil's pitching moment about its own aerodynamic centre).
     /// It is *not* the moment-arm torque, that is computed separately by the
     /// caller using `(zone_position − CG) × force`.
-    pub torque: DVec3,
+    pub torque: Vector,
 }
 
 /// Convert non-dimensional coefficients into a world-space force and torque.
@@ -72,13 +72,13 @@ pub(crate) struct ZoneWorldForce {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn zone_force_world(
     coeffs: &ZoneCoefficients,
-    qbar: f64,
-    zone_area: f64,
-    span_ref: f64,
-    zone_chord: f64,
-    alpha: f64,
-    vel_zone_unit: DVec3,
-    zone_to_world: DQuat,
+    qbar: Scalar,
+    zone_area: Scalar,
+    span_ref: Scalar,
+    zone_chord: Scalar,
+    alpha: Scalar,
+    vel_zone_unit: Vector,
+    zone_to_world: Quaternion,
 ) -> ZoneWorldForce {
     // Drag: opposes the full 3D velocity vector in zone frame.
     let drag_zone = vel_zone_unit * (-coeffs.cd * qbar * zone_area);
@@ -86,8 +86,8 @@ pub(crate) fn zone_force_world(
     // Lift and side force: stability frame (alpha rotation about zone-Y only).
     // CY = stability +Y = zone +Y, so this keeps side force rotating with the
     // aircraft and zone instead of being locked to a world direction.
-    let stab_to_zone = DQuat::from_rotation_y(-alpha);
-    let lift_side_stab = DVec3::new(
+    let stab_to_zone = Quaternion::from_rotation_y(-alpha);
+    let lift_side_stab = Vector::new(
         0.0,
         coeffs.cy * qbar * zone_area,
         -coeffs.cl * qbar * zone_area,
@@ -96,7 +96,7 @@ pub(crate) fn zone_force_world(
 
     let force = zone_to_world * (drag_zone + lift_side_zone);
 
-    let torque_zone = DVec3::new(
+    let torque_zone = Vector::new(
         coeffs.croll * qbar * zone_area * span_ref,
         coeffs.cm * qbar * zone_area * zone_chord,
         coeffs.cn * qbar * zone_area * span_ref,
@@ -111,7 +111,7 @@ mod tests {
     use super::super::coefficients::ZoneCoefficients;
     use super::*;
 
-    fn unit_coeffs(cl: f64, cd: f64, cy: f64, cm: f64) -> ZoneCoefficients {
+    fn unit_coeffs(cl: Scalar, cd: Scalar, cy: Scalar, cm: Scalar) -> ZoneCoefficients {
         ZoneCoefficients {
             cl,
             cd,
@@ -122,7 +122,7 @@ mod tests {
         }
     }
 
-    /// Level flight at α=0: lift (−Z_stab) rotates to +Y world.
+    /// Level flight at alpha=0: lift (−Z_stab) rotates to +Y world.
     #[test]
     fn lift_opposes_gravity_at_zero_alpha() {
         let coeffs = unit_coeffs(1.0, 0.0, 0.0, 0.0);
@@ -133,8 +133,8 @@ mod tests {
             10.0,
             1.6,
             0.0,
-            DVec3::X,
-            DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2),
+            Vector::X,
+            Quaternion::from_rotation_x(avian3d::math::FRAC_PI_2),
         );
         assert!(
             wf.force.y > 0.0,
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn drag_opposes_forward_motion() {
         let coeffs = unit_coeffs(0.0, 1.0, 0.0, 0.0);
-        // vel_body_unit = +X (flying forward at α=0, β=0)
+        // vel_body_unit = +X (flying forward at alpha=0, beta=0)
         let wf = zone_force_world(
             &coeffs,
             1000.0,
@@ -155,8 +155,8 @@ mod tests {
             10.0,
             1.6,
             0.0,
-            DVec3::X,
-            DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2),
+            Vector::X,
+            Quaternion::from_rotation_x(avian3d::math::FRAC_PI_2),
         );
         assert!(
             wf.force.x < 0.0,
@@ -172,11 +172,12 @@ mod tests {
         let coeffs = unit_coeffs(0.0, 1.0, 0.0, 0.0);
         // Aircraft yawed 45 degrees right. Velocity is still world +X.
         // In body frame, the velocity has a sideways (beta) component.
-        let beta = -std::f64::consts::FRAC_PI_4; // 45 degrees of sideslip
-        let vel_body_unit = DVec3::new(beta.cos(), beta.sin(), 0.0);
+        let frac_pi_4 = avian3d::math::FRAC_PI_2 / 2.0;
+        let beta: Scalar = -frac_pi_4;
+        let vel_body_unit = Vector::new(beta.cos(), beta.sin(), 0.0);
         // body_to_world: initial spawn rotation + 45 deg right yaw
-        let body_to_world = DQuat::from_rotation_y(-std::f64::consts::FRAC_PI_4)
-            * DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2);
+        let body_to_world = Quaternion::from_rotation_y(-frac_pi_4)
+            * Quaternion::from_rotation_x(avian3d::math::FRAC_PI_2);
         let wf = zone_force_world(
             &coeffs,
             1000.0,
@@ -207,9 +208,10 @@ mod tests {
     fn side_force_rotates_with_aircraft() {
         let cy = 1.0;
         let coeffs = unit_coeffs(0.0, 0.0, cy, 0.0);
+        let frac_pi_2 = avian3d::math::FRAC_PI_2;
 
         // Level aircraft (no yaw).
-        let body_to_world_level = DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2);
+        let body_to_world_level = Quaternion::from_rotation_x(frac_pi_2);
         let wf_level = zone_force_world(
             &coeffs,
             1000.0,
@@ -217,16 +219,16 @@ mod tests {
             10.0,
             1.6,
             0.0,
-            DVec3::X,
+            Vector::X,
             body_to_world_level,
         );
 
         // Aircraft yawed 90 degrees right.
-        let body_to_world_yawed = DQuat::from_rotation_y(-std::f64::consts::FRAC_PI_2)
-            * DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2);
+        let body_to_world_yawed =
+            Quaternion::from_rotation_y(-frac_pi_2) * Quaternion::from_rotation_x(frac_pi_2);
         // At 90 deg yaw, velocity (world +X) is now body -Y, so beta = -90 deg.
-        let beta_90 = -std::f64::consts::FRAC_PI_2;
-        let vel_body_unit_yawed = DVec3::new(beta_90.cos(), beta_90.sin(), 0.0);
+        let beta_90: Scalar = -frac_pi_2;
+        let vel_body_unit_yawed = Vector::new(beta_90.cos(), beta_90.sin(), 0.0);
         let wf_yawed = zone_force_world(
             &coeffs,
             1000.0,
@@ -259,8 +261,8 @@ mod tests {
             10.0,
             1.6,
             0.0,
-            DVec3::X,
-            DQuat::IDENTITY,
+            Vector::X,
+            Quaternion::IDENTITY,
         );
         let wf2 = zone_force_world(
             &coeffs,
@@ -269,12 +271,12 @@ mod tests {
             10.0,
             1.6,
             0.0,
-            DVec3::X,
-            DQuat::IDENTITY,
+            Vector::X,
+            Quaternion::IDENTITY,
         );
         let ratio = wf2.force.length() / wf1.force.length();
         assert!(
-            (ratio - 4.0).abs() < 1e-10,
+            (ratio - 4.0).abs() < 1e-4,
             "force should scale 4:1 with q̄, ratio = {ratio}"
         );
     }
@@ -290,8 +292,8 @@ mod tests {
             10.0,
             2.0,
             0.0,
-            DVec3::X,
-            DQuat::IDENTITY,
+            Vector::X,
+            Quaternion::IDENTITY,
         );
         let wf_b = zone_force_world(
             &coeffs,
@@ -300,12 +302,12 @@ mod tests {
             10.0,
             4.0,
             0.0,
-            DVec3::X,
-            DQuat::IDENTITY,
+            Vector::X,
+            Quaternion::IDENTITY,
         );
         let ratio = wf_b.torque.y / wf_a.torque.y;
         assert!(
-            (ratio - 2.0).abs() < 1e-10,
+            (ratio - 2.0).abs() < 1e-4,
             "CM should scale with chord, ratio = {ratio}"
         );
     }

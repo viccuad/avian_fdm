@@ -15,7 +15,7 @@
 
 use avian_fdm::prelude::*;
 use avian_fdm_j3cub_jsbsim::presets::j3cub;
-use avian3d::math::Vector;
+use avian3d::math::{Scalar, Vector};
 use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
 use bevy::ecs::message::MessageWriter;
 use bevy::prelude::*;
@@ -51,12 +51,13 @@ fn spawn_aircraft(mut commands: Commands) {
 
 /// Linearly ramp throttle from 50% → 75% over the first 12.5 seconds.
 /// Starting at 50% avoids the zoom-climb that occurs at zero throttle.
+#[allow(clippy::unnecessary_cast)]
 fn ramp_throttle(
     mut query: Query<&mut ControlInputs, With<AircraftGeometry>>,
     time: Res<Time>,
 ) {
     let t = time.elapsed_secs_f64();
-    let throttle = (0.5 + t / 50.0).min(0.75);
+    let throttle = (0.5 + t / 50.0).min(0.75) as Scalar;
     for mut ctrl in &mut query {
         ctrl.throttle = throttle;
     }

@@ -2,6 +2,7 @@
 //! Written by the game's hit/damage system; read by domain systems independently.
 
 use crate::_bevy::*;
+use avian3d::math::Scalar;
 use serde::{Deserialize, Serialize};
 
 /// Fraction of a zone's nominal capability that remains after damage or failure.
@@ -48,7 +49,7 @@ pub struct Failure {
     ///
     /// Multiply any output (force, torque, thrust) by this value before applying
     /// it to the simulation. Write this from your projectile / collision system.
-    pub remaining: f64,
+    pub remaining: Scalar,
 }
 
 impl Default for Failure {
@@ -70,7 +71,7 @@ impl Default for Failure {
 /// assert_eq!(get_remaining(Some(&f)), 0.4);
 /// ```
 #[inline]
-pub fn get_remaining(failure: Option<&Failure>) -> f64 {
+pub fn get_remaining(failure: Option<&Failure>) -> Scalar {
     failure.map(|f| f.remaining).unwrap_or(1.0)
 }
 

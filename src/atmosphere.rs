@@ -49,44 +49,45 @@
 
 use crate::_bevy::*;
 use crate::components::{AtmosphereState, FlightState, WindResource};
+use avian3d::math::{Scalar, Vector};
 
 //
 // ISA constants
 //
 
 /// Sea-level temperature (K).
-const T0: f64 = 288.15;
+const T0: Scalar = 288.15;
 /// Sea-level pressure (Pa).
-const P0: f64 = 101_325.0;
+const P0: Scalar = 101_325.0;
 /// Tropospheric lapse rate (K/m).
-const L: f64 = 0.006_5;
+const L: Scalar = 0.006_5;
 /// Tropopause altitude (m).
-const H_TROP: f64 = 11_000.0;
+const H_TROP: Scalar = 11_000.0;
 /// Tropopause temperature (K).
-const T_TROP: f64 = 216.65;
+const T_TROP: Scalar = 216.65;
 /// Specific gas constant for dry air (J/(kg·K)).
-const R_AIR: f64 = 287.052_87;
+const R_AIR: Scalar = 287.052_87;
 /// Standard gravity (m/s²).
-const G: f64 = 9.806_65;
+const G: Scalar = 9.806_65;
 /// Adiabatic index of air.
-const GAMMA: f64 = 1.4;
+const GAMMA: Scalar = 1.4;
 
 /// Pressure exponent in the troposphere: g / (R · L).
-const TROP_EXPONENT: f64 = G / (R_AIR * L); // ≈ 5.2559
+const TROP_EXPONENT: Scalar = G / (R_AIR * L); // ~ 5.2559
 
 /// Sutherland reference temperature (K).
-const T_REF_SUTH: f64 = 273.15;
+const T_REF_SUTH: Scalar = 273.15;
 /// Sutherland reference dynamic viscosity (kg/(m·s)).
-const MU_REF_SUTH: f64 = 1.716e-5;
+const MU_REF_SUTH: Scalar = 1.716e-5;
 /// Sutherland constant S (K).
-const S_SUTH: f64 = 110.4;
+const S_SUTH: Scalar = 110.4;
 
 //
 // Pure ISA functions (public for testing and external use)
 //
 
 /// Compute ISA temperature (K) at geometric altitude `h` (m).
-pub fn isa_temperature(h: f64) -> f64 {
+pub fn isa_temperature(h: Scalar) -> Scalar {
     if h <= H_TROP {
         T0 - L * h
     } else {
@@ -95,7 +96,7 @@ pub fn isa_temperature(h: f64) -> f64 {
 }
 
 /// Compute ISA static pressure (Pa) at geometric altitude `h` (m).
-pub fn isa_pressure(h: f64) -> f64 {
+pub fn isa_pressure(h: Scalar) -> Scalar {
     if h <= H_TROP {
         let t = isa_temperature(h);
         P0 * (t / T0).powf(TROP_EXPONENT)
@@ -108,24 +109,24 @@ pub fn isa_pressure(h: f64) -> f64 {
 
 /// Compute ISA air density (kg/m³) at geometric altitude `h` (m).
 #[cfg(test)]
-pub(crate) fn isa_density(h: f64) -> f64 {
+pub(crate) fn isa_density(h: Scalar) -> Scalar {
     let t = isa_temperature(h);
     let p = isa_pressure(h);
     p / (R_AIR * t)
 }
 
 /// Compute speed of sound (m/s) at temperature `t` (K).
-pub fn speed_of_sound(t: f64) -> f64 {
+pub fn speed_of_sound(t: Scalar) -> Scalar {
     (GAMMA * R_AIR * t).sqrt()
 }
 
 /// Compute dynamic viscosity (kg/(m·s)) via Sutherland's law at temperature `t` (K).
-pub fn sutherland_viscosity(t: f64) -> f64 {
+pub fn sutherland_viscosity(t: Scalar) -> Scalar {
     MU_REF_SUTH * (t / T_REF_SUTH).powf(1.5) * (T_REF_SUTH + S_SUTH) / (t + S_SUTH)
 }
 
 /// Populate an [`AtmosphereState`] for the given altitude (m).
-pub fn atmosphere_at(h: f64) -> AtmosphereState {
+pub fn atmosphere_at(h: Scalar) -> AtmosphereState {
     let temperature_k = isa_temperature(h);
     let pressure_pa = isa_pressure(h);
     let density_kgm3 = pressure_pa / (R_AIR * temperature_k);
@@ -145,9 +146,10 @@ pub fn atmosphere_at(h: f64) -> AtmosphereState {
 /// Updates [`AtmosphereState`] on each aircraft from its world-space altitude.
 ///
 /// Reads `GlobalTransform.translation().y` as geometric altitude above sea level.
+#[allow(clippy::unnecessary_cast)]
 pub fn update_atmosphere(mut query: Query<(&GlobalTransform, &mut AtmosphereState)>) {
     for (transform, mut atm) in &mut query {
-        let altitude_m = transform.translation().y as f64;
+        let altitude_m = transform.translation().y as Scalar;
         *atm = atmosphere_at(altitude_m);
     }
 }
@@ -156,6 +158,7 @@ pub fn update_atmosphere(mut query: Query<(&GlobalTransform, &mut AtmosphereStat
 ///
 /// Reads [`avian3d::prelude::LinearVelocity`] and [`avian3d::prelude::AngularVelocity`],
 /// converts to body frame, and derives α, β, V, q̄, Re, Mach.
+#[allow(clippy::unnecessary_cast)]
 pub fn update_flight_state(
     mut query: Query<(
         &GlobalTransform,
@@ -167,24 +170,23 @@ pub fn update_flight_state(
     )>,
     wind: Option<Res<WindResource>>,
 ) {
-    use crate::math::{world_to_body, VecToF64};
-    use bevy_math::{DQuat, DVec3};
+    use crate::math::{quat_to_quaternion, world_to_body};
 
-    let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(DVec3::ZERO);
+    let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vector::ZERO);
 
     for (transform, lin_vel, ang_vel, atm, geom, mut fs) in &mut query {
-        let altitude_m = transform.translation().y as f64;
+        let altitude_m = transform.translation().y as Scalar;
 
         // Body angular rates, rotate world AngularVelocity to body frame.
-        let q = DQuat::from_array(transform.rotation().to_array().map(|x| x as f64));
-        let av_world = ang_vel.0.vec_to_f64();
+        let q = quat_to_quaternion(transform.rotation());
+        let av_world = ang_vel.0;
         let omega_body = q.inverse() * av_world;
         let p_rads = omega_body.x;
         let q_rads = omega_body.y;
         let r_rads = omega_body.z;
 
         // World-frame velocity relative to air mass.
-        let vel_world = lin_vel.0.vec_to_f64() - wind_world;
+        let vel_world = lin_vel.0 - wind_world;
 
         let airspeed_ms = vel_world.length();
 
@@ -206,10 +208,10 @@ pub fn update_flight_state(
         let u = vel_body.x; // forward
         let v = vel_body.y; // right
         let w = vel_body.z; // down
-        let alpha_rad = f64::atan2(w, u);
+        let alpha_rad = w.atan2(u);
 
         // Sideslip β: atan2(v, sqrt(u²+w²))
-        let beta_rad = f64::atan2(v, (u * u + w * w).sqrt());
+        let beta_rad = v.atan2((u * u + w * w).sqrt());
 
         let dynamic_pressure_pa = 0.5 * atm.density_kgm3 * airspeed_ms * airspeed_ms;
         let mu = sutherland_viscosity(atm.temperature_k);
@@ -241,11 +243,11 @@ mod tests {
 
     /// Tolerance for ISA validation: ±0.1% on density, ±0.5% on pressure.
     /// Reference values from ICAO Doc 7488 / standard ISA tables.
-    const DENS_TOL: f64 = 0.001;
-    const PRES_TOL: f64 = 0.005;
-    const TEMP_TOL: f64 = 0.001;
+    const DENS_TOL: Scalar = 0.001;
+    const PRES_TOL: Scalar = 0.005;
+    const TEMP_TOL: Scalar = 0.001;
 
-    fn pct_err(got: f64, expected: f64) -> f64 {
+    fn pct_err(got: Scalar, expected: Scalar) -> Scalar {
         (got - expected).abs() / expected
     }
 

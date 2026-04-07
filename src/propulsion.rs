@@ -23,9 +23,9 @@
 //! `V_ind` is stored in [`PropwashState`] on the root entity and read by
 //! `compute_aero_forces` for propwash effects (Group A, post-v1).
 
-use std::f64::consts::PI;
+use avian3d::math::Scalar;
 use crate::_bevy::*;
-use bevy_math::DQuat;
+use crate::math::{quat_to_quaternion, vector_to_vec3};
 use avian3d::prelude::ColliderOf;
 
 use crate::components::{
@@ -33,8 +33,11 @@ use crate::components::{
     get_remaining,
 };
 
+#[allow(clippy::unnecessary_cast)]
+const PI_VAL: Scalar = std::f64::consts::PI as Scalar;
+
 /// Sea-level standard density (kg/m³).
-const RHO_0: f64 = 1.225;
+const RHO_0: Scalar = 1.225;
 
 /// Phase 1: compute engine thrust and write `ZoneForce` + update `PropwashState`.
 #[allow(clippy::type_complexity)]
@@ -87,7 +90,7 @@ pub fn compute_engine_zone_forces(
 
         // 3. Actuator disk induced velocity.
         let radius = engine.prop_diameter_m * 0.5;
-        let disk_area = PI * radius * radius;
+        let disk_area = PI_VAL * radius * radius;
         let v_ind = if thrust_n > 0.0 && rho > 0.0 {
             (thrust_n / (2.0 * rho * disk_area)).sqrt()
         } else {
@@ -97,7 +100,7 @@ pub fn compute_engine_zone_forces(
         propwash.direction_body = engine.thrust_axis_body.normalize_or_zero();
 
         // 4. Rotate thrust axis body to world and write ZoneForce.
-        let q = DQuat::from_array(root_gt.rotation().to_array().map(|x| x as f64));
+        let q = quat_to_quaternion(root_gt.rotation());
         let thrust_world = q * (engine.thrust_axis_body.normalize_or_zero() * thrust_n);
 
         if !thrust_world.is_finite() {
@@ -105,11 +108,7 @@ pub fn compute_engine_zone_forces(
             continue;
         }
 
-        zone_force.force = Vec3::new(
-            thrust_world.x as f32,
-            thrust_world.y as f32,
-            thrust_world.z as f32,
-        );
+        zone_force.force = vector_to_vec3(thrust_world);
         zone_force.world_point = engine_gt.translation();
     }
 }
@@ -117,14 +116,14 @@ pub fn compute_engine_zone_forces(
 /// Linear interpolation over a `[[throttle, fraction]; N]` lookup table.
 ///
 /// Clamps to the boundary values when `x` is outside the table range.
-pub(crate) fn interp_curve(curve: &[[f64; 2]], x: f64) -> f64 {
+pub(crate) fn interp_curve(curve: &[[Scalar; 2]], x: Scalar) -> Scalar {
     use crate::components::aero_coeff::lerp_1d;
     if curve.is_empty() { return 0.0; }
     if curve.len() == 1 { return curve[0][1]; }
     // Clamp to table bounds (lerp_1d assumes in-range input).
     let x = x.clamp(curve[0][0], curve[curve.len() - 1][0]);
-    let bp: Vec<f64> = curve.iter().map(|p| p[0]).collect();
-    let vals: Vec<f64> = curve.iter().map(|p| p[1]).collect();
+    let bp: Vec<Scalar> = curve.iter().map(|p| p[0]).collect();
+    let vals: Vec<Scalar> = curve.iter().map(|p| p[1]).collect();
     lerp_1d(x, &bp, &vals)
 }
 
@@ -159,25 +158,25 @@ mod tests {
 
     #[test]
     fn gagg_ferrar_altitude_reduces_thrust() {
-        let rho_alt = 0.9_f64;
+        let rho_alt = 0.9;
         let ratio = (rho_alt / RHO_0).powf(0.7);
         assert!(ratio < 1.0);
     }
 
     #[test]
     fn induced_velocity_positive_at_nonzero_thrust() {
-        let thrust = 400.0_f64;
-        let rho = 1.225_f64;
-        let radius = 0.9_f64;
-        let disk_area = PI * radius * radius;
+        let thrust = 400.0;
+        let rho = 1.225;
+        let radius = 0.9;
+        let disk_area = PI_VAL * radius * radius;
         let v_ind = (thrust / (2.0 * rho * disk_area)).sqrt();
         assert!(v_ind > 0.0);
     }
 
     #[test]
     fn zero_remaining_zero_thrust() {
-        let remaining = 0.0_f64;
-        let max_thrust = 500.0_f64;
+        let remaining = 0.0;
+        let max_thrust = 500.0;
         let thrust = max_thrust * remaining;
         assert_eq!(thrust, 0.0);
     }
@@ -189,7 +188,7 @@ mod tests {
 
     #[test]
     fn interp_curve_single_entry_returns_that_value() {
-        let curve = vec![[0.5_f64, 0.8_f64]];
+        let curve = vec![[0.5, 0.8]];
         assert!((interp_curve(&curve, 0.0) - 0.8).abs() < 1e-12, "below");
         assert!((interp_curve(&curve, 0.5) - 0.8).abs() < 1e-12, "exact");
         assert!((interp_curve(&curve, 1.0) - 0.8).abs() < 1e-12, "above");

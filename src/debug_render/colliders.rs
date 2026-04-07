@@ -57,6 +57,7 @@ pub(super) fn plugin(app: &mut App) {
 /// Runs in `PostUpdate` after transform propagation so `GlobalTransform`
 /// reflects the current physics state. Uses `avian3d::parry` (re-exported
 /// by avian3d) so no direct parry dependency is needed in calling code.
+#[allow(clippy::unnecessary_cast)]
 pub(super) fn debug_render_colliders(
     mut gizmos: Gizmos<FdmGizmos>,
     root_query: Query<&Transform, With<AircraftGeometry>>,

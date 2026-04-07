@@ -29,13 +29,14 @@
 //!
 //! ## Table storage layout
 //!
-//! `Table2D::data` is a **flat, row-major `Vec<f64>`** of length
+//! `Table2D::data` is a **flat, row-major `Vec<S>`** of length
 //! `rows.len() * cols.len()`. Element at row index `i`, column index `j`
 //! is accessed as `data[i * cols.len() + j]`. This layout uses a single
 //! heap allocation and maximises cache locality during bilinear
 //! interpolation.
 
 use crate::_bevy::*;
+use avian3d::math::Scalar as S;
 use serde::{Deserialize, Serialize};
 
 /// An aerodynamic coefficient value: constant, 1-D table, or 2-D table.
@@ -43,7 +44,7 @@ use serde::{Deserialize, Serialize};
 /// Used for CL, CD, CY, CM, Cl, Cn, any dimensionless coefficient that
 /// may depend on angle of attack and/or Reynolds number.
 ///
-/// Call [`AeroCoeff::evaluate`] each frame to obtain a `f64` value at the
+/// Call [`AeroCoeff::evaluate`] each frame to obtain a `Scalar` value at the
 /// current flight conditions.
 ///
 /// ## Completeness system, `Absent`, `Placeholder`, and data variants
@@ -91,7 +92,7 @@ pub enum AeroCoeff {
     Placeholder,
 
     /// Constant value. Suitable for simple linear models.
-    Scalar(f64),
+    Scalar(S),
 
     /// 1-D lookup table: coefficient as a function of angle of attack (rad).
     ///
@@ -99,9 +100,9 @@ pub enum AeroCoeff {
     /// `breakpoints` must be strictly increasing.
     Table1D {
         /// Angle-of-attack breakpoints in radians, strictly increasing.
-        breakpoints: Vec<f64>,
+        breakpoints: Vec<S>,
         /// Coefficient values at each breakpoint.
-        values: Vec<f64>,
+        values: Vec<S>,
     },
 
     /// 2-D lookup table: coefficient as a function of angle of attack × Reynolds number.
@@ -112,11 +113,11 @@ pub enum AeroCoeff {
     /// Matches JSBSim's default table representation.
     Table2D {
         /// Angle-of-attack breakpoints (rows), in radians, strictly increasing.
-        rows: Vec<f64>,
+        rows: Vec<S>,
         /// Reynolds-number breakpoints (columns), strictly increasing.
-        cols: Vec<f64>,
+        cols: Vec<S>,
         /// Flat row-major coefficient data. Length must equal `rows.len() × cols.len()`.
-        data: Vec<f64>,
+        data: Vec<S>,
     },
 }
 
@@ -184,10 +185,10 @@ impl AeroCoeff {
     /// let cl_full = cl.with_post_stall_lift(3.0);
     /// // Original data is preserved; extension points added to +/-180 deg.
     /// // At 90 deg AoA, CL is near zero (flat plate).
-    /// let cl_90 = cl_full.evaluate(std::f64::consts::FRAC_PI_2, 0.0);
+    /// let cl_90 = cl_full.evaluate(std::f32::consts::FRAC_PI_2 as _, 0.0);
     /// assert!(cl_90.abs() < 0.01);
     /// ```
-    pub fn with_post_stall_lift(self, aspect_ratio: f64) -> Self {
+    pub fn with_post_stall_lift(self, aspect_ratio: S) -> Self {
         match self {
             AeroCoeff::Table1D {
                 breakpoints,
@@ -240,10 +241,10 @@ impl AeroCoeff {
     /// let cd = AeroCoeff::Scalar(0.01);
     /// let cd_full = cd.with_post_stall_drag(3.0);
     /// // At 90 deg AoA, CD is near CD_max (flat plate):
-    /// let cd_90 = cd_full.evaluate(std::f64::consts::FRAC_PI_2, 0.0);
+    /// let cd_90 = cd_full.evaluate(std::f32::consts::FRAC_PI_2 as _, 0.0);
     /// assert!((cd_90 - 1.164).abs() < 0.01);
     /// ```
-    pub fn with_post_stall_drag(self, aspect_ratio: f64) -> Self {
+    pub fn with_post_stall_drag(self, aspect_ratio: S) -> Self {
         match self {
             AeroCoeff::Scalar(cd0) => {
                 let (bp, vals) = scalar_to_drag_table(cd0, aspect_ratio);
@@ -376,7 +377,7 @@ impl AeroCoeff {
     ///
     /// Never panics in release builds. Returns `0.0` on a degenerate table
     /// (empty breakpoints) after a `warn!`.
-    pub fn evaluate(&self, angle_rad: f64, re: f64) -> f64 {
+    pub fn evaluate(&self, angle_rad: S, re: S) -> S {
         match self {
             AeroCoeff::Absent => 0.0,
             AeroCoeff::Placeholder => {
@@ -422,12 +423,12 @@ impl AeroCoeff {
 }
 
 /// Returns `true` if the slice is strictly increasing (each element > previous).
-fn is_strictly_increasing(s: &[f64]) -> bool {
+fn is_strictly_increasing(s: &[S]) -> bool {
     s.windows(2).all(|w| w[0] < w[1])
 }
 
 /// Clamp `v` to `[lo, hi]`, emitting `warn_once!` if clamping occurs.
-fn clamp_with_warn(v: f64, lo: f64, hi: f64, label: &'static str) -> f64 {
+fn clamp_with_warn(v: S, lo: S, hi: S, label: &'static str) -> S {
     if v < lo {
         warn_once!("{label} = {v:.4} is below table minimum {lo:.4}; clamping");
         lo
@@ -440,7 +441,7 @@ fn clamp_with_warn(v: f64, lo: f64, hi: f64, label: &'static str) -> f64 {
 }
 
 /// Linear interpolation in a 1-D table. `x` must be within `[bp[0], bp[last]]`.
-pub(crate) fn lerp_1d(x: f64, bp: &[f64], vals: &[f64]) -> f64 {
+pub(crate) fn lerp_1d(x: S, bp: &[S], vals: &[S]) -> S {
     debug_assert_eq!(bp.len(), vals.len());
     // Degenerate: single-point table, no interval to interpolate.
     if bp.len() == 1 {
@@ -455,7 +456,7 @@ pub(crate) fn lerp_1d(x: f64, bp: &[f64], vals: &[f64]) -> f64 {
 
 /// Bilinear interpolation in a 2-D flat row-major table.
 /// `angle_rad` and `re` must already be clamped to their respective ranges.
-fn bilerp(angle_rad: f64, re: f64, rows: &[f64], cols: &[f64], data: &[f64]) -> f64 {
+fn bilerp(angle_rad: S, re: S, rows: &[S], cols: &[S], data: &[S]) -> S {
     let nc = cols.len();
 
     // saturating_sub(2) handles the single-row / single-col degenerate case.
@@ -503,25 +504,26 @@ fn bilerp(angle_rad: f64, re: f64, rows: &[f64], cols: &[f64], data: &[f64]) -> 
 // table clamping during post-stall flight, tumbling, or any orientation
 // where the local angle of attack exceeds the wind-tunnel data range.
 
-use std::f64::consts::PI;
-const HALF_PI: f64 = PI / 2.0;
+#[allow(clippy::unnecessary_cast)]
+const PI: S = std::f64::consts::PI as S;
+const HALF_PI: S = PI / 2.0;
 
 /// Viterna CD_max for a finite-aspect-ratio surface.
-fn viterna_cd_max(ar: f64) -> f64 {
+fn viterna_cd_max(ar: S) -> S {
     1.11 + 0.018 * ar
 }
 
 /// Angles (in radians) at which to generate extension points.
 /// Covers 25 deg to 180 deg in 5-deg steps from 25 to 50, then 10-deg steps.
-fn extension_angles() -> Vec<f64> {
+fn extension_angles() -> Vec<S> {
     let mut angles = Vec::new();
     // Fine steps near stall transition (25-50 deg)
     for deg in (25..=50).step_by(5) {
-        angles.push((deg as f64).to_radians());
+        angles.push((deg as S).to_radians());
     }
     // Coarser steps for the rest (60-180 deg)
     for deg in (60..=180).step_by(10) {
-        angles.push((deg as f64).to_radians());
+        angles.push((deg as S).to_radians());
     }
     angles
 }
@@ -535,7 +537,7 @@ fn extension_angles() -> Vec<f64> {
 /// value into flat-plate behavior. Beyond 90 deg, only the sin(2a) term
 /// remains because the A2 term would diverge as sin(a) approaches zero
 /// near 180 deg.
-fn viterna_cl(a: f64, a1: f64, a2: f64) -> f64 {
+fn viterna_cl(a: S, a1: S, a2: S) -> S {
     let sa = a.sin();
     let flat = a1 * (2.0 * a).sin();
     if a.abs() <= HALF_PI && sa.abs() > 1e-10 {
@@ -550,7 +552,7 @@ fn viterna_cl(a: f64, a1: f64, a2: f64) -> f64 {
 ///   CD = CD_0_eff + (CD_max - CD_0_eff) * sin^2(a)
 ///
 /// This gives CD_0_eff at 0 and 180 deg, and CD_max at 90 deg.
-fn viterna_cd(a: f64, cd0_eff: f64, cd_max: f64) -> f64 {
+fn viterna_cd(a: S, cd0_eff: S, cd_max: S) -> S {
     cd0_eff + (cd_max - cd0_eff) * a.sin().powi(2)
 }
 
@@ -559,7 +561,7 @@ fn viterna_cd(a: f64, cd0_eff: f64, cd_max: f64) -> f64 {
 ///   A2 = (CL_s - A1 * sin(2*alpha_s)) * sin(alpha_s) / cos^2(alpha_s)
 ///
 /// If alpha_s is close to 90 deg (cos^2 near zero), returns 0 (pure flat plate).
-fn viterna_a2(alpha_s: f64, cl_s: f64, a1: f64) -> f64 {
+fn viterna_a2(alpha_s: S, cl_s: S, a1: S) -> S {
     let cos2 = alpha_s.cos().powi(2);
     if cos2 < 1e-6 {
         return 0.0;
@@ -572,7 +574,7 @@ fn viterna_a2(alpha_s: f64, cl_s: f64, a1: f64) -> f64 {
 ///   CD_0_eff = (CD_s - CD_max * sin^2(alpha_s)) / cos^2(alpha_s)
 ///
 /// If alpha_s is near 90 deg, falls back to CD_s (accept minor discontinuity).
-fn effective_cd0(alpha_s: f64, cd_s: f64, cd_max: f64) -> f64 {
+fn effective_cd0(alpha_s: S, cd_s: S, cd_max: S) -> S {
     let cos2 = alpha_s.cos().powi(2);
     if cos2 < 1e-6 {
         return cd_s;
@@ -581,7 +583,7 @@ fn effective_cd0(alpha_s: f64, cd_s: f64, cd_max: f64) -> f64 {
 }
 
 /// Extend a 1-D lift table to +/-pi.
-fn extend_1d_lift(bp: &[f64], vals: &[f64], ar: f64) -> (Vec<f64>, Vec<f64>) {
+fn extend_1d_lift(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     if bp.is_empty() {
         return (bp.to_vec(), vals.to_vec());
     }
@@ -635,7 +637,7 @@ fn extend_1d_lift(bp: &[f64], vals: &[f64], ar: f64) -> (Vec<f64>, Vec<f64>) {
 }
 
 /// Extend a 1-D drag table to +/-pi.
-fn extend_1d_drag(bp: &[f64], vals: &[f64], ar: f64) -> (Vec<f64>, Vec<f64>) {
+fn extend_1d_drag(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     if bp.is_empty() {
         return (bp.to_vec(), vals.to_vec());
     }
@@ -685,7 +687,7 @@ fn extend_1d_drag(bp: &[f64], vals: &[f64], ar: f64) -> (Vec<f64>, Vec<f64>) {
 }
 
 /// Convert a scalar CD to a Table1D with flat-plate drag progression.
-fn scalar_to_drag_table(cd0: f64, ar: f64) -> (Vec<f64>, Vec<f64>) {
+fn scalar_to_drag_table(cd0: S, ar: S) -> (Vec<S>, Vec<S>) {
     let cd_max = viterna_cd_max(ar);
     let all_angles = extension_angles();
 
@@ -711,15 +713,15 @@ fn scalar_to_drag_table(cd0: f64, ar: f64) -> (Vec<f64>, Vec<f64>) {
 
 /// Extend a 2-D lift table to +/-pi.
 /// Each Reynolds-number column is extended independently.
-fn extend_2d_lift(rows: &[f64], cols: &[f64], data: &[f64], ar: f64) -> (Vec<f64>, Vec<f64>) {
+fn extend_2d_lift(rows: &[S], cols: &[S], data: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     let nc = cols.len();
     if rows.is_empty() || nc == 0 {
         return (rows.to_vec(), data.to_vec());
     }
     // Extract each column as a 1-D table and extend it.
-    let mut col_results: Vec<(Vec<f64>, Vec<f64>)> = Vec::with_capacity(nc);
+    let mut col_results: Vec<(Vec<S>, Vec<S>)> = Vec::with_capacity(nc);
     for j in 0..nc {
-        let col_vals: Vec<f64> = (0..rows.len()).map(|i| data[i * nc + j]).collect();
+        let col_vals: Vec<S> = (0..rows.len()).map(|i| data[i * nc + j]).collect();
         col_results.push(extend_1d_lift(rows, &col_vals, ar));
     }
     // All columns must produce the same breakpoints (they share the same rows).
@@ -735,14 +737,14 @@ fn extend_2d_lift(rows: &[f64], cols: &[f64], data: &[f64], ar: f64) -> (Vec<f64
 }
 
 /// Extend a 2-D drag table to +/-pi.
-fn extend_2d_drag(rows: &[f64], cols: &[f64], data: &[f64], ar: f64) -> (Vec<f64>, Vec<f64>) {
+fn extend_2d_drag(rows: &[S], cols: &[S], data: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     let nc = cols.len();
     if rows.is_empty() || nc == 0 {
         return (rows.to_vec(), data.to_vec());
     }
-    let mut col_results: Vec<(Vec<f64>, Vec<f64>)> = Vec::with_capacity(nc);
+    let mut col_results: Vec<(Vec<S>, Vec<S>)> = Vec::with_capacity(nc);
     for j in 0..nc {
-        let col_vals: Vec<f64> = (0..rows.len()).map(|i| data[i * nc + j]).collect();
+        let col_vals: Vec<S> = (0..rows.len()).map(|i| data[i * nc + j]).collect();
         col_results.push(extend_1d_drag(rows, &col_vals, ar));
     }
     let new_rows = col_results[0].0.clone();
@@ -983,7 +985,7 @@ mod tests {
 
     #[test]
     fn validate_scalar_nan() {
-        let v = AeroCoeff::Scalar(f64::NAN).validate("test");
+        let v = AeroCoeff::Scalar(S::NAN).validate("test");
         assert_eq!(v.len(), 1);
         assert!(v[0].contains("not finite"));
     }
@@ -1023,7 +1025,7 @@ mod tests {
     fn validate_table1d_nan_value() {
         let c = AeroCoeff::Table1D {
             breakpoints: vec![0.0, 0.3],
-            values: vec![0.0, f64::NAN],
+            values: vec![0.0, S::NAN],
         };
         let v = c.validate("cl");
         assert!(!v.is_empty());
@@ -1164,7 +1166,7 @@ mod tests {
         };
         let extended = cl.with_post_stall_lift(3.0);
         // Check symmetry at a few post-stall angles.
-        for deg in [45.0_f64, 60.0, 90.0, 120.0, 150.0] {
+        for deg in [45.0 as S, 60.0, 90.0, 120.0, 150.0] {
             let a = deg.to_radians();
             let pos = extended.evaluate(a, 0.0);
             let neg = extended.evaluate(-a, 0.0);
@@ -1236,7 +1238,7 @@ mod tests {
     #[test]
     fn post_stall_drag_symmetric() {
         let cd = AeroCoeff::Scalar(0.01).with_post_stall_drag(3.0);
-        for deg in [30.0_f64, 60.0, 90.0, 120.0, 150.0] {
+        for deg in [30.0 as S, 60.0, 90.0, 120.0, 150.0] {
             let a = deg.to_radians();
             let pos = cd.evaluate(a, 0.0);
             let neg = cd.evaluate(-a, 0.0);

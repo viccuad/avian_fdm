@@ -10,15 +10,16 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use avian_fdm::components::aero_coeff::AeroCoeff;
+use avian3d::math::Scalar;
 
 // ── Shared test data ──────────────────────────────────────────────────────────
 
-const ALPHA_BP: [f64; 14] = [
+const ALPHA_BP: [Scalar; 14] = [
     -1.5700, -0.3491, -0.2443, -0.1745, -0.0873, 0.0000, 0.0873, 0.1309, 0.1745, 0.2182, 0.2618,
     0.3054, 0.3491, 1.5700,
 ];
-const RE_BP: [f64; 2] = [1_668_183.0, 3_707_224.0];
-const CL_DATA: [f64; 28] = [
+const RE_BP: [Scalar; 2] = [1_668_183.0, 3_707_224.0];
+const CL_DATA: [Scalar; 28] = [
     0.0000, 0.0000, -0.0085, -0.5085, -0.5085, -0.8136, -0.5085, -0.5085, 0.1017, 0.1017,
     0.5339, 0.5339, 1.2204, 1.2204, 1.4746, 1.4746, 1.5000, 1.6272, 1.6201, 1.7797, 1.5645,
     1.8306, 1.4272, 1.6272, 1.3138, 1.4238, 0.0000, 0.0000,
@@ -89,7 +90,7 @@ fn table2d_lookup_under_500ns() {
 
 #[test]
 fn aggregate_zones_15_under_5000ns() {
-    let fractions: [f64; 6] = [0.175, 0.175, 0.150, 0.175, 0.175, 0.150];
+    let fractions: [Scalar; 6] = [0.175, 0.175, 0.150, 0.175, 0.175, 0.150];
     let tables: Vec<AeroCoeff> = fractions
         .iter()
         .flat_map(|&f| {
@@ -107,7 +108,7 @@ fn aggregate_zones_15_under_5000ns() {
         .collect();
 
     let ns = median_ns(1_000, || {
-        let sum: f64 = tables
+        let sum: Scalar = tables
             .iter()
             .map(|t| t.evaluate(black_box(0.087), black_box(2_000_000.0)))
             .sum();
@@ -118,7 +119,7 @@ fn aggregate_zones_15_under_5000ns() {
 
 #[test]
 fn aggregate_zones_15x100_under_500000ns() {
-    let fractions: [f64; 6] = [0.175, 0.175, 0.150, 0.175, 0.175, 0.150];
+    let fractions: [Scalar; 6] = [0.175, 0.175, 0.150, 0.175, 0.175, 0.150];
     let tables: Vec<AeroCoeff> = fractions
         .iter()
         .flat_map(|&f| {
@@ -134,12 +135,12 @@ fn aggregate_zones_15x100_under_500000ns() {
         })
         .take(15)
         .collect();
-    let states: Vec<(f64, f64)> = (0..100)
-        .map(|i| (0.05 + i as f64 * 0.001, 1_500_000.0 + i as f64 * 5_000.0))
+    let states: Vec<(Scalar, Scalar)> = (0..100)
+        .map(|i| (0.05 + i as Scalar * 0.001, 1_500_000.0 + i as Scalar * 5_000.0))
         .collect();
 
     let ns = median_ns(100, || {
-        let mut total = 0.0_f64;
+        let mut total = 0.0;
         for (alpha, re) in &states {
             for t in &tables {
                 total += t.evaluate(black_box(*alpha), black_box(*re));

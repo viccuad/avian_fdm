@@ -31,6 +31,7 @@
 
 use avian3d::prelude::{AngularVelocity, LinearVelocity, PhysicsPlugins, Rotation};
 use avian_fdm::prelude::*;
+use avian3d::math::Scalar;
 use avian_fdm_j3cub_jsbsim::presets::j3cub;
 use bevy::input::gamepad::{Gamepad, GamepadAxis};
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
@@ -254,7 +255,8 @@ fn handle_input(
     gamepads: Query<&Gamepad>,
     time: Res<Time>,
 ) {
-    let dt = time.delta_secs_f64();
+    #[allow(clippy::unnecessary_cast)]
+    let dt = time.delta_secs_f64() as Scalar;
 
     // Keyboard: binary deflection while key is held.
     // W = stick forward = nose down (-1), S = pull back = nose up (+1).
@@ -271,11 +273,11 @@ fn handle_input(
         .next()
         .map(|pad| {
             // Left stick: aileron (X) + elevator (Y, push forward = nose up).
-            let aileron = pad.get(GamepadAxis::LeftStickX).unwrap_or(0.0) as f64;
-            let elevator = -pad.get(GamepadAxis::LeftStickY).unwrap_or(0.0) as f64;
-            let rudder = pad.get(GamepadAxis::RightStickX).unwrap_or(0.0) as f64;
+            let aileron = pad.get(GamepadAxis::LeftStickX).unwrap_or(0.0) as Scalar;
+            let elevator = -pad.get(GamepadAxis::LeftStickY).unwrap_or(0.0) as Scalar;
+            let rudder = pad.get(GamepadAxis::RightStickX).unwrap_or(0.0) as Scalar;
             // Right trigger (RightZ): range [0, 1].
-            let throttle = pad.get(GamepadAxis::RightZ).unwrap_or(-1.0) as f64;
+            let throttle = pad.get(GamepadAxis::RightZ).unwrap_or(-1.0) as Scalar;
             (elevator, aileron, rudder, throttle)
         })
         .unwrap_or((0.0, 0.0, 0.0, -1.0)); // -1 on throttle = no gamepad connected
@@ -283,21 +285,21 @@ fn handle_input(
     for mut ctrl in &mut query {
         // Deflection: keyboard overrides gamepad when both active.
         ctrl.elevator = if kb_elevator != 0 {
-            kb_elevator as f64
+            kb_elevator as Scalar
         } else {
             gp_elevator
         }
         .clamp(-1.0, 1.0);
 
         ctrl.aileron = if kb_aileron != 0 {
-            kb_aileron as f64
+            kb_aileron as Scalar
         } else {
             gp_aileron
         }
         .clamp(-1.0, 1.0);
 
         ctrl.rudder = if kb_rudder != 0 {
-            kb_rudder as f64
+            kb_rudder as Scalar
         } else {
             gp_rudder
         }
@@ -305,7 +307,7 @@ fn handle_input(
 
         // Throttle: rate-based from keyboard; direct from gamepad trigger.
         if kb_throttle != 0 {
-            ctrl.throttle = (ctrl.throttle + kb_throttle as f64 * 0.5 * dt).clamp(0.0, 1.0);
+            ctrl.throttle = (ctrl.throttle + kb_throttle as Scalar * 0.5 * dt).clamp(0.0, 1.0);
         } else if gp_throttle >= 0.0 {
             ctrl.throttle = gp_throttle;
         }
