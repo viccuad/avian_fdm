@@ -110,6 +110,6 @@ The JSBSim-derived J-3 Cub reference aircraft is in the separate
 
 ## License
 
-`avian_fdm` is licensed under [LGPL-2.1-or-later](LICENSE).
+`avian_fdm` is licensed under [LGPL-3.0-or-later](LICENSE).
 
 `avian_fdm_j3cub_jsbsim` is licensed under GPL-3.0-only (JSBSim-derived data).
