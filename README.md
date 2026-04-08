@@ -51,7 +51,7 @@ Add dependencies to `Cargo.toml`:
 
 ```toml
 [dependencies]
-avian_fdm              = { version = "0.1", features = ["f32"] }
+avian_fdm              = "0.1"
 avian_fdm_j3cub_jsbsim = "0.1"
 avian3d                = "0.6"
 bevy                   = "0.18"
@@ -93,11 +93,12 @@ zone decomposition guide.
 
 | Feature | Default | Description |
 |---|---|---|
-| `f32` | off | Avian3d f32 physics backend (standard Bevy precision) |
-| `f64` | off | Avian3d f64 physics backend (double precision) |
-| `debug-plugin` | off | Bevy Gizmo overlays for forces, moments, and zones |
+| `f32` | yes | Avian3d f32 physics backend (standard Bevy precision) |
+| `f64` | -- | Avian3d f64 physics backend (mutually exclusive with f32) |
+| `debug-plugin` | yes | Bevy Gizmo overlays for forces, moments, and zones |
 
 Exactly one of `f32` or `f64` must be enabled. They are mutually exclusive.
+For f64, use `default-features = false, features = ["f64"]`.
 
 The JSBSim-derived J-3 Cub reference aircraft is in the separate
 `avian_fdm_j3cub_jsbsim` crate (GPL-3.0-only, due to JSBSim data provenance).

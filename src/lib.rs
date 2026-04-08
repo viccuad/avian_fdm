@@ -38,7 +38,7 @@
 //! Add `avian_fdm` and `avian3d` to `Cargo.toml`:
 //!
 //! ```toml
-//! avian_fdm          = { version = "0.1", features = ["f32"] }
+//! avian_fdm          = "0.1"
 //! avian_fdm_j3cub_jsbsim = { version = "0.1" }
 //! avian3d            = { version = "0.6" }
 //! bevy               = { version = "0.18" }
@@ -180,8 +180,8 @@
 //! with a rotation that aligns body X (forward) to world X and body Z (down) to
 //! world −Y. `Quat::from_rotation_x(FRAC_PI_2)` achieves this.
 //!
-//! All internal computation uses `f64` for numerical stability. The only
-//! `f64`-to-`f32` cast is when writing to Avian's `f32` force/torque components.
+//! All internal computation uses avian3d's native precision (`Scalar`),
+//! which is `f32` or `f64` depending on the active feature flag.
 //!
 //! ---
 //!
@@ -687,8 +687,9 @@
 //!
 //! | Feature        | Default | Description |
 //! |----------------|---------|-------------|
-//! | `f32`          | off     | Enable avian3d f32 backend and collider shapes. Required unless you provide your own avian3d backend. |
-//! | `debug-plugin` | off     | Bevy Gizmo overlays for forces, moments, and zones ([`debug_render`]) |
+//! | `f32`          | yes     | Enable avian3d f32 backend and collider shapes. |
+//! | `f64`          | --      | Enable avian3d f64 backend (mutually exclusive with f32). |
+//! | `debug-plugin` | yes     | Bevy Gizmo overlays for forces, moments, and zones ([`debug_render`]) |
 //!
 //! JSBSim-derived reference aircraft (J-3 Cub) are in the separate
 //! `avian_fdm_j3cub_jsbsim` crate (GPL-3.0-only).

@@ -10,6 +10,7 @@ exclude = ["/.github/"]
 members = [".", "avian_fdm_j3cub_jsbsim"]
 
 [features]
+default = ["f32", "debug-plugin"]
 # Exactly one of `f32` or `f64` must be enabled. They select the avian3d physics
 # backend and are mutually exclusive: enabling both is a compile error.
 #
