@@ -125,7 +125,7 @@ fn spawn_aircraft(mut commands: Commands) {
     let level = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
     let root = j3cub::spawn(
         &mut commands,
-        Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(level),
+        Transform::from_xyz(0.0, 1000.0, 0.0).with_rotation(level),
     );
     commands.entity(root).insert((
         LinearVelocity(Vec3::new(27.0, 0.0, 0.0)),
@@ -256,7 +256,7 @@ fn restart_aircraft(
     }
     let level = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
     for (mut transform, mut lin_vel, mut ang_vel, mut ctrl) in &mut query {
-        *transform = Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(level);
+        *transform = Transform::from_xyz(0.0, 1000.0, 0.0).with_rotation(level);
         *lin_vel = LinearVelocity(Vec3::new(27.0, 0.0, 0.0));
         *ang_vel = AngularVelocity::default();
         *ctrl = ControlInputs {
