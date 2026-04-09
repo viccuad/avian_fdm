@@ -4,6 +4,13 @@ version = "0.1.0"
 edition = "2021"
 description = "6-DoF Flight Dynamics Model for Bevy + Avian 0.6"
 license = "LGPL-3.0-or-later"
+authors = ["Víctor Cuadrado Juan <me@viccuad.me>"]
+repository = "https://github.com/viccuad/avian_fdm"
+homepage = "https://github.com/viccuad/avian_fdm"
+documentation = "https://docs.rs/avian_fdm"
+readme = "README.md"
+keywords = ["bevy", "avian", "fdm", "flight", "simulation"]
+categories = ["game-development", "simulation", "science"]
 exclude = ["/.github/"]
 
 [workspace]

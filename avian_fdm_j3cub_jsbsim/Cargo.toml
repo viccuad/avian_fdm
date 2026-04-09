@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 description = "J3Cub aircraft preset for avian_fdm derived from github.com/wlbragg/J3Cub"
 license = "GPL-3.0-only"
+authors = ["Víctor Cuadrado Juan <me@viccuad.me>"]
+repository = "https://github.com/viccuad/avian_fdm"
+readme = "README.md"
+keywords = ["bevy", "avian", "fdm", "flight", "simulation"]
+categories = ["game-development", "simulation", "science"]
 
 [features]
 default = ["f32", "debug-plugin"]
