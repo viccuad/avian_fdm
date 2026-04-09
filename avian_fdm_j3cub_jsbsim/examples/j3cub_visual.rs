@@ -74,6 +74,7 @@ fn main() {
                 orbit_camera,
                 toggle_colliders,
                 update_hud,
+                update_controls_overlay,
                 debug_print_rotation,
             ),
         )
@@ -87,6 +88,9 @@ struct TrackingCamera;
 
 #[derive(Component)]
 struct HudText;
+
+#[derive(Component)]
+struct ControlsOverlay;
 
 // ── Orbit camera resource ─────────────────────────────────────────────────────
 
@@ -164,6 +168,23 @@ fn spawn_scene(mut commands: Commands) {
             ..default()
         },
         HudText,
+    ));
+
+    // ── Controls overlay (bottom-right corner) ────────────────────────────────
+    commands.spawn((
+        Text::new(""),
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(12.0),
+            right: Val::Px(12.0),
+            ..default()
+        },
+        ControlsOverlay,
     ));
 }
 
@@ -411,6 +432,31 @@ fn update_hud(
         nx = net.x,
         ny = net.y,
         nz = net.z,
+    );
+}
+
+/// Updates the controls overlay in the bottom-right corner with axis percentages.
+///
+/// Elevator and aileron use a ±100 % scale (signed).
+/// Rudder uses ±100 % (signed). Throttle uses 0–100 % (unsigned).
+fn update_controls_overlay(
+    aircraft: Query<&ControlInputs, With<AircraftGeometry>>,
+    mut overlay: Query<&mut Text, With<ControlsOverlay>>,
+) {
+    let Ok(ctrl) = aircraft.single() else { return };
+    let Ok(mut text) = overlay.single_mut() else {
+        return;
+    };
+
+    text.0 = format!(
+        "Elevator  {elv:+.0}%\n\
+         Aileron   {ail:+.0}%\n\
+         Rudder    {rud:+.0}%\n\
+         Throttle   {thr:.0}%",
+        elv = ctrl.elevator * 100.0,
+        ail = ctrl.aileron * 100.0,
+        rud = ctrl.rudder * 100.0,
+        thr = ctrl.throttle * 100.0,
     );
 }
 
