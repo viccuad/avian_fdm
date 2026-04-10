@@ -590,7 +590,7 @@ fn j3cub_inertia_comparison() {
         &ComputedCenterOfMass,
     )>();
 
-    for (mass, inertia, com) in query.iter(&world) {
+    for (mass, inertia, com) in query.iter(world) {
         found = true;
         let m = mass.value() as f64;
         let (principal, local_frame) = inertia.principal_angular_inertia_with_local_frame();
@@ -600,15 +600,15 @@ fn j3cub_inertia_comparison() {
         let r = bevy::math::Mat3::from_quat(local_frame);
         let p = [principal.x as f64, principal.y as f64, principal.z as f64];
         let mut ib = [[0.0f64; 3]; 3];
-        for i in 0..3 {
-            for j in 0..3 {
-                for k in 0..3 {
+        (0..3).for_each(|i| {
+            (0..3).for_each(|j| {
+                (0..3).for_each(|k| {
                     let ri = [r.x_axis[i] as f64, r.y_axis[i] as f64, r.z_axis[i] as f64];
                     let rj = [r.x_axis[j] as f64, r.y_axis[j] as f64, r.z_axis[j] as f64];
                     ib[i][j] += ri[k] * p[k] * rj[k];
-                }
-            }
-        }
+                });
+            });
+        });
         let ixx = ib[0][0];
         let iyy = ib[1][1];
         let izz = ib[2][2];
@@ -734,11 +734,7 @@ fn j3cub_emergent_cmq() {
     let read_torque = |app: &mut App| -> Vec3 {
         let world = app.world_mut();
         let mut query = world.query::<&ConstantTorque>();
-        query
-            .iter(&world)
-            .next()
-            .expect("no ConstantTorque found")
-            .0
+        query.iter(world).next().expect("no ConstantTorque found").0
     };
 
     let t_base = read_torque(&mut baseline);
