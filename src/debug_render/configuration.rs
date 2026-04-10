@@ -168,15 +168,10 @@ impl FdmGizmos {
 /// [`AeroZone`]: crate::components::AeroZone
 #[derive(Component, Reflect, Clone, Copy, PartialEq)]
 #[reflect(Component, PartialEq)]
+#[derive(Default)]
 pub struct FdmDebugRender {
     /// Wireframe colour for this zone's collider. `None` = use global [`FdmGizmos::zone_color`].
     pub zone_color: Option<Color>,
-}
-
-impl Default for FdmDebugRender {
-    fn default() -> Self {
-        Self { zone_color: None }
-    }
 }
 
 impl FdmDebugRender {
