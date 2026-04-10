@@ -5,6 +5,92 @@ use avian3d::math::Scalar;
 use avian3d::prelude::{AngularVelocity, ConstantForce, ConstantTorque, LinearVelocity, RigidBody};
 use serde::{Deserialize, Serialize};
 
+/// Core bundle. Spawn on the aircraft root entity.
+///
+/// Mass, centre of gravity, and inertia are computed automatically by Avian
+/// from child colliders' [`avian3d::prelude::ColliderDensity`] values.
+///
+/// Aerodynamic forces are accumulated each frame into the included
+/// [`ConstantForce`] and [`ConstantTorque`] components, which Avian then
+/// applies natively via `ForceSystems::ApplyConstantForces`.
+///
+/// [`LinearVelocity`] and [`AngularVelocity`] are present on a RigidBody::Dynamic
+/// and included with zero defaults. Override them after spawning to set an
+/// initial velocity.
+///
+/// # Collision filtering
+///
+/// Zone colliders are real physics colliders and will interact with terrain or
+/// other objects in the scene by default. For aerodynamics-only simulation
+/// (no collision response), use [`avian3d::prelude::CollisionLayers`] on each
+/// zone child entity to prevent contact with world geometry. Do not use
+/// [`avian3d::prelude::Sensor`] - it excludes the collider from mass computation.
+///
+/// # Optional components (add to the same entity after spawning)
+///
+/// - [`InducedDrag`], add for conventional lifting aircraft (most fixed-wing).
+///   Omit for gliders with polar-based CDs, missiles, or LOD AI.
+/// - [`LodDamping`], add only for sparse-zone aircraft where zone geometry
+///   cannot produce realistic roll/pitch/yaw damping.
+///
+/// # Example
+/// ```rust,no_run
+/// # use avian_fdm::components::*;
+/// # use bevy::prelude::*;
+/// // Full-fidelity aircraft with induced drag, zone-based damping:
+/// // commands.spawn((
+/// //     AircraftCoreBundle { geometry: AircraftGeometry { wing_area_m2: 16.2, wing_span_m: 10.6, chord_m: 1.53 }, ..default() },
+/// //     InducedDrag { oswald_factor: 0.85 },
+/// // ));
+/// ```
+#[derive(Bundle, Default)]
+pub struct AircraftCoreBundle {
+    /// Wing/tail geometry constants.
+    pub geometry: AircraftGeometry,
+    /// Control surface inputs, write each frame from your input system.
+    pub controls: crate::components::ControlInputs,
+    /// Derived flight-state quantities (written by the library).
+    pub flight_state: crate::components::FlightState,
+    /// ISA atmosphere at this entity's altitude (written by the library).
+    pub atmosphere: crate::components::AtmosphereState,
+    /// Avian rigid body type. Must be `RigidBody::Dynamic`.
+    pub rigid_body: RigidBody,
+    /// Accumulated aerodynamic + propulsive force (written by the library each
+    /// frame). Avian applies this natively via `ForceSystems::ApplyConstantForces`.
+    pub constant_force: ConstantForce,
+    /// Accumulated aerodynamic + propulsive torque (written by the library each
+    /// frame). Avian applies this natively via `ForceSystems::ApplyConstantForces`.
+    pub constant_torque: ConstantTorque,
+    /// Linear velocity in world space. Required by `update_flight_state`.
+    /// Set a non-zero value after spawning to start with an initial airspeed.
+    pub linear_velocity: LinearVelocity,
+    /// Angular velocity in world space. Required by `update_flight_state`.
+    pub angular_velocity: AngularVelocity,
+    /// World-space transform.
+    pub transform: Transform,
+    /// Required by Bevy for transform propagation.
+    pub global_transform: GlobalTransform,
+}
+
+/// Wing and tail geometry constants used for converting forces to
+/// dimensionless coefficients (non-dimensionalisation) and back.
+///
+/// Lives on the **aircraft root entity** as part of [`AircraftCoreBundle`].
+///
+/// Optional components (add separately to the root entity as needed):
+/// - [`LodDamping`]: explicit damping for sparse-zone aircraft.
+/// - [`InducedDrag`]: lift-induced drag for conventional aircraft.
+#[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
+#[reflect(Component, Serialize, Deserialize)]
+pub struct AircraftGeometry {
+    /// Reference wing area S (m²).
+    pub wing_area_m2: Scalar,
+    /// Wing span b (m). Used to non-dimensionalise rolling/yawing moments.
+    pub wing_span_m: Scalar,
+    /// Mean aerodynamic chord c̄ (m). Used to non-dimensionalise pitching moment.
+    pub chord_m: Scalar,
+}
+
 /// Whole-aircraft angular-rate damping derivatives (LOD = Level of Detail
 /// fallback).
 ///
@@ -13,9 +99,9 @@ use serde::{Deserialize, Serialize};
 /// when the zone layout is too sparse to produce realistic damping from
 /// geometry alone (e.g. single-zone missiles, low-fidelity aircraft).
 ///
-/// **Mutually exclusive with per-zone local α/β**, when this component is
+/// **Mutually exclusive with per-zone local alpha/beta**, when this component is
 /// present, `compute_aero_forces`
-/// evaluates all zones at the global α/β (no rate corrections) and uses these
+/// evaluates all zones at the global alpha/beta (no rate corrections) and uses these
 /// derivatives as the sole source of angular damping.  When absent, per-zone
 /// local angles run and damping emerges naturally from zone geometry.
 ///
@@ -89,90 +175,4 @@ pub struct InducedDrag {
     /// account for real-world losses from wing shape and fuselage
     /// interference.
     pub oswald_factor: Scalar,
-}
-
-/// Wing and tail geometry constants used for converting forces to
-/// dimensionless coefficients (non-dimensionalisation) and back.
-///
-/// Lives on the **aircraft root entity** as part of [`AircraftCoreBundle`].
-///
-/// Optional components (add separately to the root entity as needed):
-/// - [`LodDamping`]: explicit damping for sparse-zone aircraft.
-/// - [`InducedDrag`]: lift-induced drag for conventional aircraft.
-#[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
-#[reflect(Component, Serialize, Deserialize)]
-pub struct AircraftGeometry {
-    /// Reference wing area S (m²).
-    pub wing_area_m2: Scalar,
-    /// Wing span b (m). Used to non-dimensionalise rolling/yawing moments.
-    pub wing_span_m: Scalar,
-    /// Mean aerodynamic chord c̄ (m). Used to non-dimensionalise pitching moment.
-    pub chord_m: Scalar,
-}
-
-/// Core bundle. Spawn on the aircraft root entity.
-///
-/// Mass, centre of gravity, and inertia are computed automatically by Avian
-/// from child colliders' [`avian3d::prelude::ColliderDensity`] values.
-///
-/// Aerodynamic forces are accumulated each frame into the included
-/// [`ConstantForce`] and [`ConstantTorque`] components, which Avian then
-/// applies natively via `ForceSystems::ApplyConstantForces`.
-///
-/// [`LinearVelocity`] and [`AngularVelocity`] are present on a RigidBody::Dynamic
-/// and included with zero defaults. Override them after spawning to set an
-/// initial velocity.
-///
-/// # Collision filtering
-///
-/// Zone colliders are real physics colliders and will interact with terrain or
-/// other objects in the scene by default. For aerodynamics-only simulation
-/// (no collision response), use [`avian3d::prelude::CollisionLayers`] on each
-/// zone child entity to prevent contact with world geometry. Do not use
-/// [`avian3d::prelude::Sensor`] - it excludes the collider from mass computation.
-///
-/// # Optional components (add to the same entity after spawning)
-///
-/// - [`InducedDrag`], add for conventional lifting aircraft (most fixed-wing).
-///   Omit for gliders with polar-based CDs, missiles, or LOD AI.
-/// - [`LodDamping`], add only for sparse-zone aircraft where zone geometry
-///   cannot produce realistic roll/pitch/yaw damping.
-///
-/// # Example
-/// ```rust,no_run
-/// # use avian_fdm::components::*;
-/// # use bevy::prelude::*;
-/// // Full-fidelity aircraft with induced drag, zone-based damping:
-/// // commands.spawn((
-/// //     AircraftCoreBundle { geometry: AircraftGeometry { wing_area_m2: 16.2, wing_span_m: 10.6, chord_m: 1.53 }, ..default() },
-/// //     InducedDrag { oswald_factor: 0.85 },
-/// // ));
-/// ```
-#[derive(Bundle, Default)]
-pub struct AircraftCoreBundle {
-    /// Wing/tail geometry constants.
-    pub geometry: AircraftGeometry,
-    /// Control surface inputs, write each frame from your input system.
-    pub controls: crate::components::ControlInputs,
-    /// Derived flight-state quantities (written by the library).
-    pub flight_state: crate::components::FlightState,
-    /// ISA atmosphere at this entity's altitude (written by the library).
-    pub atmosphere: crate::components::AtmosphereState,
-    /// Avian rigid body type. Must be `RigidBody::Dynamic`.
-    pub rigid_body: RigidBody,
-    /// Accumulated aerodynamic + propulsive force (written by the library each
-    /// frame). Avian applies this natively via `ForceSystems::ApplyConstantForces`.
-    pub constant_force: ConstantForce,
-    /// Accumulated aerodynamic + propulsive torque (written by the library each
-    /// frame). Avian applies this natively via `ForceSystems::ApplyConstantForces`.
-    pub constant_torque: ConstantTorque,
-    /// Linear velocity in world space. Required by `update_flight_state`.
-    /// Set a non-zero value after spawning to start with an initial airspeed.
-    pub linear_velocity: LinearVelocity,
-    /// Angular velocity in world space. Required by `update_flight_state`.
-    pub angular_velocity: AngularVelocity,
-    /// World-space transform.
-    pub transform: Transform,
-    /// Required by Bevy for transform propagation.
-    pub global_transform: GlobalTransform,
 }

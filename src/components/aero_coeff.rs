@@ -8,24 +8,24 @@
 //!
 //! An aerodynamic coefficient (e.g: CL, CD) can be stored as a constant, a 1-D
 //! table over angle of attack, or a 2-D table over angle of attack and Reynolds
-//! number. The 2-D form is the most accurate and matches JSBSim's default
-//! representation.
+//! number.
 //!
 //! ## Stability derivatives
 //!
 //! Real aerodynamic coefficients are nonlinear functions of many variables.
 //! The *stability derivative method* approximates them as a Taylor expansion
-//! around a trim condition. **Lift coefficient = baseline value + lift slope ×
-//! angle-of-attack + pitch-rate correction term. See: stability
-//! derivatives, aerodynamic Taylor series.**
+//! around a trim condition.
+//! See: stability derivatives, aerodynamic Taylor series.
+
+//! **Lift coefficient = baseline value + lift slope ×
+//! angle-of-attack + pitch-rate correction term.
 //!
+//! ```text
+//! CL(alpha, Re) ≈ CL₀ + CL_alpha * alpha + CL_q * (q & c̄/2V) + …
+//! ```
 //! For a high-fidelity simulation, pre-computed tables of CL vs alpha
 //! (at several Re valyues) are more accurate than linear approximations,
 //! especially near stall (the flight regime where the wing abruptly loses lift).
-//!
-//! ```text
-//! CL(α, Re) ≈ CL₀ + CL_α * α + CL_q * (q & c̄/2V) + …
-//! ```
 //!
 //! ## Table storage layout
 //!
@@ -96,7 +96,7 @@ pub enum AeroCoeff {
 
     /// 1-D lookup table: coefficient as a function of angle of attack (rad).
     ///
-    /// `breakpoints` and `values` must have the same length (≥ 1).
+    /// `breakpoints` and `values` must have the same length (>= 1).
     /// `breakpoints` must be strictly increasing.
     Table1D {
         /// Angle-of-attack breakpoints in radians, strictly increasing.
@@ -105,12 +105,10 @@ pub enum AeroCoeff {
         values: Vec<S>,
     },
 
-    /// 2-D lookup table: coefficient as a function of angle of attack × Reynolds number.
+    /// 2-D lookup table: coefficient as a function of angle of attack x Reynolds number.
     ///
     /// Stored row-major: `data[i * cols.len() + j]` is the value at
     /// `rows[i]` (alpha) and `cols[j]` (Re).
-    ///
-    /// Matches JSBSim's default table representation.
     Table2D {
         /// Angle-of-attack breakpoints (rows), in radians, strictly increasing.
         rows: Vec<S>,
@@ -143,7 +141,9 @@ impl AeroCoeff {
         matches!(self, AeroCoeff::Placeholder)
     }
 
-    // ── Post-stall extension (Viterna-Corrigan) ─────────────────────────
+    //
+    // Post-stall extension (Viterna-Corrigan)
+    //
 
     /// Extend a lift-type coefficient (CL or CY) to +/-180 deg using the
     /// Viterna-Corrigan post-stall model.
@@ -363,8 +363,8 @@ impl AeroCoeff {
     /// Evaluate the coefficient at the given primary angle (rad) and Reynolds number.
     ///
     /// The primary angle is the first table axis:
-    /// - For CL, CD, CM, Croll, Cn: pass the local angle of attack `α_local`.
-    /// - For CY (side force): pass the local sideslip angle `β_local`.
+    /// - For CL, CD, CM, Croll, Cn: pass the local angle of attack `alpha_local`.
+    /// - For CY (side force): pass the local sideslip angle `beta_local`.
     ///
     /// - [`AeroCoeff::Absent`]: returns `0.0` silently (not applicable by design).
     /// - [`AeroCoeff::Placeholder`]: emits `warn_once!` and returns `0.0`.
@@ -494,7 +494,8 @@ fn bilerp(angle_rad: S, re: S, rows: &[S], cols: &[S], data: &[S]) -> S {
     v0 + ta * (v1 - v0) // interpolate along angle
 }
 
-// ── Viterna-Corrigan post-stall extension ──────────────────────────────────
+//
+// Viterna-Corrigan post-stall extension
 //
 // Reference: Viterna, L.A. & Corrigan, R.D. (1982), "Fixed Pitch Rotor
 // Performance of Large Horizontal Axis Wind Turbines", NASA CP-2230.
@@ -910,7 +911,9 @@ mod tests {
         );
     }
 
-    // ── Placeholder variant ───────────────────────────────────────────────────
+    //
+    // Placeholder variant
+    //
 
     #[test]
     fn placeholder_evaluates_to_zero() {
@@ -943,7 +946,9 @@ mod tests {
         assert!(AeroCoeff::default().is_placeholder());
     }
 
-    // ── Absent variant ────────────────────────────────────────────────────────
+    //
+    // Absent variant
+    //
 
     #[test]
     fn absent_evaluates_to_zero_silently() {
@@ -966,7 +971,9 @@ mod tests {
         assert!(!AeroCoeff::Scalar(0.0).is_absent());
     }
 
-    // ── validate() tests ────────────────────────────────────────────────
+    //
+    // validate() tests
+    //
 
     #[test]
     fn validate_absent_ok() {
@@ -1089,7 +1096,7 @@ mod tests {
             .any(|s| s.contains("cols") && s.contains("strictly increasing")));
     }
 
-    // ── Post-stall extension tests ────────────────────────────────────────
+    // Post-stall extension tests
 
     #[test]
     fn post_stall_lift_preserves_original_data() {

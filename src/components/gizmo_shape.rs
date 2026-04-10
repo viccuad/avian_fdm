@@ -17,7 +17,7 @@
 //! | Round instead of box  | Wheel             | `Sphere`           |
 //!
 //! Aerodynamic surfaces (wings, h-stab, ailerons, elevator) use thin colliders
-//! (≈ 2 cm) whose cuboid outline naturally looks like a flat panel, they need
+//! (~ 2 cm) whose cuboid outline naturally looks like a flat panel, they need
 //! no `GizmoShape` at all.
 //!
 //! ## Contour detail

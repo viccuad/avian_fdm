@@ -44,7 +44,7 @@
 //! bevy               = { version = "0.18" }
 //! ```
 //!
-//! Spawn the reference J-3 Cub aircraft:
+//! Spawn the reference J-3 Cub aircraft from `avian_fdm_j3cub_jsbsim`:
 //!
 //! ```rust,ignore
 //! use avian_fdm::prelude::*;
@@ -81,7 +81,7 @@
 //! ## What is a Flight Dynamics Model?
 //!
 //! A **Flight Dynamics Model** (FDM) computes all forces and moments acting on
-//! an aircraft each instant, given its state (position, velocity, attitude,
+//! an aircraft at each instant, given its state (position, velocity, attitude,
 //! angular rate) and the pilot's control inputs. The output feeds a rigid-body
 //! integrator that advances the state forward in time. `avian_fdm` is the FDM;
 //! [Avian] is the integrator.
@@ -96,7 +96,7 @@
 //! - Failure degradation (performance loss with damage)
 //! - 6-DoF integration (via Avian)
 //!
-//! **Out of scope** (or game's responsibility):
+//! **Out of scope** (future, or game's responsibility):
 //! - Ground contact and landing gear forces
 //! - Structural elasticity / aeroelasticity
 //! - Compressibility effects (transonic / supersonic)
@@ -108,16 +108,12 @@
 //! ### Stability-derivative approach
 //!
 //! `avian_fdm` uses the **small-perturbation stability-derivative method**
-//! (sometimes called the *linear aerodynamic model*). Aerodynamic coefficients
-//! C_L, C_D, C_Y are expressed as tabulated functions of angle of attack alpha
-//! and Reynolds number Re, then multiplied by dynamic pressure q̄  (q-bar) and
-//! reference area S. **Aerodynamic force = coefficient × dynamic pressure × wing area:**
+//! (sometimes called the *linear aerodynamic model*).
 //!
-//! Aerodynamic coefficients (CL, CD, CY) are dimensionless numbers that
+//! Aerodynamic coefficients (C_L, C_D, C_Y) are dimensionless numbers that
 //! describe how much lift, drag, or side-force an airfoil produces. They are
-//! stored as lookup tables indexed by angle of attack and Reynolds number,
-//! then multiplied by dynamic pressure and wing area to obtain forces.
-//! Force = coefficient * dynamic pressure * wing area:
+//! stored as lookup tables indexed by angle of attack and Reynolds number Re,
+//! then multiplied by dynamic pressure q̄  (q-bar) and wing area S to obtain forces.
 //!
 //! ```text
 //! Lift  = C_L(alpha, Re) * q-bar * S
@@ -156,21 +152,14 @@
 //! textbooks (Stevens & Lewis, Etkin & Reid, Nelson).
 //! Zone transforms in the presets are authored in this frame. Example:
 //! a wing zone at `Transform::from_xyz(-0.10, -2.82, -0.58)` is 0.10 m aft of
-//! the CG datum, 2.82 m to port (−Y), and 0.58 m above datum (−Z = up).
+//! the CG datum, 2.82 m to port (-Y), and 0.58 m above datum (-Z = up).
 //! Zone transforms in the presets are authored in this frame.
 //!
 //! ### Stability frame
 //!
-//! The stability frame is the body frame rotated by −α about body Y, aligning
+//! The stability frame is the body frame rotated by -alpha about body Y, aligning
 //! its X axis with the velocity vector. Lift is defined as perpendicular to the
-//! velocity (−Z_stability), drag as opposing it (−X_stability).
-//! **Force in stability axes, then rotated to body frame, then to world frame:**
-//!
-//! ```text
-//! force_stability = (−C_D · q̄ · S,  C_Y · q̄ · S,  −C_L · q̄ · S)
-//! force_body      = R_y(−α) · force_stability
-//! force_world     = q_root  · force_body
-//! ```
+//! velocity (-Z_stability), drag as opposing it (-X_stability).
 //!
 //! See the `aerodynamics` module for the full derivation.
 //!
@@ -178,7 +167,17 @@
 //!
 //! Bevy uses a Y-up, right-handed world frame. The aircraft must be spawned
 //! with a rotation that aligns body X (forward) to world X and body Z (down) to
-//! world −Y. `Quat::from_rotation_x(FRAC_PI_2)` achieves this.
+//! world -Y. `Quat::from_rotation_x(FRAC_PI_2)` achieves this.
+//!
+//! ### Result
+//!
+//! **Force in stability axes, then rotated to body frame, then to world frame:**
+//!
+//! ```text
+//! force_stability = (-C_D · q̄ · S,  C_Y · q̄ · S,  -C_L · q̄ · S)
+//! force_body      = R_y(-alpha) · force_stability
+//! force_world     = q_root  · force_body
+//! ```
 //!
 //! All internal computation uses avian3d's native precision (`Scalar`),
 //! which is `f32` or `f64` depending on the active feature flag.
@@ -192,7 +191,7 @@
 //!
 //! ### Translational dynamics
 //!
-//! Net force = mass * acceleration (Newton's second law):
+//! **Net force = mass * acceleration** (Newton's second law):
 //!
 //! ```text
 //! F_net = m * (dV/dt)
@@ -243,20 +242,20 @@
 //! See the `atmosphere` module for the full implementation.
 //!
 //! Every aerodynamic force scales with dynamic pressure, which is the
-//! kinetic energy of the airflow per unit volume. Dynamic pressure =
-//! half * air density * airspeed squared:
+//! kinetic energy of the airflow per unit volume.
+//! **Dynamic pressure = half * air density * airspeed squared**:
 //!
 //! ```text
 //! q-bar = 0.5 * rho * V^2
 //! ```
 //!
-//! At sea level, rho = 1.225 kg/m^3. At 2 500 m it drops about 20%, directly
+//! At sea level, rho = 1.225 kg/m^3. At 2500 m it drops about 20%, directly
 //! cutting lift and drag by 20% at the same airspeed. An aircraft must fly
 //! faster at altitude to generate the same lift.
 //!
 //! Dynamic pressure also controls Reynolds number.
-//! **Reynolds number = (density × speed × chord) ÷ viscosity, a dimensionless ratio
-//! of inertial to viscous forces that determines whether airflow is smooth or turbulent:**
+//! **Reynolds number = (density × speed × chord) ÷ viscosity**, a dimensionless ratio
+//! of inertial to viscous forces that determines whether airflow is smooth or turbulent:
 //!
 //! ```text
 //! Re = ρ · V · c̄  / μ
@@ -264,7 +263,7 @@
 //!
 //! where c̄  is mean aerodynamic chord and μ is dynamic viscosity. Reynolds
 //! number governs boundary-layer behaviour: at low Re the flow separates
-//! earlier (sharper stall, higher C_D₀), so the FDM uses Re as the second
+//! earlier (sharper stall, higher C_D0), so the FDM uses Re as the second
 //! dimension of its C_L/C_D lookup tables.
 //! The `atmosphere` module implements the International Standard Atmosphere
 //! (ICAO Doc 7488) for 0-20 km. Each frame,
@@ -413,9 +412,9 @@
 //!
 //! **Propulsion torque reaction:**
 //! A rotating propeller or engine imparts angular momentum to the airframe in
-//! the opposite direction. Model this by adding a pure torque on the engine
-//! zone in the axis opposite to prop rotation. The moment propagates to the
-//! root via Avian's constraint solver.
+//! the opposite direction. We will model this in the future by adding a pure
+//! torque on the engine zone in the axis oppositek to prop rotation. The moment
+//! propagates to the root via Avian's constraint solver.
 //!
 //! ### Aerodynamic configuration effects
 //!
@@ -489,7 +488,7 @@
 //! - **Clr and Cnp fully:** The angle-only correction captures part of these.
 //!   The dominant term is the differential dynamic pressure (V +/- r*y)^2
 //!   per zone. Planned: extend `zone_local_angles` to also scale each zone's
-//!   local qbar. With that change, Clr and Cnp would be fully emergent and
+//!   local q-bar. With that change, Clr and Cnp would be fully emergent and
 //!   automatically damage-aware.
 //!
 //! - **Cm_alphadot:** Requires tracking the lag between wing downwash and tail

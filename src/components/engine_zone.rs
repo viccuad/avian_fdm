@@ -35,7 +35,7 @@ pub struct EngineZone {
     /// - At V = V_zero: factor = 0.0 (propeller windmilling)
     ///
     /// `None` disables speed dependence (constant-thrust model).
-    /// Typical values for light GA: 70–90 m/s (J3 Cub ≈ 80 m/s).
+    /// Typical values for light GA: 70–90 m/s (J3 Cub ~ 80 m/s).
     pub zero_thrust_speed_ms: Option<Scalar>,
 }
 

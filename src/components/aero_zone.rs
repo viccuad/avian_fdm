@@ -14,27 +14,18 @@ use serde::{Deserialize, Serialize};
 /// at the current flight state, and accumulates force and torque onto the
 /// nearest `RigidBody` ancestor.
 ///
+/// Lives on each **AeroZone child entity** (child of the aircraft root).
+///
+/// Failure state is tracked separately via [`super::Failure`].
+///
+/// All fields are [`AeroCoeff`].
+///
 /// ## Aerodynamic centre offset
 ///
 /// The aerodynamic centre is the point on a wing section where the pitching
 /// moment does not change with angle of attack. By default, forces are applied
 /// at the zone entity's origin. Set [`ac_offset`](Self::ac_offset) to shift
 /// the force application point relative to the entity origin.
-///
-/// Failure state is tracked separately via [`super::Failure`].
-///
-/// ## Coefficient presence semantics
-///
-/// All fields are [`AeroCoeff`]. Three variants carry distinct meaning:
-///
-/// | Value | Meaning | Runtime |
-/// |---|---|---|
-/// | `Absent` (default for `cy/cm/croll/cn`) | Not applicable by design: symmetric section, no contribution | Silent 0.0 |
-/// | `Placeholder` (default for `cl/cd`) | Should exist but not yet modelled | `warn_once!` + 0.0 |
-/// | `Scalar(0.0)` with [`crate::sourced!`] | Explicitly zero | Silent 0.0 |
-/// | `Table1D` / `Table2D` | Fully modelled | Interpolated value |
-///
-/// Lives on each **AeroZone child entity** (child of the aircraft root).
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct AeroZone {

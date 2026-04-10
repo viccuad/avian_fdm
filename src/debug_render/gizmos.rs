@@ -304,7 +304,7 @@ fn zone_type_color(aero: Option<&AeroZone>) -> Color {
     }
 }
 
-/// Blend `color` toward grey proportional to damage (`remaining` 0 → 1).
+/// Blend `color` toward grey proportional to damage (`remaining` 0 -> 1).
 ///
 /// At `remaining = 1.0` the color is unchanged. At `remaining = 0.0` the
 /// result is fully grey (`srgba(0.55, 0.55, 0.55, 0.6)`).
