@@ -2,7 +2,6 @@
 
 use crate::_bevy::*;
 use crate::components::aero_coeff::AeroCoeff;
-use crate::components::zone_force::ZoneForce;
 use avian3d::math::Scalar;
 use avian3d::prelude::Collider;
 use serde::{Deserialize, Serialize};
@@ -26,8 +25,13 @@ use serde::{Deserialize, Serialize};
 /// moment does not change with angle of attack. By default, forces are applied
 /// at the zone entity's origin. Set [`ac_offset`](Self::ac_offset) to shift
 /// the force application point relative to the entity origin.
+///
+/// ## Required components
+///
+/// - [`ZoneForce`]: written by the FDM each frame; treat as read-only.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
+#[require(crate::components::zone_force::ZoneForce)]
 pub struct AeroZone {
     /// Partial contribution to CL (lift coefficient).
     ///
@@ -214,8 +218,6 @@ pub enum ControlSurfaceRole {
 pub struct AeroZoneBundle {
     /// Aerodynamic coefficients and control role.
     pub zone: AeroZone,
-    /// Per-frame force output (written by FDM, read by accumulation system).
-    pub zone_force: ZoneForce,
     /// Avian collider defining this zone's shape and volume.
     ///
     /// Used by Avian to compute the zone's mass contribution (via

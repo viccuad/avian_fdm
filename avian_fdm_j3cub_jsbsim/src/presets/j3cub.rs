@@ -118,7 +118,7 @@ use bevy_transform::prelude::*;
 
 use avian_fdm::components::{
     AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry, ControlSurfaceRole,
-    EngineZone, GizmoContours, InducedDrag, ZoneForce,
+    EngineZone, GizmoContours, InducedDrag,
 };
 use avian_fdm::sourced;
 
@@ -560,7 +560,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         cd: AeroCoeff::Scalar(0.0),
                         ..Default::default()
                     },
-                    zone_force: ZoneForce::default(),
                     collider: Collider::cuboid(1.33, 0.60, 0.70),
                     transform: Transform::from_xyz(-0.47, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
@@ -580,7 +579,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         cd: AeroCoeff::Scalar(0.0),
                         ..Default::default()
                     },
-                    zone_force: ZoneForce::default(),
                     collider: Collider::cuboid(2.05, 0.40, 0.35),
                     transform: Transform::from_xyz(-1.82, 0.0, 0.0),
                     global_transform: GlobalTransform::default(),
@@ -599,7 +597,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         cd: AeroCoeff::Scalar(0.0),
                         ..Default::default()
                     },
-                    zone_force: ZoneForce::default(),
                     collider: Collider::cuboid(1.20, 0.68, 0.50),
                     transform: Transform::from_xyz(0.20, 0.0, -0.60),
                     global_transform: GlobalTransform::default(),
@@ -639,7 +636,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                             cd: AeroCoeff::Scalar(0.0),
                             ..Default::default()
                         },
-                        zone_force: ZoneForce::default(),
                         collider: Collider::cuboid(length as Scalar, 0.04, 0.04),
                         transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
@@ -669,7 +665,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                             area_m2: GEAR_LEG_AREA_M2,
                             ..Default::default()
                         },
-                        zone_force: ZoneForce::default(),
                         collider: Collider::cuboid(length as Scalar, 0.04, 0.04),
                         transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
@@ -692,7 +687,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                             area_m2: WHEEL_AREA_M2,
                             ..Default::default()
                         },
-                        zone_force: ZoneForce::default(),
                         collider: Collider::cuboid(0.30, 0.10, 0.30),
                         transform: Transform::from_xyz(0.50, 0.55 * sign, 0.90),
                         global_transform: GlobalTransform::default(),
@@ -711,7 +705,6 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                         cd: AeroCoeff::Scalar(0.0),
                         ..Default::default()
                     },
-                    zone_force: ZoneForce::default(),
                     collider: Collider::cuboid(0.12, 0.06, 0.12),
                     transform: Transform::from_xyz(-3.60, 0.0, 0.15),
                     global_transform: GlobalTransform::default(),
@@ -851,7 +844,6 @@ pub fn wing_zone(
                 ..Default::default()
             }
             .with_post_stall_extension(),
-            zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(x_m as f32, y_m as f32, z_m as f32)
                 .with_rotation(dihedral_rot),
@@ -890,7 +882,6 @@ pub fn aileron_zone(
                 chord_m: CHORD_M,
                 ..Default::default()
             },
-            zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(aileron_x, y_m as f32, z_m as f32)
                 .with_rotation(dihedral_rot),
@@ -915,7 +906,6 @@ pub fn fuselage_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
                 cd: AeroCoeff::Scalar(0.0),
                 ..Default::default()
             },
-            zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(-0.45, 0.0, 0.0),
             global_transform: GlobalTransform::default(),
@@ -955,7 +945,6 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                 ..Default::default()
             }
             .with_post_stall_extension(),
-            zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(-(H_TAIL_ARM_M as f32), 0.0, -0.10),
             global_transform: GlobalTransform::default(),
@@ -986,7 +975,6 @@ pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
                 chord_m: ELEVATOR_CHORD_M,
                 ..Default::default()
             },
-            zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(elevator_center_x as f32, 0.0, -0.10),
             global_transform: GlobalTransform::default(),
@@ -1029,7 +1017,6 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                 ..Default::default()
             }
             .with_post_stall_extension(),
-            zone_force: ZoneForce::default(),
             collider,
             transform: Transform::from_xyz(-(VFIN_ARM_M as f32), 0.0, -0.60),
             global_transform: GlobalTransform::default(),
@@ -1058,7 +1045,6 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
                 chord_m: RUDDER_MEAN_CHORD_M,
                 ..Default::default()
             },
-            zone_force: ZoneForce::default(),
             collider,
             // Rudder LE is at the fin TE. Fin center at -VFIN_ARM_M, fin extends
             // VFIN_MEAN_CHORD_M/2 aft, so rudder LE = -(VFIN_ARM_M + VFIN_MEAN_CHORD_M/2).
@@ -1096,7 +1082,6 @@ pub fn engine_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
             // J_zero ≈ 1.1 at 22° pitch: V_zero = J × n × D ≈ 1.1 × (2300/60) × 1.880 ≈ 79 m/s.
             zero_thrust_speed_ms: Some(sourced!(80.0, "Estimate:J3Cub FlightGear: prop_74in_2f_NACA; J_zero ≈ 1.1 at 22° pitch, maxrpm 2300 -> V = 1.1 × (2300/60) × 1.880 ≈ 79 m/s, rounded to 80")),
         },
-        ZoneForce::default(),
         collider,
         density,
         Transform::from_xyz(1.31, 0.0, 0.04),

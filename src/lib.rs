@@ -806,7 +806,7 @@ pub mod prelude {
     pub use crate::components::{
         aero_coeff::AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
         AtmosphereState, ControlInputs, ControlSurfaceRole, Failure, FlightState, GizmoContours,
-        GizmoShape, ZoneForce,
+        GizmoShape,
     };
     pub use crate::plugin::AircraftFdmPlugin;
     pub use crate::sourced;

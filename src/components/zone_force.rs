@@ -16,7 +16,7 @@ use crate::_bevy::*;
 /// **Do not read or write this component from game code.**
 #[derive(Component, Reflect, Default, Clone, Copy, Debug)]
 #[reflect(Component)]
-pub struct ZoneForce {
+pub(crate) struct ZoneForce {
     /// World-space force contribution (N), from CL, CD, CY coefficients.
     pub force: Vec3,
     /// World-space point at which the force acts (for moment arm calculation).

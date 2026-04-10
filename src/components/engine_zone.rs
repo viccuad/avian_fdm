@@ -15,8 +15,13 @@ use serde::{Deserialize, Serialize};
 /// When absent the engine is treated as fully intact.
 ///
 /// Lives on the **engine child entity**.
+///
+/// ## Required components
+///
+/// - [`ZoneForce`]: written by the FDM each frame; treat as read-only.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
+#[require(crate::components::zone_force::ZoneForce)]
 pub struct EngineZone {
     /// Sea-level static maximum thrust (N).
     pub max_thrust_n: Scalar,

@@ -18,6 +18,6 @@ pub use controls::ControlInputs;
 pub use failure::{get_remaining, Failure};
 pub use flight_state::{AtmosphereState, FlightState, WindResource};
 pub use gizmo_shape::{GizmoContours, GizmoShape};
-pub use zone_force::ZoneForce;
+pub(crate) use zone_force::ZoneForce;
 
 pub use engine_zone::EngineZone;
