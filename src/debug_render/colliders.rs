@@ -58,6 +58,7 @@ pub(super) fn plugin(app: &mut App) {
 /// reflects the current physics state. Uses `avian3d::parry` (re-exported
 /// by avian3d) so no direct parry dependency is needed in calling code.
 #[allow(clippy::unnecessary_cast)]
+#[allow(clippy::type_complexity)]
 pub(super) fn debug_render_colliders(
     mut gizmos: Gizmos<FdmGizmos>,
     root_query: Query<&Transform, With<AircraftGeometry>>,

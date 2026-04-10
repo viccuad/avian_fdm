@@ -242,6 +242,7 @@ pub(super) fn debug_render_moments(
 /// to disable. Per-entity [`FdmDebugRender::zone_color`] overrides the color
 /// (damage tint still applies on top).
 #[allow(clippy::unnecessary_cast)]
+#[allow(clippy::type_complexity)]
 pub(super) fn debug_render_zones(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
