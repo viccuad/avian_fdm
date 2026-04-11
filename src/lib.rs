@@ -38,16 +38,17 @@
 //! Add `avian_fdm` and `avian3d` to `Cargo.toml`:
 //!
 //! ```toml
-//! avian_fdm = { version = "0.1", features = ["presets"] }
-//! avian3d   = { version = "0.6" }
-//! bevy      = { version = "0.18" }
+//! avian_fdm          = { version = "0.1", features = ["f32"] }
+//! avian_fdm_j3cub_jsbsim = { version = "0.1" }
+//! avian3d            = { version = "0.6" }
+//! bevy               = { version = "0.18" }
 //! ```
 //!
 //! Spawn the reference J-3 Cub aircraft:
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use avian_fdm::prelude::*;
-//! use avian_fdm::presets::j3cub;
+//! use avian_fdm_j3cub_jsbsim::presets::j3cub;
 //! use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
 //! use bevy::prelude::*;
 //!
@@ -688,10 +689,13 @@
 //!
 //! ## Feature Flags
 //!
-//! | Feature      | Default | Description |
-//! |--------------|---------|-------------|
-//! | `debug-plugin` | off   | Bevy Gizmo overlays for forces, moments, and zones ([`debug_render`]) |
-//! | `presets`    | off     | Reference aircraft presets ([`presets`], e.g. J-3 Cub) |
+//! | Feature        | Default | Description |
+//! |----------------|---------|-------------|
+//! | `f32`          | off     | Enable avian3d f32 backend and collider shapes. Required unless you provide your own avian3d backend. |
+//! | `debug-plugin` | off     | Bevy Gizmo overlays for forces, moments, and zones ([`debug_render`]) |
+//!
+//! JSBSim-derived reference aircraft (J-3 Cub) are in the separate
+//! `avian_fdm_j3cub_jsbsim` crate (GPL-3.0-only).
 //!
 //! ---
 //!
@@ -795,15 +799,11 @@ pub(crate) mod atmosphere;
 pub mod components;
 pub(crate) mod math;
 pub mod plugin;
-pub mod systems;
-
 pub mod propulsion;
+pub mod systems;
 
 #[cfg(feature = "debug-plugin")]
 pub mod debug_render;
-
-#[cfg(feature = "presets")]
-pub mod presets;
 
 /// Re-exports for convenient glob import: `use avian_fdm::prelude::*;`
 pub mod prelude {

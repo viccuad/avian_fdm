@@ -107,12 +107,15 @@
 //!
 //! All zones are tiled without collider overlap. No double-counted mass.
 
-use crate::_bevy::*;
+use bevy_ecs::prelude::*;
+use bevy_math::prelude::*;
+use bevy_transform::prelude::*;
 use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
 
 use bevy_math::DVec3;
 
-use crate::components::{
+use avian_fdm::sourced;
+use avian_fdm::components::{
     AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
     ControlSurfaceRole, EngineZone, GizmoContours, InducedDrag, PropwashState, ZoneForce,
 };
@@ -407,18 +410,18 @@ fn cd_table() -> AeroCoeff {
 ///
 /// Returns the root entity ID. The aircraft root is spawned at `transform`
 /// (typically over the runway at some altitude). Add your own input system that
-/// writes to [`crate::components::ControlInputs`] on the root entity.
+/// writes to [`avian_fdm::components::ControlInputs`] on the root entity.
 ///
 /// # Example
 /// ```rust,no_run
 /// # use bevy::prelude::*;
-/// # use avian_fdm::presets::j3cub;
+/// # use avian_fdm_j3cub_jsbsim::presets::j3cub;
 /// fn startup(mut commands: Commands) {
 ///     j3cub::spawn(&mut commands, Transform::from_xyz(0.0, 300.0, 0.0));
 /// }
 /// ```
 pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
-    use crate::components::GizmoShape;
+    use avian_fdm::components::GizmoShape;
 
     let root = commands
         .spawn((
@@ -741,7 +744,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
 /// Mass, CoG, and inertia are computed by Avian from child zone colliders.
 ///
 /// Pair with [`InducedDrag`] (already included by [`spawn`]) for lift-induced
-/// drag.  No [`LodDamping`](crate::components::LodDamping). Roll/pitch/yaw
+/// drag.  No [`LodDamping`](avian_fdm::components::LodDamping). Roll/pitch/yaw
 /// damping emerges from per-zone local α/β physics.
 pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
     (

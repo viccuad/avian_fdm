@@ -14,7 +14,7 @@
 //! demonstrating pitch stability from the horizontal stabiliser.
 
 use avian_fdm::prelude::*;
-use avian_fdm::presets::j3cub;
+use avian_fdm_j3cub_jsbsim::presets::j3cub;
 use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
 use bevy::ecs::message::MessageWriter;
 use bevy::prelude::*;

@@ -391,6 +391,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "avian_fdm_j3cub_jsbsim"
+version = "0.1.0"
+dependencies = [
+ "avian3d",
+ "avian_fdm",
+ "bevy",
+ "bevy_ecs",
+ "bevy_math",
+ "bevy_transform",
+]
+
+[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -31,7 +31,7 @@
 
 use avian3d::prelude::{AngularVelocity, LinearVelocity, PhysicsPlugins, Rotation};
 use avian_fdm::prelude::*;
-use avian_fdm::presets::j3cub;
+use avian_fdm_j3cub_jsbsim::presets::j3cub;
 use bevy::input::gamepad::{Gamepad, GamepadAxis};
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::math::Quat;

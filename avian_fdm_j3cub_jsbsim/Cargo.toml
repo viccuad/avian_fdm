@@ -1,0 +1,38 @@
+[package]
+name = "avian_fdm_j3cub_jsbsim"
+version = "0.1.0"
+edition = "2021"
+description = "J3Cub aircraft preset for avian_fdm derived from github.com/wlbragg/J3Cub"
+license = "GPL-3.0-only"
+
+[features]
+debug-plugin = ["avian_fdm/debug-plugin"]
+
+[dependencies]
+avian_fdm = { path = "../", features = ["f32"] }
+avian3d = { version = "0.6", default-features = false, features = [
+    "3d",
+    "f32",
+    "parry-f32",
+    "default-collider",
+] }
+bevy_ecs = { version = "0.18", default-features = false }
+bevy_math = { version = "0.18", default-features = false }
+bevy_transform = { version = "0.18", default-features = false }
+
+[dev-dependencies]
+bevy = { version = "0.18", features = [
+    "bevy_winit",
+    "bevy_pbr",
+    "bevy_gizmos",
+] }
+
+[[example]]
+name = "j3cub_minimal"
+
+[[example]]
+name = "j3cub_visual"
+required-features = ["debug-plugin"]
+
+[[test]]
+name = "jsbsim_comparison"

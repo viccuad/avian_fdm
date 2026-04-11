@@ -36,13 +36,13 @@
 //!     2>/dev/null | grep -E '^[0-9t]' > tests/fixtures/jsbsim_j3cub_glide_60s.csv
 //! ```
 
-#![cfg(feature = "presets")]
+
 
 use std::time::Duration;
 
 use avian3d::prelude::*;
 use avian_fdm::prelude::*;
-use avian_fdm::presets::j3cub;
+use avian_fdm_j3cub_jsbsim::presets::j3cub;
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
 
