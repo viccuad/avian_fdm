@@ -794,3 +794,40 @@ fn plank_cn_r() {
         error * 100.0
     );
 }
+
+/// Verify the Plank holds alpha ≈ 0 over a 10-second simulation.
+///
+/// The Plank has a symmetric airfoil (CL0 = 0) and CG exactly at the wing
+/// aerodynamic centre, so there is zero pitching moment at alpha = 0.  No
+/// perturbation is applied.  Alpha should not drift beyond 0.5 deg due to
+/// numerical asymmetry or integration error.
+#[test]
+fn plank_trim() {
+    fn spawn(mut commands: Commands) {
+        let root = spawn_plank(&mut commands, plank_transform(500.0, 50.0));
+        commands
+            .entity(root)
+            .insert(LinearVelocity(Vec3::new(50.0, 0.0, 0.0)));
+    }
+
+    // 10 seconds at PHYSICS_DT frames.
+    let n_frames = (10.0 / PHYSICS_DT).round() as u32;
+    let mut app = run_plank_app(n_frames, spawn);
+
+    let world = app.world_mut();
+    let mut q = world.query::<&FlightState>();
+    let fs = q.iter(world).next().expect("no FlightState");
+    let alpha_rad = fs.alpha_rad;
+
+    eprintln!(
+        "Plank trim: alpha after 10s = {:.4} rad ({:.3} deg)",
+        alpha_rad,
+        alpha_rad.to_degrees()
+    );
+
+    assert!(
+        alpha_rad.abs() < 0.5_f32.to_radians(),
+        "Alpha drifted to {:.3} deg (limit 0.5 deg)",
+        alpha_rad.to_degrees()
+    );
+}
