@@ -244,7 +244,7 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
                 transform: Transform::from_xyz(0.0, -2.5, -0.3),
                 ..Default::default()
             },
-            ColliderDensity(WING_PANEL_DENSITY as f32),
+            ColliderDensity(WING_PANEL_DENSITY),
         ));
     });
 
@@ -263,7 +263,7 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
                 transform: Transform::from_xyz(0.0, 2.5, -0.3),
                 ..Default::default()
             },
-            ColliderDensity(WING_PANEL_DENSITY as f32),
+            ColliderDensity(WING_PANEL_DENSITY),
         ));
     });
 
@@ -280,10 +280,10 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
                 }
                 .with_post_stall_extension(),
                 collider: Collider::cuboid(0.5, 1.5, 0.03),
-                transform: Transform::from_xyz(-HSTAB_ARM as f32, 0.0, 0.0),
+                transform: Transform::from_xyz(-HSTAB_ARM, 0.0, 0.0),
                 ..Default::default()
             },
-            ColliderDensity(HSTAB_DENSITY as f32),
+            ColliderDensity(HSTAB_DENSITY),
         ));
     });
 
@@ -303,10 +303,10 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
                 }
                 .with_post_stall_extension(),
                 collider: Collider::cuboid(0.5, 0.03, 0.75),
-                transform: Transform::from_xyz(-VSTAB_ARM as f32, 0.0, -0.75),
+                transform: Transform::from_xyz(-VSTAB_ARM, 0.0, -0.75),
                 ..Default::default()
             },
-            ColliderDensity(VSTAB_DENSITY as f32),
+            ColliderDensity(VSTAB_DENSITY),
         ));
     });
 
@@ -324,7 +324,7 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
                 transform: Transform::from_xyz(0.0, 0.0, 0.0),
                 ..Default::default()
             },
-            ColliderDensity(FUSELAGE_DENSITY as f32),
+            ColliderDensity(FUSELAGE_DENSITY),
         ));
     });
 
@@ -342,7 +342,7 @@ pub fn spawn_plank(commands: &mut Commands, transform: Transform) -> Entity {
                 transform: Transform::from_xyz(2.0, 0.0, 0.0),
                 ..Default::default()
             },
-            ColliderDensity(ENGINE_DENSITY as f32),
+            ColliderDensity(ENGINE_DENSITY),
         ));
     });
 
