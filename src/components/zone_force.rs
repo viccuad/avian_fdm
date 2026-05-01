@@ -1,4 +1,4 @@
-//! [`ZoneForce`], per-zone force output written by the FDM
+//! ZoneForce, per-zone force output written by the FDM
 //! `compute_aero_forces` system (and `compute_engine_zone_forces` for thrust).
 //! Also read by the debug visualisation for per-zone force arrows.
 

@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// ## Required components
 ///
-/// - [`ZoneForce`]: written by the FDM each frame; treat as read-only.
+/// - ZoneForce: written by the FDM each frame; treat as read-only.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
 #[require(crate::components::zone_force::ZoneForce)]
