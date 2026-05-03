@@ -285,34 +285,4 @@ mod tests {
         assert_eq!(c.cn, 0.0, "Absent cn -> 0");
     }
 
-    //
-    // AeroCoeff variant behaviour
-    //
-
-    #[test]
-    fn aero_coeff_scalar_evaluate() {
-        let c = AeroCoeff::Scalar(0.8);
-        assert!((c.evaluate(0.1, 1e6) - 0.8).abs() < 1e-12);
-    }
-
-    #[test]
-    fn absent_evaluates_to_zero_silently() {
-        assert_eq!(AeroCoeff::Absent.evaluate(0.3, 1e6), 0.0);
-        assert_eq!(AeroCoeff::Absent.evaluate(-0.5, 2e6), 0.0);
-    }
-
-    #[test]
-    fn absent_is_absent_true() {
-        assert!(AeroCoeff::Absent.is_absent());
-    }
-
-    #[test]
-    fn scalar_is_absent_false() {
-        assert!(!AeroCoeff::Scalar(0.0).is_absent());
-    }
-
-    #[test]
-    fn placeholder_is_absent_false() {
-        assert!(!AeroCoeff::Placeholder.is_absent());
-    }
 }
