@@ -65,6 +65,10 @@ pub struct AeroZone {
     pub cm: AeroCoeff,
     /// Partial contribution to Cl (rolling-moment coefficient, about b).
     ///
+    /// Named `croll` (not `cl`) to avoid collision with the lift coefficient field `cl` on
+    /// [`AirfoilData`](crate::airfoil::AirfoilData). Standard ICAS/NASA notation uses `Cl`
+    /// for rolling moment; the lowercase spelling here is a field-name disambiguation.
+    ///
     /// Defaults to [`AeroCoeff::Absent`]. Roll is often handled emergently by zone geometry.
     /// Set to [`AeroCoeff::Placeholder`] if this zone should contribute Cl but data is pending.
     pub croll: AeroCoeff,
