@@ -96,7 +96,7 @@ pub fn compute_engine_zone_forces(
 ///
 /// Clamps to the boundary values when `x` is outside the table range.
 pub(crate) fn interp_curve(curve: &[[Scalar; 2]], x: Scalar) -> Scalar {
-    use crate::components::aero_coeff::lerp_1d;
+    use crate::math::lerp_1d;
     if curve.is_empty() {
         return 0.0;
     }

@@ -36,6 +36,7 @@
 //! interpolation.
 
 use crate::_bevy::*;
+use crate::math::lerp_1d;
 use avian3d::math::Scalar as S;
 use serde::{Deserialize, Serialize};
 
@@ -438,20 +439,6 @@ fn clamp_with_warn(v: S, lo: S, hi: S, label: &'static str) -> S {
     } else {
         v
     }
-}
-
-/// Linear interpolation in a 1-D table. `x` must be within `[bp[0], bp[last]]`.
-pub(crate) fn lerp_1d(x: S, bp: &[S], vals: &[S]) -> S {
-    debug_assert_eq!(bp.len(), vals.len());
-    // Degenerate: single-point table, no interval to interpolate.
-    if bp.len() == 1 {
-        return vals[0];
-    }
-    // Find the interval containing x.
-    let idx = bp.partition_point(|&b| b <= x).saturating_sub(1);
-    let idx = idx.min(bp.len() - 2);
-    let t = (x - bp[idx]) / (bp[idx + 1] - bp[idx]);
-    vals[idx] + t * (vals[idx + 1] - vals[idx])
 }
 
 /// Bilinear interpolation in a 2-D flat row-major table.

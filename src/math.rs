@@ -8,6 +8,26 @@
 use avian3d::math::{Quaternion, Scalar, Vector};
 use bevy_math::{Quat, Vec3};
 
+/// Linear interpolation in a 1-D breakpoint table.
+///
+/// `x` is clamped to `[bp[0], bp[last]]` by the caller; this function assumes
+/// `bp` and `vals` are the same length and that `bp` is sorted ascending.
+/// Returns `0.0` for an empty table, and `vals[0]` for a single-entry table.
+#[inline]
+pub(crate) fn lerp_1d(x: Scalar, bp: &[Scalar], vals: &[Scalar]) -> Scalar {
+    debug_assert_eq!(bp.len(), vals.len());
+    if bp.is_empty() {
+        return 0.0 as Scalar;
+    }
+    if bp.len() == 1 {
+        return vals[0];
+    }
+    let idx = bp.partition_point(|&b| b <= x).saturating_sub(1);
+    let idx = idx.min(bp.len() - 2);
+    let t = (x - bp[idx]) / (bp[idx + 1] - bp[idx]);
+    vals[idx] + t * (vals[idx + 1] - vals[idx])
+}
+
 /// Convert a Bevy `Vec3` (always f32) to the active-precision `Vector`.
 #[inline]
 #[allow(clippy::unnecessary_cast)]
