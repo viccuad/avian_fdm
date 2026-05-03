@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// Thrust is applied via `apply_force_at_point` at the engine's world
 /// position. Avian computes the torque contribution automatically.
 ///
-/// Failure state is read from [`super::Failure`] if present on the same entity.
+/// Failure state is read from [`crate::components::Failure`] if present on the same entity.
 /// When absent the engine is treated as fully intact.
 ///
 /// Lives on the **engine child entity**.

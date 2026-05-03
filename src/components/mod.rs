@@ -4,7 +4,6 @@ pub mod aero_coeff;
 pub mod aero_zone;
 pub mod aircraft;
 pub mod controls;
-pub mod engine_zone;
 pub mod failure;
 pub mod flight_state;
 pub mod zone_force;
@@ -18,4 +17,4 @@ pub use flight_state::{AtmosphereState, FlightState, WindResource};
 pub use crate::gizmo_shape::{GizmoContours, GizmoShape};
 pub(crate) use zone_force::ZoneForce;
 
-pub use engine_zone::EngineZone;
+pub use crate::propulsion::EngineZone;

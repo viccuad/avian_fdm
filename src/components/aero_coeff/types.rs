@@ -1,8 +1,8 @@
 //! [`AeroCoeff`] enum and its trivial accessors.
 
+use crate::_bevy::*;
 use avian3d::math::Scalar as S;
 use serde::{Deserialize, Serialize};
-use crate::_bevy::*;
 
 /// An aerodynamic coefficient value: constant, 1-D table, or 2-D table.
 ///
