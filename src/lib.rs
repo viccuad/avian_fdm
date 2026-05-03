@@ -813,8 +813,8 @@ pub mod prelude {
     pub use crate::airfoil::{AirfoilData, AirfoilLibrary, RegisterAirfoil};
     pub use crate::components::{
         aero_coeff::AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
-        AtmosphereState, ControlInputs, ControlSurfaceRole, Failure, FlightState, GizmoContours,
-        GizmoShape,
+        AtmosphereState, ControlInputs, ControlSurfaceRole, EngineZone, Failure, FlightState,
+        GizmoContours, GizmoShape,
     };
     pub use crate::plugin::AircraftFdmPlugin;
     pub use crate::sourced;
@@ -824,6 +824,4 @@ pub mod prelude {
     pub use crate::debug_render::{
         AircraftFdmDebugPlugin, FdmDebugRender, FdmGizmos, ShowColliders,
     };
-
-    pub use crate::components::EngineZone;
 }
