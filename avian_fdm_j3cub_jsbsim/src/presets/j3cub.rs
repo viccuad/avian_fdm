@@ -811,6 +811,7 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
 /// `fraction` is the fraction of the total wing area this panel represents.
 /// The panel's aerodynamic area is `fraction * WING_AREA_M2` and the CL/CD
 /// tables are taken from `airfoil` (unscaled).
+#[allow(clippy::too_many_arguments)]
 pub fn wing_zone(
     _name: &str,
     x_m: Scalar,
