@@ -794,6 +794,12 @@ pub(crate) mod aerodynamics;
 pub(crate) mod atmosphere;
 pub mod airfoil;
 pub mod components;
+// Declared without the `debug-plugin` gate so that `AircraftFdmPlugin` can call
+// `.register_type::<GizmoShape>()` unconditionally, keeping these components
+// scene-serializable in builds where `debug-plugin` is disabled.
+// The file lives in `src/debug_render/` because it belongs there conceptually.
+#[path = "debug_render/gizmo_shape.rs"]
+pub(crate) mod gizmo_shape;
 pub(crate) mod math;
 pub mod plugin;
 pub(crate) mod propulsion;

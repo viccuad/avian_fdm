@@ -35,6 +35,7 @@ mod colliders;
 mod configuration;
 mod gizmos;
 
+pub use crate::gizmo_shape::{GizmoContours, GizmoShape};
 pub use colliders::ShowColliders;
 pub use configuration::{FdmDebugRender, FdmGizmos};
 

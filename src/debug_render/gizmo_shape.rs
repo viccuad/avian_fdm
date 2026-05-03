@@ -1,5 +1,15 @@
 //! [`GizmoShape`], optional visual override for debug wireframe drawing.
 //!
+//! # Module location
+//!
+//! This file lives in `src/debug_render/` but is declared at the crate root
+//! (via `#[path]`) **without** the `debug-plugin` feature gate.  The reason is
+//! that [`crate::plugin::AircraftFdmPlugin`] (the core plugin) calls
+//! `.register_type::<GizmoShape>()` unconditionally so that these components
+//! remain scene-serializable even in builds where `debug-plugin` is disabled.
+//! Users can therefore store `GizmoShape` overrides in scene files and only
+//! enable [`crate::debug_render::AircraftFdmDebugPlugin`] in development builds.
+//!
 //! ## Hybrid visualisation approach
 //!
 //! Most zones are drawn directly from their [`avian3d::prelude::Collider`]
@@ -101,7 +111,7 @@ pub enum GizmoShape {
 ///
 /// # Example
 /// ```rust
-/// # use avian_fdm::components::gizmo_shape::GizmoContours;
+/// # use avian_fdm::components::GizmoContours;
 /// # use bevy::prelude::*;
 /// // Elliptical fuselage cross-section at x = 0
 /// let ring: Vec<Vec3> = (0..=12).map(|i| {
