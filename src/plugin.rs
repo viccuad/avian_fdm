@@ -32,7 +32,8 @@ use crate::_bevy::*;
 use avian3d::prelude::{PhysicsSchedule, PhysicsStepSystems};
 
 use crate::aerodynamics::compute_aero_forces;
-use crate::atmosphere::{update_atmosphere, update_flight_state};
+use crate::atmosphere::update_atmosphere;
+use crate::kinematics::update_flight_state;
 use crate::propulsion::compute_engine_zone_forces;
 
 /// Named system sets for the FDM pipeline. Use these to hook in custom systems.

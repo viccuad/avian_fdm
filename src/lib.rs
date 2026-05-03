@@ -800,6 +800,7 @@ pub mod components;
 // The file lives in `src/debug_render/` because it belongs there conceptually.
 #[path = "debug_render/gizmo_shape.rs"]
 pub(crate) mod gizmo_shape;
+pub(crate) mod kinematics;
 pub(crate) mod math;
 pub mod plugin;
 pub(crate) mod propulsion;

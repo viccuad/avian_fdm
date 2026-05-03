@@ -1,10 +1,13 @@
 //! ISA atmosphere model and wind resource.
 //!
-//! See [`model`] for the International Standard Atmosphere implementation and
-//! Bevy systems. See [`resources`] for [`WindResource`].
+//! - [`isa`]: pure ISA / Sutherland functions and constants (no Bevy types).
+//! - [`systems`]: Bevy systems that bridge ISA into ECS components.
+//! - [`resources`]: [`WindResource`] global wind vector.
 
-pub mod model;
+pub mod isa;
 pub mod resources;
+pub mod systems;
 
-pub use model::{sutherland_viscosity, update_atmosphere, update_flight_state};
+pub use isa::sutherland_viscosity;
 pub use resources::WindResource;
+pub use systems::update_atmosphere;

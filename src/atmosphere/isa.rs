@@ -1,8 +1,9 @@
-//! ISA atmosphere model: ISA functions and Bevy update systems.
+//! ISA (International Standard Atmosphere) model, pure functions.
 //!
 //! Implements the International Standard Atmosphere (ICAO Doc 7488) for the
 //! troposphere (0-11 km) and lower stratosphere (11-20 km), plus Sutherland's
-//! law for dynamic viscosity.
+//! law for dynamic viscosity. Contains no Bevy types, see
+//! [`super::systems`] for the ECS plumbing that consumes these.
 //!
 //! ## Why density matters
 //!
@@ -47,10 +48,8 @@
 //! μ_ref = 1.716×10⁻⁵ kg/(m·s),  T_ref = 273.15 K,  S = 110.4 K
 //! ```
 
-use crate::_bevy::*;
-use crate::components::{AtmosphereState, FlightState};
-use super::resources::WindResource;
-use avian3d::math::{Scalar, Vector};
+use crate::components::AtmosphereState;
+use avian3d::math::Scalar;
 
 //
 // ISA constants
@@ -137,96 +136,6 @@ pub fn atmosphere_at(h: Scalar) -> AtmosphereState {
         pressure_pa,
         temperature_k,
         speed_of_sound_ms,
-    }
-}
-
-//
-// Bevy systems
-//
-
-/// Updates [`AtmosphereState`] on each aircraft from its world-space altitude.
-///
-/// Reads `GlobalTransform.translation().y` as geometric altitude above sea level.
-#[allow(clippy::unnecessary_cast)]
-pub fn update_atmosphere(mut query: Query<(&GlobalTransform, &mut AtmosphereState)>) {
-    for (transform, mut atm) in &mut query {
-        let altitude_m = transform.translation().y as Scalar;
-        *atm = atmosphere_at(altitude_m);
-    }
-}
-
-/// Updates [`FlightState`] on each aircraft from velocity and atmosphere.
-///
-/// Reads [`avian3d::prelude::LinearVelocity`] and [`avian3d::prelude::AngularVelocity`],
-/// converts to body frame, and derives α, β, V, q̄, Re, Mach.
-#[allow(clippy::unnecessary_cast)]
-pub fn update_flight_state(
-    mut query: Query<(
-        &GlobalTransform,
-        &avian3d::prelude::LinearVelocity,
-        &avian3d::prelude::AngularVelocity,
-        &AtmosphereState,
-        &mut FlightState,
-    )>,
-    wind: Option<Res<WindResource>>,
-) {
-    use crate::math::{quat_to_quaternion, world_to_body};
-
-    let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vector::ZERO);
-
-    for (transform, lin_vel, ang_vel, atm, mut fs) in &mut query {
-        let altitude_m = transform.translation().y as Scalar;
-
-        // Body angular rates, rotate world AngularVelocity to body frame.
-        let q = quat_to_quaternion(transform.rotation());
-        let av_world = ang_vel.0;
-        let omega_body = q.inverse() * av_world;
-        let p_rads = omega_body.x;
-        let q_rads = omega_body.y;
-        let r_rads = omega_body.z;
-
-        // World-frame velocity relative to air mass.
-        let vel_world = lin_vel.0 - wind_world;
-
-        let airspeed_ms = vel_world.length();
-
-        // Zero-airspeed guard: skip derived quantities, leave stale FlightState values.
-        if airspeed_ms < 1e-4 {
-            fs.airspeed_ms = airspeed_ms;
-            fs.altitude_m = altitude_m;
-            fs.dynamic_pressure_pa = 0.0;
-            fs.p_rads = p_rads;
-            fs.q_rads = q_rads;
-            fs.r_rads = r_rads;
-            continue;
-        }
-
-        // Rotate velocity to body frame.
-        let vel_body = world_to_body(q, vel_world);
-
-        // Angle of attack α: atan2(w, u)
-        let u = vel_body.x; // forward
-        let v = vel_body.y; // right
-        let w = vel_body.z; // down
-        let alpha_rad = w.atan2(u);
-
-        // Sideslip β: atan2(v, sqrt(u²+w²))
-        let beta_rad = v.atan2((u * u + w * w).sqrt());
-
-        let dynamic_pressure_pa = 0.5 * atm.density_kgm3 * airspeed_ms * airspeed_ms;
-        let mach = airspeed_ms / atm.speed_of_sound_ms;
-
-        *fs = FlightState {
-            alpha_rad,
-            beta_rad,
-            airspeed_ms,
-            mach,
-            dynamic_pressure_pa,
-            altitude_m,
-            p_rads,
-            q_rads,
-            r_rads,
-        };
     }
 }
 
