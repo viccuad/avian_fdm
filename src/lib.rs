@@ -803,7 +803,6 @@ pub(crate) mod gizmo_shape;
 pub(crate) mod math;
 pub mod plugin;
 pub(crate) mod propulsion;
-pub mod systems;
 
 #[cfg(feature = "debug-plugin")]
 pub mod debug_render;
@@ -818,7 +817,7 @@ pub mod prelude {
     };
     pub use crate::plugin::AircraftFdmPlugin;
     pub use crate::sourced;
-    pub use crate::systems::AircraftFdmSystem;
+    pub use crate::plugin::AircraftFdmSystem;
 
     #[cfg(feature = "debug-plugin")]
     pub use crate::debug_render::{
