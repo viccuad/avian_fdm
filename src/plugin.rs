@@ -51,10 +51,9 @@ impl Plugin for AircraftFdmPlugin {
         }
 
         use crate::components::{
-            AeroZone, AircraftGeometry, AtmosphereState, ControlInputs, Failure, FlightState,
-            GizmoContours, GizmoShape, InducedDrag, LodDamping, ZoneForce,
+            AeroZone, AircraftGeometry, AtmosphereState, ControlInputs, EngineZone, Failure,
+            FlightState, GizmoContours, GizmoShape, InducedDrag, LodDamping, ZoneForce,
         };
-
         app.register_type::<AircraftGeometry>()
             .register_type::<ControlInputs>()
             .register_type::<FlightState>()
@@ -65,10 +64,12 @@ impl Plugin for AircraftFdmPlugin {
             .register_type::<GizmoContours>()
             .register_type::<Failure>()
             .register_type::<InducedDrag>()
-            .register_type::<LodDamping>();
+            .register_type::<LodDamping>()
+            .register_type::<EngineZone>();
 
-        use crate::components::EngineZone;
-        app.register_type::<EngineZone>();
+        use crate::airfoil::{resolve_airfoil_names, AirfoilLibrary};
+        app.init_resource::<AirfoilLibrary>()
+            .add_systems(PreUpdate, resolve_airfoil_names);
 
         crate::systems::register_fdm_systems(app);
 

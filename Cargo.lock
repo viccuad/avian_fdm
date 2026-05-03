@@ -389,6 +389,7 @@ dependencies = [
  "bevy_reflect",
  "bevy_transform",
  "serde",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

@@ -792,6 +792,7 @@ pub(crate) mod _bevy {
 
 pub(crate) mod aerodynamics;
 pub(crate) mod atmosphere;
+pub mod airfoil;
 pub mod components;
 pub(crate) mod math;
 pub mod plugin;
@@ -803,6 +804,7 @@ pub mod debug_render;
 
 /// Re-exports for convenient glob import: `use avian_fdm::prelude::*;`
 pub mod prelude {
+    pub use crate::airfoil::{AirfoilData, AirfoilLibrary, RegisterAirfoil};
     pub use crate::components::{
         aero_coeff::AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry,
         AtmosphereState, ControlInputs, ControlSurfaceRole, Failure, FlightState, GizmoContours,

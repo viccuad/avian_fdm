@@ -33,6 +33,18 @@ use serde::{Deserialize, Serialize};
 #[reflect(Component, Serialize, Deserialize)]
 #[require(crate::components::zone_force::ZoneForce)]
 pub struct AeroZone {
+    /// Name of a registered airfoil to resolve coefficient tables from at spawn
+    /// time. Set to a name registered via
+    /// [`RegisterAirfoil::register_airfoil`](crate::airfoil::RegisterAirfoil::register_airfoil)
+    /// (e.g. `"NACA2412"`, `"USA35B"`).
+    ///
+    /// When non-empty, the airfoil resolution system will look up this name in
+    /// [`AirfoilLibrary`](crate::airfoil::AirfoilLibrary) and overwrite any
+    /// [`AeroCoeff::Placeholder`] cl/cd/cm fields with data from the library.
+    /// Explicit (non-`Placeholder`) fields are never overwritten.
+    ///
+    /// Defaults to `""` (empty string = no named airfoil, resolution is skipped).
+    pub airfoil_name: String,
     /// Partial contribution to CL (lift coefficient).
     ///
     /// Always present. Defaults to [`AeroCoeff::Placeholder`] so unset zones warn.
@@ -248,6 +260,7 @@ impl Default for AeroZone {
             croll: AeroCoeff::Absent,
             cn: AeroCoeff::Absent,
             ac_offset: Vec3::ZERO,
+            airfoil_name: String::new(),
             control_role: None,
             damage_drag_coeff: None,
             area_m2: 0.0,

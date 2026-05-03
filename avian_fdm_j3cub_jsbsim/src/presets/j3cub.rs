@@ -116,6 +116,7 @@ use bevy_ecs::prelude::*;
 use bevy_math::prelude::*;
 use bevy_transform::prelude::*;
 
+use avian_fdm::airfoil::AirfoilData;
 use avian_fdm::components::{
     AeroCoeff, AeroZone, AeroZoneBundle, AircraftCoreBundle, AircraftGeometry, ControlSurfaceRole,
     EngineZone, GizmoContours, InducedDrag,
@@ -372,6 +373,9 @@ const WING_DIHEDRAL_RAD: Scalar = sourced!(
 
 /// Alpha breakpoints (radians) shared by wing CL and CD tables.
 /// Sourced directly from the `tableData` in `J3Cub.xml` (USA-35B airfoil).
+/// Kept for use in unit tests; not used in production code (wing zones now receive
+/// airfoil data from the `avian_fdm` built-in library).
+#[allow(dead_code)]
 const ALPHA_BP: [Scalar; 14] = sourced!(
     [
         -1.5700, -0.3491, -0.2443, -0.1745, -0.0873, 0.0000, 0.0873, 0.1309, 0.1745, 0.2182,
@@ -381,6 +385,8 @@ const ALPHA_BP: [Scalar; 14] = sourced!(
 );
 
 /// Reynolds number breakpoints for the USA-35B airfoil tables.
+/// Kept for use in unit tests.
+#[allow(dead_code)]
 const RE_BP: [Scalar; 2] = sourced!(
     [1_668_183.0, 3_707_224.0],
     "JSBSim:J3Cub.xml: Re at cruise (V=27 m/s) and fast cruise (V=40 m/s), chord=1.6 m, ν=1.46e-5"
@@ -389,6 +395,8 @@ const RE_BP: [Scalar; 2] = sourced!(
 // ── Whole-aircraft CL data (row-major: 14 alpha rows × 2 Re columns) ─────────
 //
 // From J3Cub.xml `Lift_alpha` table. Rows correspond to ALPHA_BP, columns to RE_BP.
+// Kept for use in unit tests.
+#[allow(dead_code)]
 const CL_DATA: [Scalar; 28] = sourced!(
     [
         0.0000, 0.0000, // alpha = −1.5700
@@ -413,6 +421,8 @@ const CL_DATA: [Scalar; 28] = sourced!(
 //
 // From J3Cub.xml `Drag_basic` table (profile drag only; induced drag is implicit
 // in lift distribution). Columns correspond to RE_BP.
+// Kept for use in unit tests.
+#[allow(dead_code)]
 const CD_DATA: [Scalar; 28] = sourced!(
     [
         1.4091, 1.4091, // alpha = −1.5700
@@ -433,26 +443,6 @@ const CD_DATA: [Scalar; 28] = sourced!(
     "JSBSim:J3Cub.xml: Drag_basic table (profile drag only, parasite; no induced drag)"
 );
 
-// ── Internal helpers ──────────────────────────────────────────────────────────
-
-/// Build a Table2D AeroCoeff for CL using the full USA-35B airfoil data (unscaled).
-fn cl_table() -> AeroCoeff {
-    AeroCoeff::Table2D {
-        rows: ALPHA_BP.to_vec(),
-        cols: RE_BP.to_vec(),
-        data: CL_DATA.to_vec(),
-    }
-}
-
-/// Build a Table2D AeroCoeff for CD using the full USA-35B airfoil data (unscaled).
-fn cd_table() -> AeroCoeff {
-    AeroCoeff::Table2D {
-        rows: ALPHA_BP.to_vec(),
-        cols: RE_BP.to_vec(),
-        data: CD_DATA.to_vec(),
-    }
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /// Spawn a complete Piper J-3 Cub aircraft with all child [`AeroZone`] entities.
@@ -470,6 +460,7 @@ fn cd_table() -> AeroCoeff {
 /// }
 /// ```
 pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
+    use crate::airfoils::usa35b;
     use avian_fdm::components::GizmoShape;
 
     let root = commands
@@ -490,11 +481,13 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // Thin collider (z=0.02 m). See module docs on hybrid approach.
             parent.spawn((wing_zone(
                 "L-root", WING_AC_X, WING_AC_X, -0.94, 0.175,
+                usa35b(),
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density; total wing mass ~80 kg for Ixx=729")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             parent.spawn((wing_zone(
                 "L-mid", WING_AC_X, WING_AC_X, -2.82, 0.175,
+                usa35b(),
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density; total wing mass ~80 kg for Ixx=729")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
@@ -504,6 +497,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // application point to WING_AC_X (25% of the full wing chord).
             parent.spawn((wing_zone(
                 "L-tip", 0.075, WING_AC_X, -4.19, 0.150,
+                usa35b(),
                 Collider::cuboid(0.45, 0.86, 0.02),
                 ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density matches panel for physical consistency")),
             ), GizmoShape::Box { x: 0.45, y: 0.86, z: 0.02 }));
@@ -511,16 +505,19 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // ── Right wing ───────────────────────────────────────────────────
             parent.spawn((wing_zone(
                 "R-root", WING_AC_X, WING_AC_X, 0.94, 0.175,
+                usa35b(),
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density; total wing mass ~80 kg for Ixx=729")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             parent.spawn((wing_zone(
                 "R-mid", WING_AC_X, WING_AC_X, 2.82, 0.175,
+                usa35b(),
                 Collider::cuboid(0.80, 1.88, 0.02),
                 ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density; total wing mass ~80 kg for Ixx=729")),
             ), GizmoShape::Box { x: 0.80, y: 1.88, z: 0.02 }));
             parent.spawn((wing_zone(
                 "R-tip", 0.075, WING_AC_X, 4.19, 0.150,
+                usa35b(),
                 Collider::cuboid(0.45, 0.86, 0.02),
                 ColliderDensity(sourced!(585.0, "Inertia-calibrated: uniform wing density matches panel for physical consistency")),
             ), GizmoShape::Box { x: 0.45, y: 0.86, z: 0.02 }));
@@ -813,31 +810,25 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
 ///
 /// `fraction` is the fraction of the total wing area this panel represents.
 /// The panel's aerodynamic area is `fraction * WING_AREA_M2` and the CL/CD
-/// tables are the unscaled airfoil data.
+/// tables are taken from `airfoil` (unscaled).
 pub fn wing_zone(
     _name: &str,
     x_m: Scalar,
     ac_x_m: Scalar,
     y_m: Scalar,
     fraction: Scalar,
+    airfoil: AirfoilData,
     collider: Collider,
     density: ColliderDensity,
 ) -> impl Bundle {
     let ac_offset = Vec3::new((ac_x_m - x_m) as f32, 0.0, 0.0);
-    // Place the zone center on the dihedral plane so that adjacent rotated
-    // panels are coplanar and form a continuous wing surface.
-    // At spanwise station y_m, the wing surface sits at:
-    //   z = WING_Z - |y_m| * sin(Γ)
-    // (tips are higher = more negative Z, since +Z is down in body frame).
     let z_m = WING_Z - y_m.abs() * WING_DIHEDRAL_RAD.sin();
-    // Rotate the zone about the body X axis by the dihedral angle so its
-    // local frame matches the tilted panel surface.
     let dihedral_rot = Quat::from_rotation_x(-(WING_DIHEDRAL_RAD * y_m.signum()) as f32);
     (
         AeroZoneBundle {
             zone: AeroZone {
-                cl: cl_table(),
-                cd: cd_table(),
+                cl: airfoil.cl,
+                cd: airfoil.cd,
                 ac_offset,
                 area_m2: fraction * WING_AREA_M2,
                 chord_m: CHORD_M,
