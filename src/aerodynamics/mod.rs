@@ -28,10 +28,11 @@
 
 pub(crate) mod coefficients;
 pub(crate) mod damping;
+pub(crate) mod engine_coupling;
+pub(crate) mod induced_drag;
 pub(crate) mod local_angles;
 pub(crate) mod world_forces;
 
-// Re-export the public API so callers use `aerodynamics::foo`.
 pub(crate) use coefficients::evaluate_zone_coefficients;
 pub use damping::damping_torque;
 pub use local_angles::zone_local_angles;
@@ -48,34 +49,8 @@ use crate::components::{
     FlightState, InducedDrag, LodDamping, ZoneForce,
 };
 
-use avian3d::math::PI;
-
-//
-// Step 3: Engine force accumulation
-//
-
-/// Accumulate a pre-computed engine zone's thrust into the root force/torque.
-///
-/// The moment arm is measured from the aircraft's CG to the engine's world
-/// position.  An off-centre engine naturally produces a yawing moment when
-/// thrust is asymmetric.
-fn accumulate_engine_force(
-    zf: &ZoneForce,
-    com_world: Vector,
-    total_force: &mut Vector,
-    total_torque: &mut Vector,
-) {
-    if zf.force != Vec3::ZERO {
-        let force = vec3_to_vector(zf.force);
-        *total_force += force;
-        // ZoneForce.world_point is Vec3 (always f32 for visualization).
-        *total_torque += (vec3_to_vector(zf.world_point) - com_world).cross(force);
-    }
-}
-
-//
-// Orchestrator system
-//
+use engine_coupling::accumulate_engine_force;
+use induced_drag::apply_induced_drag;
 
 /// Bevy system that orchestrates the aerodynamic pipeline each physics step.
 #[allow(clippy::type_complexity)]
@@ -129,7 +104,6 @@ pub fn compute_aero_forces(
         let s = geo.wing_area_m2;
         let b = geo.wing_span_m;
 
-        // Pre-compute viscosity once per aircraft for per-zone Reynolds number.
         let mu = crate::atmosphere::sutherland_viscosity(atm.temperature_k);
         let rho = atm.density_kgm3;
 
@@ -140,7 +114,6 @@ pub fn compute_aero_forces(
         let com_world: Vector = pos.0 + body_to_world * com.0;
         let use_lod = lod_damping.is_some();
 
-        // Area-weighted CL sum for induced drag: CL_aircraft = total / S_ref.
         let mut total_cl_x_area: Scalar = 0.0;
 
         for child in children.iter() {
@@ -154,28 +127,14 @@ pub fn compute_aero_forces(
                     continue;
                 }
 
-                // Zone body position relative to CG.
-                // Local Transform is used instead of GlobalTransform to avoid
-                // the one-frame propagation lag (PostUpdate runs after physics).
-                let zone_body_from_cg: Vector = vec3_to_vector(zone_transform.translation) - com.0;
-
-                // Zone rotation in body frame.
+                let zone_body_from_cg: Vector =
+                    vec3_to_vector(zone_transform.translation) - com.0;
                 let zone_q = quat_to_quaternion(zone_transform.rotation);
 
                 // Step 0: per-zone local α/β (skipped in LOD mode).
-                //
-                // In full mode: project the body-frame velocity unit vector into
-                // the zone's local frame. This naturally captures any geometric
-                // orientation effect (dihedral, sweep, anhedral, etc.) without
-                // needing explicit correction parameters. Angular-rate corrections
-                // (roll/pitch/yaw) are then added on top.
-                //
-                // In LOD mode: use whole-aircraft alpha/beta and body-to-world rotation
-                // directly (zone geometry is ignored as an approximation).
                 let (alpha_local, beta_local, vel_zone_unit_local, zone_to_world) = if use_lod {
                     (alpha, beta, vel_body_unit_global, body_to_world)
                 } else {
-                    // Velocity in zone's local frame.
                     let vel_zone = zone_q.inverse() * vel_body_unit_global;
                     let alpha_zone = vel_zone.z.atan2(vel_zone.x);
                     let beta_zone = vel_zone
@@ -202,9 +161,6 @@ pub fn compute_aero_forces(
                 };
 
                 // Step 1: coefficient evaluation.
-                // Per-zone Reynolds number: Re = rho * V * chord_zone / mu.
-                // Zones with chord_m = 0 (mass-only) get Re = 0; their
-                // coefficients are Absent so Re is never used.
                 let re_zone = if zone.chord_m > 0.0 {
                     rho * v * zone.chord_m / mu
                 } else {
@@ -240,10 +196,9 @@ pub fn compute_aero_forces(
 
                 let force = wf.force;
                 let torque = wf.torque;
-                // ac_world: aerodynamic centre in world space. zone_transform
-                // and zone.ac_offset are always Vec3 (Bevy Transform is f32).
                 let ac_world = pos.0
-                    + body_to_world * vec3_to_vector(zone_transform.translation + zone.ac_offset);
+                    + body_to_world
+                        * vec3_to_vector(zone_transform.translation + zone.ac_offset);
 
                 zone_force.force = vector_to_vec3(force);
                 zone_force.world_point = vector_to_vec3(ac_world);
@@ -264,14 +219,9 @@ pub fn compute_aero_forces(
             }
         }
 
-        // Step 4: induced drag. CD_i = CL² / (π · e · AR).
-        // CL_aircraft is the area-weighted sum of per-zone CLs divided by S_ref.
+        // Step 4: induced drag.
         if let Some(id) = induced_drag {
-            let ar = b * b / s;
-            let cl_aircraft = total_cl_x_area / s;
-            let cd_i = cl_aircraft * cl_aircraft / (PI * id.oswald_factor * ar);
-            let drag_world = body_to_world * (vel_body_unit_global * (-cd_i * qbar * s));
-            cf.0 += drag_world;
+            cf.0 += apply_induced_drag(id, total_cl_x_area, s, b, qbar, vel_body_unit_global, *rot);
         }
 
         // Step 5: LOD damping (mutually exclusive with step 0).
@@ -281,54 +231,5 @@ pub fn compute_aero_forces(
                 ct.0 += damp;
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::components::ZoneForce;
-
-    /// On-centre engine produces pure thrust, no torque.
-    #[test]
-    fn engine_at_cg_no_moment() {
-        let zf = ZoneForce {
-            force: Vec3::new(500.0, 0.0, 0.0),
-            world_point: Vec3::ZERO,
-        };
-        let (mut f, mut t) = (Vector::ZERO, Vector::ZERO);
-        accumulate_engine_force(&zf, Vector::ZERO, &mut f, &mut t);
-        assert!((f - Vector::new(500.0, 0.0, 0.0)).length() < 1e-5);
-        assert!(t.length() < 1e-5, "on-axis engine must not produce torque");
-    }
-
-    /// Starboard off-centre engine produces nose-left yaw torque.
-    #[test]
-    fn engine_offset_right_produces_yaw_torque() {
-        let zf = ZoneForce {
-            force: Vec3::new(500.0, 0.0, 0.0),
-            world_point: Vec3::new(0.0, 2.0, 0.0),
-        };
-        let (mut f, mut t) = (Vector::ZERO, Vector::ZERO);
-        accumulate_engine_force(&zf, Vector::ZERO, &mut f, &mut t);
-        // arm=(0,2,0) × thrust=(500,0,0) → torque=(0,0,-1000)
-        assert!(
-            (t.z - (-1000.0)).abs() < 1e-4,
-            "starboard engine → nose-left yaw, got z={}",
-            t.z
-        );
-    }
-
-    /// Zero-force engine short-circuits: totals unchanged.
-    #[test]
-    fn engine_zero_force_no_accumulation() {
-        let zf = ZoneForce {
-            force: Vec3::ZERO,
-            world_point: Vec3::new(0.0, 5.0, 0.0),
-        };
-        let (mut f, mut t) = (Vector::new(100.0, 0.0, 0.0), Vector::new(0.0, 50.0, 0.0));
-        accumulate_engine_force(&zf, Vector::ZERO, &mut f, &mut t);
-        assert!((f - Vector::new(100.0, 0.0, 0.0)).length() < 1e-5);
-        assert!((t - Vector::new(0.0, 50.0, 0.0)).length() < 1e-5);
     }
 }
