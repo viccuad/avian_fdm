@@ -1,4 +1,4 @@
-//! ISA atmosphere model and wind resource.
+//! ISA atmosphere model: ISA functions and Bevy update systems.
 //!
 //! Implements the International Standard Atmosphere (ICAO Doc 7488) for the
 //! troposphere (0-11 km) and lower stratosphere (11-20 km), plus Sutherland's
@@ -48,7 +48,8 @@
 //! ```
 
 use crate::_bevy::*;
-use crate::components::{AtmosphereState, FlightState, WindResource};
+use crate::components::{AtmosphereState, FlightState};
+use super::resources::WindResource;
 use avian3d::math::{Scalar, Vector};
 
 //
