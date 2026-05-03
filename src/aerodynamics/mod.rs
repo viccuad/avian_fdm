@@ -48,8 +48,7 @@ use crate::components::{
     FlightState, InducedDrag, LodDamping, ZoneForce,
 };
 
-#[allow(clippy::unnecessary_cast)]
-const PI_VAL: Scalar = std::f64::consts::PI as Scalar;
+use avian3d::math::PI;
 
 //
 // Step 3: Engine force accumulation
@@ -270,7 +269,7 @@ pub fn compute_aero_forces(
         if let Some(id) = induced_drag {
             let ar = b * b / s;
             let cl_aircraft = total_cl_x_area / s;
-            let cd_i = cl_aircraft * cl_aircraft / (PI_VAL * id.oswald_factor * ar);
+            let cd_i = cl_aircraft * cl_aircraft / (PI * id.oswald_factor * ar);
             let drag_world = body_to_world * (vel_body_unit_global * (-cd_i * qbar * s));
             cf.0 += drag_world;
         }
