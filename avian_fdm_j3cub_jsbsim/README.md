@@ -66,4 +66,5 @@ See the `examples/` directory for runnable demos.
 
 ## License
 
-GPL-3.0-only — inherited from the JSBSim J3Cub aerodynamic data.
+GPL-3.0-only — inherited from the JSBSim J3Cub aerodynamic data in
+[github.com/wlbragg/J3Cub](github.com/wlbragg/J3Cub).

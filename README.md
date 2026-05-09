@@ -1,32 +1,35 @@
-# avian_fdm
-
 [![License: LGPL-3.0+](https://img.shields.io/badge/license-LGPL--2.1+-blue.svg)](LICENSE)
 [![ci](https://github.com/viccuad/avian_fdm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/viccuad/avian_fdm/actions/workflows/ci.yml)
 
-**Avian FDM** is 6-DoF Flight Dynamics Model plugin for [Bevy](https://bevyengine.org/) + [Avian](https://crates.io/crates/avian3d).
+# avian_fdm
+
+**Avian FDM** is 6-DoF Flight Dynamics Model plugin for
+[Bevy](https://bevyengine.org/) + [Avian](https://crates.io/crates/avian3d).
 
 ---
 
 ## Design
 
 `avian_fdm` turns an Avian rigid-body hierarchy into a physically plausible
-aircraft. Each physics step it evaluates aerodynamic and propulsive forces on
-every `AeroZone` child entity and accumulates them into Avian's
-`ConstantForce`/`ConstantTorque` on the root body. Avian's integrator advances
-the state forward, `avian_fdm` never writes to position, velocity, or
+aircraft. You build your aircraft by assembling `AeroZone` entities around
+an `AircraftCoreBundle` root.
+
+Each physics step, the `avian_fdm` plugin evaluates aerodynamic and propulsive
+forces for every `AeroZone` and accumulates them into Avian's
+`ConstantForce`/`ConstantTorque` on the root body. Avian's integrator then
+advances the state forward, `avian_fdm` never writes to position, velocity, or
 orientation directly.
 
 Mass, centre of gravity, and the full inertia tensor are computed automatically
-by Avian from `ColliderDensity` on each child collider.
+by Avian from `ColliderDensity` on each child collider. In addition, several
+emergent behaviors appear when computing the AeroZones together.
 
 ## Features
 
-Below are some of the current features of avian_fdm.
-
 - ISA atmosphere (0-20 km) with density, pressure, temperature, viscosity
 - Per-zone lift, drag, and side-force from tabulated coefficients (1D or 2D)
-- Reynolds-number-dependent coefficient lookup
-- Post-stall aerodynamics via Viterna-Corrigan extrapolation
+  - Reynolds-number-dependent coefficient lookup
+  - Post-stall aerodynamics via Viterna-Corrigan extrapolation
 - Pitch, roll, and yaw damping (per-zone or whole-aircraft LOD fallback)
 - Induced drag (Oswald span efficiency)
 - Zone-based damage/failure model with graceful degradation
@@ -77,16 +80,11 @@ fn main() {
 fn spawn(mut commands: Commands) {
     let root = j3cub::spawn(
         &mut commands,
-        Transform::from_xyz(0.0, 300.0, 0.0)
-            .with_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
+        Transform::from_xyz(0.0, 300.0, 0.0),
     );
     commands.entity(root).insert(LinearVelocity(Vec3::new(27.0, 0.0, 0.0)));
 }
 ```
-
-Build your own aircraft by assembling `AeroZone` children around an
-`AircraftCoreBundle` root -- see the lib.rs documentation for the full
-zone decomposition guide.
 
 
 ## Feature flags
