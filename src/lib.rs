@@ -65,7 +65,6 @@
 //!     let root = j3cub::spawn(
 //!         &mut commands,
 //!         Transform::from_xyz(0.0, 300.0, 0.0)
-//!             .with_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
 //!     );
 //!     // Override the default zero velocity to start at cruise airspeed.
 //!     commands.entity(root).insert(LinearVelocity(Vec3::new(27.0, 0.0, 0.0)));
@@ -791,8 +790,8 @@ pub(crate) mod _bevy {
 }
 
 pub(crate) mod aerodynamics;
-pub(crate) mod atmosphere;
 pub mod airfoil;
+pub(crate) mod atmosphere;
 pub mod components;
 // Declared without the `debug-plugin` gate so that `AircraftFdmPlugin` can call
 // `.register_type::<GizmoShape>()` unconditionally, keeping these components
@@ -817,8 +816,8 @@ pub mod prelude {
         GizmoContours, GizmoShape,
     };
     pub use crate::plugin::AircraftFdmPlugin;
-    pub use crate::sourced;
     pub use crate::plugin::AircraftFdmSystem;
+    pub use crate::sourced;
 
     #[cfg(feature = "debug-plugin")]
     pub use crate::debug_render::{

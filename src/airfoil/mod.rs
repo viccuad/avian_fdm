@@ -22,13 +22,14 @@
 //! # use avian_fdm::prelude::*;
 //! # use avian_fdm::airfoil::{AirfoilData, RegisterAirfoil, foil_tools::parse_foil_tools_csv};
 //! # use bevy::prelude::*;
-//! const MY_FOIL_CSV: &str = include_str!("../assets/my_airfoil/polars.csv");
+//! // In real code: const MY_FOIL_CSV: &str = include_str!("../assets/my_airfoil/polars.csv");
+//! # let my_foil_csv = "";
 //!
 //! App::new()
 //!     .add_plugins(AircraftFdmPlugin::default())
 //!     .register_airfoil(
 //!         "MyFoil",
-//!         parse_foil_tools_csv(MY_FOIL_CSV)
+//!         parse_foil_tools_csv(my_foil_csv)
 //!             .expect("embedded polar CSV must parse cleanly")
 //!             .ncrit9                         // pick the desired Ncrit slice
 //!             .with_post_stall(7.0)           // aspect ratio of the lifting surface
