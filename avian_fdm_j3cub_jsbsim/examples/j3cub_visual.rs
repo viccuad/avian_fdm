@@ -14,7 +14,7 @@
 //! - **W / S** — elevator (pitch up / down)
 //! - **A / D** — ailerons (roll left / right)
 //! - **Q / E** — rudder (yaw left / right)
-//! - **Left Shift / Left Ctrl** — throttle up / down
+//! - **Z / X** — throttle +2% / −2% per press
 //!
 //! **Flight controls (gamepad):**
 //! - **Left stick** — elevator (Y) + ailerons (X)
@@ -229,7 +229,7 @@ fn spawn_legend(mut commands: Commands, store: Res<GizmoConfigStore>) {
             }
         }
         p.spawn((
-            TextSpan::new("\nLMB drag  orbit\nScroll    zoom\nW/S  elevator  A/D  aileron\nQ/E  rudder   Shift/Ctrl  throttle\nR  restart"),
+            TextSpan::new("\nLMB drag  orbit\nScroll    zoom\nW/S  elevator  A/D  aileron\nQ/E  rudder   Z/X  throttle ±2%\nR  restart"),
             TextColor(dim),
         ));
     });
@@ -267,26 +267,24 @@ fn restart_aircraft(
 }
 
 ///
-/// Keyboard deflections are binary (full deflection while key held).
+/// Keyboard deflections are binary (full deflection while held).
 /// Gamepad axes map directly to the [-1, 1] range via the `Gamepad` component.
-/// Throttle is rate-based: a held key changes it by 0.5 per second.
+/// Throttle is step-based: each keypress changes it by 2% and it holds that value.
+/// Z = +2%, X = −2%.
 fn handle_input(
     mut query: Query<&mut ControlInputs, With<AircraftGeometry>>,
     keys: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
-    time: Res<Time>,
 ) {
-    #[allow(clippy::unnecessary_cast)]
-    let dt = time.delta_secs_f64() as Scalar;
 
     // Keyboard: binary deflection while key is held.
     // W = stick forward = nose down (-1), S = pull back = nose up (+1).
     let kb_elevator = keys.pressed(KeyCode::KeyS) as i32 - keys.pressed(KeyCode::KeyW) as i32;
     let kb_aileron = keys.pressed(KeyCode::KeyD) as i32 - keys.pressed(KeyCode::KeyA) as i32;
     let kb_rudder = keys.pressed(KeyCode::KeyE) as i32 - keys.pressed(KeyCode::KeyQ) as i32;
-    // Shift = throttle up, Ctrl = throttle down.
-    let kb_throttle =
-        keys.pressed(KeyCode::ShiftLeft) as i32 - keys.pressed(KeyCode::ControlLeft) as i32;
+    // Throttle step: Z = +2%, X = −2%, fires once per keypress.
+    let kb_throttle_up = keys.just_pressed(KeyCode::KeyZ);
+    let kb_throttle_down = keys.just_pressed(KeyCode::KeyX);
 
     // Gamepad: use first connected pad if any.
     let (gp_elevator, gp_aileron, gp_rudder, gp_throttle) = gamepads
@@ -326,13 +324,15 @@ fn handle_input(
         }
         .clamp(-1.0, 1.0);
 
-        // Throttle: rate-based from keyboard; direct from gamepad trigger.
-        if kb_throttle != 0 {
-            ctrl.throttle = (ctrl.throttle + kb_throttle as Scalar * 0.5 * dt).clamp(0.0, 1.0);
-        } else if gp_throttle >= 0.0 {
+        // Throttle: step-based from keyboard; direct from gamepad trigger only
+        // when it is meaningfully depressed (> 5% deadzone avoids stomping kb steps).
+        if kb_throttle_up {
+            ctrl.throttle = (ctrl.throttle + 0.02).clamp(0.0, 1.0);
+        } else if kb_throttle_down {
+            ctrl.throttle = (ctrl.throttle - 0.02).clamp(0.0, 1.0);
+        } else if gp_throttle > 0.05 {
             ctrl.throttle = gp_throttle;
         }
-        // If neither active, throttle holds its current value.
     }
 }
 
