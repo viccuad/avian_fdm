@@ -1,4 +1,4 @@
-[![License: LGPL-3.0+](https://img.shields.io/badge/license-LGPL--2.1+-blue.svg)](LICENSE)
+[![License: LGPL-3.0+](https://img.shields.io/badge/license-LGPL--3+-blue.svg)](LICENSE)
 [![ci](https://github.com/viccuad/avian_fdm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/viccuad/avian_fdm/actions/workflows/ci.yml)
 
 # avian_fdm
