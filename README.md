@@ -8,6 +8,14 @@
 
 ---
 
+## Example
+
+Small recording of the provided J-3 Cub visual example.
+First a controlled turn to starboard, then a harsh climb into a high AoA stall,
+departing, diving, and recovering.
+
+https://github.com/user-attachments/assets/529451a4-5d66-4297-af42-f22bafc50001
+
 ## Design
 
 `avian_fdm` turns an Avian rigid-body hierarchy into a physically plausible
