@@ -662,8 +662,8 @@
 //!
 //!
 //! The autopilot reads [`components::FlightState`] and writes
-//! [`components::ControlInputs`]. Place it after `AircraftFdmSystem::FlightState`
-//! and before `AircraftFdmSystem::Forces`:
+//! [`components::ControlInputs`]. Place it after `AircraftFdmSystems::FlightState`
+//! and before `AircraftFdmSystems::Forces`:
 //!
 //! ```rust,no_run
 //! # use bevy::prelude::*;
@@ -673,8 +673,8 @@
 //! // app.add_systems(
 //! //     PhysicsSchedule,
 //! //     my_autopilot
-//! //         .after(AircraftFdmSystem::FlightState)
-//! //         .before(AircraftFdmSystem::Forces)
+//! //         .after(AircraftFdmSystems::FlightState)
+//! //         .before(AircraftFdmSystems::Forces)
 //! //         .in_set(PhysicsStepSystems::BroadPhase),
 //! // );
 //! ```
@@ -816,7 +816,7 @@ pub mod prelude {
         GizmoContours, GizmoShape,
     };
     pub use crate::plugin::AircraftFdmPlugin;
-    pub use crate::plugin::AircraftFdmSystem;
+    pub use crate::plugin::AircraftFdmSystems;
     pub use crate::sourced;
 
     #[cfg(feature = "debug-plugin")]

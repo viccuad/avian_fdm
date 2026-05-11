@@ -17,15 +17,15 @@
 //!
 //! ## Adding a custom system (e.g. autopilot)
 //!
-//! Use [`AircraftFdmSystem`] to schedule relative to named sets:
+//! Use [`AircraftFdmSystems`] to schedule relative to named sets:
 //!
 //! ```rust,no_run
 //! # use bevy::prelude::*;
 //! # use avian3d::prelude::*;
-//! # use avian_fdm::plugin::AircraftFdmSystem;
+//! # use avian_fdm::plugin::AircraftFdmSystems;
 //! // app.add_systems(PhysicsSchedule,
-//! //     my_autopilot.after(AircraftFdmSystem::FlightState)
-//! //                 .before(AircraftFdmSystem::Forces));
+//! //     my_autopilot.after(AircraftFdmSystems::FlightState)
+//! //                 .before(AircraftFdmSystems::Forces));
 //! ```
 
 use crate::_bevy::*;
@@ -47,13 +47,13 @@ use crate::propulsion::compute_engine_zone_forces;
 /// ```rust,no_run
 /// # use bevy::prelude::*;
 /// # use avian3d::prelude::*;
-/// # use avian_fdm::plugin::AircraftFdmSystem;
+/// # use avian_fdm::plugin::AircraftFdmSystems;
 /// // app.add_systems(PhysicsSchedule,
-/// //     my_autopilot.after(AircraftFdmSystem::FlightState)
-/// //                 .before(AircraftFdmSystem::Forces));
+/// //     my_autopilot.after(AircraftFdmSystems::FlightState)
+/// //                 .before(AircraftFdmSystems::Forces));
 /// ```
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
-pub enum AircraftFdmSystem {
+pub enum AircraftFdmSystems {
     /// Update ISA atmosphere density, temperature, and dynamic pressure.
     Atmosphere,
     /// Derive FlightState (alpha, beta, airspeed, altitude) from physics state.
@@ -143,9 +143,9 @@ fn register_fdm_systems(app: &mut App) {
     app.configure_sets(
         PhysicsSchedule,
         (
-            AircraftFdmSystem::Atmosphere,
-            AircraftFdmSystem::FlightState,
-            AircraftFdmSystem::Forces,
+            AircraftFdmSystems::Atmosphere,
+            AircraftFdmSystems::FlightState,
+            AircraftFdmSystems::Forces,
         )
             .chain()
             .in_set(PhysicsStepSystems::BroadPhase),
@@ -153,17 +153,17 @@ fn register_fdm_systems(app: &mut App) {
 
     app.add_systems(
         PhysicsSchedule,
-        update_atmosphere.in_set(AircraftFdmSystem::Atmosphere),
+        update_atmosphere.in_set(AircraftFdmSystems::Atmosphere),
     );
     app.add_systems(
         PhysicsSchedule,
-        update_flight_state.in_set(AircraftFdmSystem::FlightState),
+        update_flight_state.in_set(AircraftFdmSystems::FlightState),
     );
     app.add_systems(
         PhysicsSchedule,
         (compute_engine_zone_forces, compute_aero_forces)
             .chain()
-            .in_set(AircraftFdmSystem::Forces),
+            .in_set(AircraftFdmSystems::Forces),
     );
 }
 
