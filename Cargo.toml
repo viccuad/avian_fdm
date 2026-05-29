@@ -61,3 +61,10 @@ bevy = { version = "0.18", features = [
 [[test]]
 name = "perf_limits"
 required-features = ["f32"]
+
+[package.metadata.docs.rs]
+features = ["f32", "debug-plugin"] # same as [features]
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+] # activates any #[cfg_attr(docsrs, doc(cfg(...)))] annotations
