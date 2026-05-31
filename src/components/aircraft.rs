@@ -7,8 +7,38 @@ use serde::{Deserialize, Serialize};
 
 /// Core bundle. Spawn on the aircraft root entity.
 ///
-/// Mass, centre of gravity, and inertia are computed automatically by Avian
-/// from child colliders' [`avian3d::prelude::ColliderDensity`] values.
+/// # Mass properties (auto-compute by design)
+///
+/// Mass, centre of gravity, and the full angular-inertia tensor are computed
+/// automatically by Avian from child zone colliders' shapes and
+/// [`avian3d::prelude::ColliderDensity`] values. The results are readable
+/// through [`avian3d::prelude::ComputedMass`],
+/// [`avian3d::prelude::ComputedCenterOfMass`], and
+/// [`avian3d::prelude::ComputedAngularInertia`] on the root entity.
+///
+/// **Do not add [`avian3d::prelude::NoAutoMass`],
+/// [`avian3d::prelude::NoAutoAngularInertia`], or
+/// [`avian3d::prelude::NoAutoCenterOfMass`]** to an aircraft root unless you
+/// also supply explicit [`avian3d::prelude::Mass`],
+/// [`avian3d::prelude::AngularInertia`], and/or
+/// [`avian3d::prelude::CenterOfMass`] components. These markers zero out the
+/// child-collider contribution, and the recommended preset workflow
+/// (e.g. `avian_fdm_j3cub_jsbsim::presets::j3cub`) relies on tuning
+/// per-zone `ColliderDensity` to hit target inertia values. Adding a `NoAuto*`
+/// marker without a matching explicit override will silently leave the
+/// aircraft with the default unit mass and identity inertia.
+///
+/// ## Runtime mutation
+///
+/// Avian computes mass properties once when the rigid body + colliders are
+/// first spawned together. If you mutate a child [`avian3d::prelude::ColliderDensity`],
+/// swap a [`avian3d::prelude::Collider`], or attach new zone children to an
+/// existing aircraft after the first frame, insert
+/// [`avian3d::dynamics::rigid_body::mass_properties::components::RecomputeMassProperties`]
+/// on the root so the
+/// `Computed*` outputs refresh on the next physics step.
+///
+/// # Forces
 ///
 /// Aerodynamic forces are accumulated each frame into the included
 /// [`ConstantForce`] and [`ConstantTorque`] components, which Avian then
