@@ -1,3 +1,5 @@
+[![Open Source Flight Sim Manifesto](https://img.shields.io/badge/part_of-open_source_flight_sim_manifesto-lightblue?labelColor=4DA8DA?style=for-the-badge)](https://github.com/viccuad/open-source-flight-sim-manifesto)
+
 [![License: LGPL-3.0+](https://img.shields.io/badge/license-LGPL--3+-blue.svg)](LICENSE)
 [![ci](https://github.com/viccuad/avian_fdm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/viccuad/avian_fdm/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/avian_fdm)](https://crates.io/crates/avian_fdm)
