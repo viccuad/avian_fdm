@@ -1,9 +1,9 @@
 //! Parser for [foil.tools](https://foil.tools) XFoil polar CSV exports.
 //!
-//! foil.tools exports a CSV with header `Re,alpha,CL,CD,CM`. The layout is Re-major: for each Re
-//! value, the full alpha sweep for Ncrit=1 appears first, then the full alpha sweep for Ncrit=4,
-//! then the full alpha sweep for Ncrit=9. Re blocks are sorted ascending; alpha is sorted
-//! ascending within each Ncrit sweep.
+//! [foil.tools](https://foil.tools) exports a CSV with header `Re,alpha,CL,CD,CM`. The layout is
+//! Re-major: for each Re value, the full alpha sweep for Ncrit=1 appears first, then the full
+//! alpha sweep for Ncrit=4, then the full alpha sweep for Ncrit=9. Re blocks are sorted ascending;
+//! alpha is sorted ascending within each Ncrit sweep.
 //!
 //! ## Usage
 //!
@@ -135,7 +135,7 @@ pub enum ParseError {
     },
 }
 
-/// Parse a foil.tools XFoil polar CSV into all three Ncrit slices.
+/// Parse a <https://foil.tools> XFoil polar CSV into all three Ncrit slices.
 ///
 /// foil.tools exports polars for all Ncrit values in a single CSV. The layout
 /// is Re-major: for each Re value, there are three consecutive alpha sweeps of
@@ -161,10 +161,10 @@ pub enum ParseError {
 ///
 /// The CSV has no Ncrit column. The parser detects Ncrit boundaries purely by
 /// position: each Re block is divided into three equal thirds (rows
-/// `0..n_alpha` → Ncrit=1, `n_alpha..2*n_alpha` → Ncrit=4,
-/// `2*n_alpha..3*n_alpha` → Ncrit=9). If the block length is not divisible by
+/// `0..n_alpha` for Ncrit=1, `n_alpha..2*n_alpha` for Ncrit=4,
+/// `2*n_alpha..3*n_alpha` for Ncrit=9). If the block length is not divisible by
 /// 3, [`ParseError::NotMultipleOfThree`] is returned. No other validation of
-/// the Ncrit ordering is performed — a CSV with a different internal layout
+/// the Ncrit ordering is performed; a CSV with a different internal layout
 /// would be parsed silently into wrong data.
 ///
 /// # Errors
@@ -598,8 +598,8 @@ mod tests {
     #[test]
     fn parse_rejects_inconsistent_alpha_grid() {
         // Two Re blocks, but the second has a different alpha grid than the first.
-        // Re=1e6: 3 alpha (-5, 0, 5) × 3 Ncrit = 9 rows. ✓
-        // Re=2e6: 3 alpha (-5, 0, 10) — alpha grid differs at index 2. → error.
+        // Re=1e6: 3 alpha (-5, 0, 5) × 3 Ncrit = 9 rows, correct
+        // Re=2e6: 3 alpha (-5, 0, 10) — alpha grid differs at index 2, error
         let csv = "Re,alpha,CL,CD,CM\n\
                    1000000,-5,-0.5,0.01,0.0\n\
                    1000000,0,0.0,0.01,0.0\n\
@@ -663,7 +663,7 @@ mod tests {
 
     #[test]
     fn validate_flags_placeholder_cl() {
-        // AeroCoeff::validate does not flag Placeholder as an error — it is a
+        // AeroCoeff::validate does not flag Placeholder as an error: it is a
         // valid "not yet modelled" sentinel that warns at runtime, not at
         // parse time. AirfoilData::validate therefore returns empty for a
         // default (Placeholder cl/cd, Absent cm) airfoil.
