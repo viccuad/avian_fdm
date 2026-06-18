@@ -56,7 +56,10 @@ mod tests {
     fn zero_cl_produces_zero_induced_drag() {
         let id = InducedDrag { oswald_factor: 0.8 };
         let drag = apply_induced_drag(&id, 0.0, 10.0, 10.0, 100.0, Vector::X, identity_rot());
-        assert!(drag.length() < 1e-10, "zero CL → zero induced drag, got {drag:?}");
+        assert!(
+            drag.length() < 1e-10,
+            "zero CL → zero induced drag, got {drag:?}"
+        );
     }
 
     #[test]
@@ -64,7 +67,10 @@ mod tests {
         let id = InducedDrag { oswald_factor: 0.8 };
         // Velocity in +X; induced drag should be in -X.
         let drag = apply_induced_drag(&id, 10.0, 10.0, 10.0, 100.0, Vector::X, identity_rot());
-        assert!(drag.x < 0.0, "induced drag should oppose velocity, got {drag:?}");
+        assert!(
+            drag.x < 0.0,
+            "induced drag should oppose velocity, got {drag:?}"
+        );
         assert!(drag.y.abs() < 1e-10);
         assert!(drag.z.abs() < 1e-10);
     }

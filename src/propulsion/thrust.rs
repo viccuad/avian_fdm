@@ -5,11 +5,11 @@ use crate::math::{quat_to_quaternion, vector_to_vec3};
 use avian3d::math::Scalar;
 use avian3d::prelude::ColliderOf;
 
+use super::engine_zone::EngineZone;
+use super::throttle::interp_curve;
 use crate::components::{
     get_remaining, AtmosphereState, ControlInputs, Failure, FlightState, ZoneForce,
 };
-use super::engine_zone::EngineZone;
-use super::throttle::interp_curve;
 
 /// Sea-level standard density (kg/m³).
 pub(super) const RHO_0: Scalar = 1.225;

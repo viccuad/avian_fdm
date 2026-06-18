@@ -4,9 +4,9 @@
 //! entities. Currently exposes a single system, [`update_atmosphere`], which
 //! samples [`AtmosphereState`] from the world-space altitude.
 
+use super::isa::atmosphere_at;
 use crate::_bevy::*;
 use crate::components::AtmosphereState;
-use super::isa::atmosphere_at;
 use avian3d::math::Scalar;
 
 /// Updates [`AtmosphereState`] on each aircraft from its world-space altitude.

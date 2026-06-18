@@ -1,7 +1,7 @@
 //! Throttle-to-thrust-fraction interpolation.
 
-use avian3d::math::Scalar;
 use crate::math::lerp_1d;
+use avian3d::math::Scalar;
 
 /// Linear interpolation over a `[[throttle, fraction]; N]` lookup table.
 ///
@@ -57,17 +57,38 @@ mod tests {
     #[test]
     fn interp_curve_three_breakpoints() {
         let curve = vec![[0.0, 0.0], [0.5, 0.6], [1.0, 1.0]];
-        assert!((interp_curve(&curve, 0.0) - 0.0).abs() < 1e-12, "lower clamp");
-        assert!((interp_curve(&curve, 0.25) - 0.3).abs() < 1e-12, "lower segment mid");
-        assert!((interp_curve(&curve, 0.5) - 0.6).abs() < 1e-12, "breakpoint");
-        assert!((interp_curve(&curve, 0.75) - 0.8).abs() < 1e-12, "upper segment mid");
-        assert!((interp_curve(&curve, 1.0) - 1.0).abs() < 1e-12, "upper clamp");
+        assert!(
+            (interp_curve(&curve, 0.0) - 0.0).abs() < 1e-12,
+            "lower clamp"
+        );
+        assert!(
+            (interp_curve(&curve, 0.25) - 0.3).abs() < 1e-12,
+            "lower segment mid"
+        );
+        assert!(
+            (interp_curve(&curve, 0.5) - 0.6).abs() < 1e-12,
+            "breakpoint"
+        );
+        assert!(
+            (interp_curve(&curve, 0.75) - 0.8).abs() < 1e-12,
+            "upper segment mid"
+        );
+        assert!(
+            (interp_curve(&curve, 1.0) - 1.0).abs() < 1e-12,
+            "upper clamp"
+        );
     }
 
     #[test]
     fn interp_curve_clamps_outside_range() {
         let curve = vec![[0.2, 0.1], [0.8, 0.9]];
-        assert!((interp_curve(&curve, 0.0) - 0.1).abs() < 1e-12, "below range clamps to first value");
-        assert!((interp_curve(&curve, 1.0) - 0.9).abs() < 1e-12, "above range clamps to last value");
+        assert!(
+            (interp_curve(&curve, 0.0) - 0.1).abs() < 1e-12,
+            "below range clamps to first value"
+        );
+        assert!(
+            (interp_curve(&curve, 1.0) - 0.9).abs() < 1e-12,
+            "above range clamps to last value"
+        );
     }
 }

@@ -276,7 +276,6 @@ fn handle_input(
     keys: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
 ) {
-
     // Keyboard: binary deflection while key is held.
     // W = stick forward = nose down (-1), S = pull back = nose up (+1).
     let kb_elevator = keys.pressed(KeyCode::KeyS) as i32 - keys.pressed(KeyCode::KeyW) as i32;
