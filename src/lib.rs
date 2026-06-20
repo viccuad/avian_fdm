@@ -38,10 +38,10 @@
 //! Add `avian_fdm` and `avian3d` to `Cargo.toml`:
 //!
 //! ```toml
-//! avian_fdm          = "0.1"
-//! avian_fdm_j3cub_jsbsim = { version = "0.1" }
-//! avian3d            = { version = "0.6" }
-//! bevy               = { version = "0.18" }
+//! avian_fdm          = "0.2"
+//! avian_fdm_j3cub_jsbsim = { version = "0.2" }
+//! avian3d            = { version = "0.7" }
+//! bevy               = { version = "0.19" }
 //! ```
 //!
 //! Spawn the reference J-3 Cub aircraft from `avian_fdm_j3cub_jsbsim`:

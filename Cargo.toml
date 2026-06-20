@@ -1,6 +1,6 @@
 [package]
 name = "avian_fdm"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "6-DoF Flight Dynamics Model for Bevy + Avian 0.6"
 license = "LGPL-3.0-or-later"
@@ -39,20 +39,20 @@ debug-plugin = [
 # collider-from-mesh is excluded: avian_fdm uses only analytic shapes (boxes, spheres,
 # capsules) for AeroZone colliders. Mesh-based colliders would require AssetPlugin +
 # MeshPlugin in headless apps, and are never needed for a flight dynamics library.
-avian3d = { version = "0.6", default-features = false, features = ["3d"] }
-bevy_app = { version = "0.18", default-features = false }
-bevy_ecs = { version = "0.18", default-features = false }
-bevy_math = { version = "0.18", default-features = false }
-bevy_transform = { version = "0.18", default-features = false }
-bevy_reflect = { version = "0.18", default-features = false }
-bevy_color = { version = "0.18", default-features = false, optional = true }
-bevy_gizmos = { version = "0.18", default-features = false, optional = true }
-bevy_log = { version = "0.18", default-features = false }
+avian3d = { version = "0.7", default-features = false, features = ["3d"] }
+bevy_app = { version = "0.19", default-features = false }
+bevy_ecs = { version = "0.19", default-features = false }
+bevy_math = { version = "0.19", default-features = false }
+bevy_transform = { version = "0.19", default-features = false }
+bevy_reflect = { version = "0.19", default-features = false }
+bevy_color = { version = "0.19", default-features = false, optional = true }
+bevy_gizmos = { version = "0.19", default-features = false, optional = true }
+bevy_log = { version = "0.19", default-features = false }
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 
 [dev-dependencies]
-bevy = { version = "0.18", features = [
+bevy = { version = "0.19", features = [
     "bevy_winit",
     "bevy_pbr",
     "bevy_gizmos",

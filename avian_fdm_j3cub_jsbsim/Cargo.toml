@@ -1,6 +1,6 @@
 [package]
 name = "avian_fdm_j3cub_jsbsim"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "J3Cub aircraft preset for avian_fdm derived from github.com/wlbragg/J3Cub"
 license = "GPL-3.0-only"
@@ -31,13 +31,13 @@ debug-plugin = ["avian_fdm/debug-plugin"]
 
 [dependencies]
 avian_fdm = { path = "../" }
-avian3d = { version = "0.6", default-features = false, features = ["3d"] }
-bevy_ecs = { version = "0.18", default-features = false }
-bevy_math = { version = "0.18", default-features = false }
-bevy_transform = { version = "0.18", default-features = false }
+avian3d = { version = "0.7", default-features = false, features = ["3d"] }
+bevy_ecs = { version = "0.19", default-features = false }
+bevy_math = { version = "0.19", default-features = false }
+bevy_transform = { version = "0.19", default-features = false }
 
 [dev-dependencies]
-bevy = { version = "0.18", features = [
+bevy = { version = "0.19", features = [
     "bevy_winit",
     "bevy_pbr",
     "bevy_gizmos",
