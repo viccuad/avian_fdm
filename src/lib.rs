@@ -133,12 +133,12 @@
 //! ### Body frame (SAE aerospace convention)
 //!
 //! ```text
-//!         X ──► (forward / nose)
+//!         X (forward / nose)
 //!        ╱
 //!       ╱
 //!      ╱──── Y (right wing / starboard)
 //!      │
-//!      ▼  Z (down / belly)
+//!      │  Z (down / belly)
 //! ```
 //!
 //! | Axis | Points toward | Positive rotation (right-hand rule) |
@@ -152,7 +152,6 @@
 //! Zone transforms in the presets are authored in this frame. Example:
 //! a wing zone at `Transform::from_xyz(-0.10, -2.82, -0.58)` is 0.10 m aft of
 //! the CG datum, 2.82 m to port (-Y), and 0.58 m above datum (-Z = up).
-//! Zone transforms in the presets are authored in this frame.
 //!
 //! ### Stability frame
 //!

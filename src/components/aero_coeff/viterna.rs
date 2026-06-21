@@ -561,7 +561,11 @@ mod tests {
         };
         let extended = cl.with_post_stall_lift(3.0);
         if let AeroCoeff::Table1D { breakpoints, .. } = extended {
-            assert_eq!(breakpoints.len(), 3, "should not add points to full-range table");
+            assert_eq!(
+                breakpoints.len(),
+                3,
+                "should not add points to full-range table"
+            );
         }
     }
 
@@ -570,11 +574,7 @@ mod tests {
         let cl = AeroCoeff::Table2D {
             rows: vec![-0.35, 0.0, 0.35],
             cols: vec![1e6, 3e6],
-            data: vec![
-                -2.0, -2.5,
-                 0.0,  0.0,
-                 2.0,  2.5,
-            ],
+            data: vec![-2.0, -2.5, 0.0, 0.0, 2.0, 2.5],
         };
         let extended = cl.with_post_stall_lift(3.0);
         if let AeroCoeff::Table2D {

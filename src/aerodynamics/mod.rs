@@ -127,8 +127,7 @@ pub fn compute_aero_forces(
                     continue;
                 }
 
-                let zone_body_from_cg: Vector =
-                    vec3_to_vector(zone_transform.translation) - com.0;
+                let zone_body_from_cg: Vector = vec3_to_vector(zone_transform.translation) - com.0;
                 let zone_q = quat_to_quaternion(zone_transform.rotation);
 
                 // Step 0: per-zone local α/β (skipped in LOD mode).
@@ -197,8 +196,7 @@ pub fn compute_aero_forces(
                 let force = wf.force;
                 let torque = wf.torque;
                 let ac_world = pos.0
-                    + body_to_world
-                        * vec3_to_vector(zone_transform.translation + zone.ac_offset);
+                    + body_to_world * vec3_to_vector(zone_transform.translation + zone.ac_offset);
 
                 zone_force.force = vector_to_vec3(force);
                 zone_force.world_point = vector_to_vec3(ac_world);

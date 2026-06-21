@@ -256,8 +256,14 @@ mod tests {
         };
         assert!((c.evaluate(0.0, 1e6) - 0.0).abs() < 1e-12);
         assert!((c.evaluate(1.0, 1e6) - 2.0).abs() < 1e-12);
-        assert!((c.evaluate(0.5, 1e6) - 1.0).abs() < 1e-12, "midpoint on alpha");
-        assert!((c.evaluate(0.5, 999.0) - 1.0).abs() < 1e-12, "Re clamped to only column");
+        assert!(
+            (c.evaluate(0.5, 1e6) - 1.0).abs() < 1e-12,
+            "midpoint on alpha"
+        );
+        assert!(
+            (c.evaluate(0.5, 999.0) - 1.0).abs() < 1e-12,
+            "Re clamped to only column"
+        );
     }
 
     #[test]

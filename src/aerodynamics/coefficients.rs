@@ -284,5 +284,4 @@ mod tests {
         assert_eq!(c.croll, 0.0, "Absent croll -> 0");
         assert_eq!(c.cn, 0.0, "Absent cn -> 0");
     }
-
 }

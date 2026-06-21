@@ -9,8 +9,8 @@
 use avian3d::math::Vector;
 use bevy_math::Vec3;
 
-use crate::math::vec3_to_vector;
 use crate::components::ZoneForce;
+use crate::math::vec3_to_vector;
 
 /// Accumulate a pre-computed engine zone's thrust into the root force/torque.
 ///
