@@ -33,6 +33,7 @@ use avian3d::math::Scalar;
 use avian3d::prelude::{AngularVelocity, LinearVelocity, PhysicsPlugins, Rotation};
 use avian_fdm::prelude::*;
 use avian_fdm_j3cub_jsbsim::presets::j3cub;
+use bevy::dev_tools::infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings};
 use bevy::input::gamepad::{Gamepad, GamepadAxis};
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::math::Quat;
@@ -48,6 +49,7 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugins(InfiniteGridPlugin)
         .add_plugins(PhysicsPlugins::default())
         .add_plugins(AircraftFdmPlugin::default())
         .add_plugins(AircraftFdmDebugPlugin)
@@ -137,6 +139,15 @@ fn spawn_aircraft(mut commands: Commands) {
 }
 
 fn spawn_scene(mut commands: Commands) {
+    // ── Infinite grid ────────────────────────────────────────────────────────────────
+    commands.spawn((
+        InfiniteGrid,
+        InfiniteGridSettings {
+            fadeout_distance: 1000.0,
+            ..default()
+        },
+    ));
+
     // ── Camera ────────────────────────────────────────────────────────────────
     commands.spawn((
         Camera3d::default(),

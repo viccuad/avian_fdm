@@ -41,6 +41,7 @@ bevy = { version = "0.19", features = [
     "bevy_winit",
     "bevy_pbr",
     "bevy_gizmos",
+    "bevy_dev_tools",
 ] }
 
 [[example]]
