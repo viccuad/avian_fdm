@@ -43,10 +43,10 @@ JSBSIM_DATA_PATH=../jsbsim .venv/bin/python3 tests/run_jsbsim_glide.py \
 
 ```toml
 [dependencies]
-avian_fdm              = "0.1"
-avian_fdm_j3cub_jsbsim = "0.1"
-avian3d                = "0.6"
-bevy                   = "0.18"
+avian_fdm              = "0.2"
+avian_fdm_j3cub_jsbsim = "0.2"
+avian3d                = "0.7"
+bevy                   = "0.19"
 ```
 
 ```rust,ignore

@@ -157,7 +157,7 @@ fn spawn_scene(mut commands: Commands) {
     commands.spawn((
         Text::new("Initialising…"),
         TextFont {
-            font_size: 18.0,
+            font_size: FontSize::Px(18.0),
             ..default()
         },
         TextColor(Color::WHITE),
@@ -174,7 +174,7 @@ fn spawn_scene(mut commands: Commands) {
     commands.spawn((
         Text::new(""),
         TextFont {
-            font_size: 16.0,
+            font_size: FontSize::Px(16.0),
             ..default()
         },
         TextColor(Color::WHITE),
@@ -214,7 +214,7 @@ fn spawn_legend(mut commands: Commands, store: Res<GizmoConfigStore>) {
 
     commands.spawn((
         Text::default(),
-        TextFont { font_size: 15.0, ..default() },
+        TextFont { font_size: FontSize::Px(15.0), ..default() },
         Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(12.0),
@@ -276,7 +276,6 @@ fn handle_input(
     keys: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
 ) {
-
     // Keyboard: binary deflection while key is held.
     // W = stick forward = nose down (-1), S = pull back = nose up (+1).
     let kb_elevator = keys.pressed(KeyCode::KeyS) as i32 - keys.pressed(KeyCode::KeyW) as i32;
