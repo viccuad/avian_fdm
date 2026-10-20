@@ -7,7 +7,7 @@
 
 # avian_fdm
 
-**Avian FDM** is 6-DoF Flight Dynamics Model plugin for
+**AvianFDM** is 6-DoF Flight Dynamics Model plugin for
 [Bevy](https://bevyengine.org/) + [Avian](https://crates.io/crates/avian3d).
 
 ---
