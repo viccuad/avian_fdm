@@ -1,20 +1,26 @@
 categories:
   - title: "⚠️  Breaking changes"
-    labels:
-      - "kind/major"
-      - "kind/breaking-change"
+    semver-increment: "major"
+    when:
+      conventional:
+        breaking: true
   - title: "🚀 Features"
-    labels:
-      - "kind/enhancement"
-      - "kind/feature"
-      - "kind/documentation"
+    semver-increment: "minor"
+    when:
+      conventional:
+        type: "feat"
   - title: "🐛 Bug Fixes"
-    labels:
-      - "kind/bug"
+    semver-increment: "patch"
+    when:
+      conventional:
+        type: "fix"
   - title: "🧰 Maintenance"
-    labels:
-      - "kind/chore"
-      - "area/dependencies"
+    semver-increment: "patch"
+    when:
+      conventional:
+        types: ["chore", "build", "ci", "docs", "refactor", "test"]
+  - title: "📦 Other Changes"
+    semver-increment: "patch"
 
 exclude-labels:
   - duplicate
@@ -57,27 +63,3 @@ autolabeler:
   - label: "kind/chore"
     title:
       - "chore"
-  - label: "kind/documentation"
-    title:
-      - "docs"
-      - "chore(docs)"
-
-version-resolver:
-  major:
-    labels:
-      - "kind/major"
-      - "kind/breaking-change"
-  minor:
-    labels:
-      - "kind/minor"
-      - "kind/feature"
-      - "kind/enhancement"
-      - "kind/documentation"
-  patch:
-    labels:
-      - "kind/patch"
-      - "kind/fix"
-      - "kind/bug"
-      - "kind/chore"
-      - "area/dependencies"
-  default: patch
