@@ -1,14 +1,15 @@
-//! Step 1: coefficient evaluation — table lookup, control-surface scaling, damage.
+//! Step 1: coefficient evaluation. Table evaluation, control-surface scaling, and damage.
 
 use crate::components::{AeroZone, ControlInputs, ControlSurfaceRole};
 use avian3d::math::Scalar;
 
-/// Six non-dimensional aerodynamic coefficients, fully scaled and ready to be
-/// multiplied by dynamic pressure and reference area to produce forces.
+/// Six non-dimensional aerodynamic coefficients with all scaling applied. To
+/// get the forces, multiply them by the dynamic pressure and the reference
+/// area.
 pub(crate) struct ZoneCoefficients {
-    /// Lift coefficient (positive = upward in stability frame).
+    /// Lift coefficient (positive = up in the stability frame).
     pub cl: Scalar,
-    /// Drag coefficient (positive = opposing motion).
+    /// Drag coefficient (positive = opposite to the motion).
     pub cd: Scalar,
     /// Side-force coefficient (positive = starboard).
     pub cy: Scalar,
@@ -20,41 +21,42 @@ pub(crate) struct ZoneCoefficients {
     pub cn: Scalar,
 }
 
-/// Evaluate an [`AeroZone`]'s coefficient tables and apply control-surface
-/// scaling and damage degradation.
+/// Evaluates the coefficient tables of an [`AeroZone`]. Then applies the
+/// control-surface scaling and the performance loss from damage.
 ///
 /// # How it works
 ///
-/// 1. **Table lookup**. CL, CD, CM, Croll, Cn are evaluated at `alpha_local`
-///    (the per-zone effective angle of attack, already corrected for body rates
-///    via [`zone_local_angles`][super::local_angles::zone_local_angles]).  CY
-///    (side force) is evaluated at `beta_local`.  Tables may be a constant
+/// 1. **Table evaluation**. The function evaluates CL, CD, CM, Croll, and Cn
+///    at `alpha_local`. This is the local angle of attack of the zone, with
+///    the body-rate corrections from
+///    [`zone_local_angles`][super::local_angles::zone_local_angles]. It
+///    evaluates CY (side force) at `beta_local`. A table can be a constant
 ///    (`Scalar`), a 1-D function of the primary angle (`Table1D`), or a 2-D
 ///    function of (angle, Re) (`Table2D`).
 ///
-/// 2. **Control-surface scaling**. If the zone is tagged with a
-///    [`ControlSurfaceRole`], its lift/side/moment coefficients are multiplied
-///    by the corresponding pilot input ∈ [−1, 1].  The coefficients in the
-///    table represent *full-deflection* authority; scaling by the input gives
-///    the contribution at partial deflection.
+/// 2. **Control-surface scaling**. If the zone has a [`ControlSurfaceRole`],
+///    the function multiplies its lift, side-force, and moment coefficients
+///    by the matching pilot input in [−1, 1]. The table coefficients give the
+///    authority at *full deflection*. The scale by the input gives the
+///    contribution at partial deflection.
 ///
-///    Drag always *increases* with deflection (flow separation from the
-///    deflected surface), so CD is scaled by `|input|` rather than signed
-///    input.  `AileronRight` mirrors the aileron sign so that left stick
-///    deflects the left aileron trailing-edge down (more lift) and the right
-///    one trailing-edge up (less lift).
+///    Drag always *increases* with deflection, because the flow separates
+///    from the deflected surface. Thus, the function scales CD by `|input|`,
+///    not by the signed input. `AileronRight` inverts the aileron sign. Thus,
+///    a left stick input moves the trailing edge of the left aileron down
+///    (more lift) and the trailing edge of the right aileron up (less lift).
 ///
-/// 3. **Failure degradation**. All coefficients are multiplied by
-///    `remaining ∈ (0, 1]`.  A wing at 0.5 remaining produces half the lift.
-///    Additionally, structural deformation adds parasitic drag that peaks at
-///    intermediate failure:
+/// 3. **Performance loss from damage**. The function multiplies all
+///    coefficients by `remaining`, in (0, 1]. A wing with 0.5 remaining makes
+///    half the lift. Structural deformation also adds parasitic drag. This
+///    drag is largest at intermediate damage:
 ///
 ///    ```text
-///    CD_effective = (CD_base · |input| + damage_drag · (1 − remaining) / q̄) · remaining
+///    CD_effective = (CD_base * |input| + damage_drag * (1 − remaining) / qbar) * remaining
 ///    ```
 ///
-///    At `remaining = 0` the zone is fully detached and produces no force at all
-///    (handled by the caller, not this function).
+///    At `remaining = 0`, the zone is fully detached and makes no force. The
+///    caller handles this case, not this function.
 pub(crate) fn evaluate_zone_coefficients(
     zone: &AeroZone,
     ctrl: &ControlInputs,

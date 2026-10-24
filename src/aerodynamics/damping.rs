@@ -1,43 +1,44 @@
-//! Step 4 (LOD fallback): whole-aircraft angular-rate damping torque.
+//! Step 5 (LOD fallback): angular-rate damping torque of the full aircraft.
 
 use avian3d::math::{Quaternion, Vector};
 
 use crate::components::{AircraftGeometry, FlightState, LodDamping};
 
-/// Compute whole-aircraft angular-rate damping torque in world coordinates.
+/// Calculates the angular-rate damping torque of the full aircraft, in world
+/// coordinates.
 ///
-/// This is a **LOD (Level of Detail) fallback** for aircraft with too few
-/// zones to produce realistic physical damping from geometry alone. At full
-/// fidelity, use [`zone_local_angles`][super::local_angles::zone_local_angles]
-/// per zone instead; the differential forces from wing and tail zones naturally
-/// oppose body rates without any explicit derivatives.
+/// This is a **LOD (level of detail) fallback**. It is for aircraft with too
+/// few zones to make realistic physical damping from geometry. For full
+/// detail, use [`zone_local_angles`][super::local_angles::zone_local_angles]
+/// for each zone. The differences between the forces of the wing and tail
+/// zones then oppose the body rates without explicit derivatives.
 ///
-/// # When to use
+/// # When to use it
 ///
-/// Supply a [`LodDamping`] value only for Single-zone bodies (missiles, pylons)
-/// or low-fidelity AI aircraft with minimal zone layouts.
+/// Add a [`LodDamping`] component only for single-zone bodies (missiles,
+/// pylons) or for low-detail AI aircraft with few zones.
 ///
-/// For any aircraft with realistic wing, h-stab, and v-tail zones, leave
-/// `lod_damping = None` and let zone physics do the work.
+/// For aircraft with realistic wing, horizontal stabilizer, and vertical tail
+/// zones, do not add `LodDamping`. The zone physics then make the damping.
 ///
 /// # How it works
 ///
-/// - **Roll damping (Cl_p):** Descending wing sees increased AoA → more lift;
-///   rising wing sees less.  Differential lift opposes the roll.
-/// - **Pitch damping (Cm_q):** Nose-up pitch drives the tail downward,
-///   increasing its AoA and generating a restoring nose-down moment.
-/// - **Yaw damping (Cn_r):** Right yaw sweeps the vertical tail into a
-///   sideslip that generates a leftward (restoring) force.
+/// - **Roll damping (Cl_p):** The descending wing gets a higher AoA and more
+///   lift. The rising wing gets less. The difference in lift opposes the roll.
+/// - **Pitch damping (Cm_q):** A nose-up pitch moves the tail down. Its AoA
+///   increases, and it makes a restoring nose-down moment.
+/// - **Yaw damping (Cn_r):** A right yaw moves the vertical tail into a
+///   sideslip. The sideslip makes a restoring force to the left.
 ///
 /// # Non-dimensional form
 ///
-/// **Damping moment = derivative × normalised rate × q̄ · S · length.**
-/// All derivatives are negative (oppose motion):
+/// **Damping moment = derivative × normalized rate × qbar × S × length.**
+/// All derivatives are negative (they oppose the motion):
 ///
 /// ```text
-/// ΔL = Cl_p · (p · b / 2V) · q̄ · S · b
-/// ΔM = Cm_q · (q · c̄ / 2V) · q̄ · S · c̄
-/// ΔN = Cn_r · (r · b / 2V) · q̄ · S · b
+/// delta_L = Cl_p * (p * b / 2V)     * qbar * S * b
+/// delta_M = Cm_q * (q * c_bar / 2V) * qbar * S * c_bar
+/// delta_N = Cn_r * (r * b / 2V)     * qbar * S * b
 /// ```
 ///
 /// Typical values (Nelson 1998, Table B1):

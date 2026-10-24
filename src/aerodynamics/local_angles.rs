@@ -1,73 +1,75 @@
-//! Step 0: per-zone effective angle of attack and sideslip.
+//! Step 0: the local angle of attack and sideslip angle of each zone.
 
 use avian3d::math::Scalar;
 
-/// Compute the local effective angle of attack and sideslip for a zone.
+/// Calculates the local angle of attack and sideslip angle of a zone.
 ///
-/// Body angular rates create local velocity increments at each zone that shift
-/// its effective angle of attack and sideslip beyond the whole-aircraft values.
-/// Three additive correction layers are applied on top of the zone-frame
-/// geometric alpha/beta (which already captures dihedral, sweep, etc. via
-/// velocity projection into the zone's local coordinate frame):
+/// The angular rates of the body add a local velocity at each zone. This
+/// velocity changes the angle of attack and the sideslip angle of the zone.
+/// The local angles are then different from the values of the full aircraft.
 ///
-/// **Layer 1. Roll-rate delta-alpha (asymmetric stall, snap rolls, spins)**
+/// The inputs `alpha` and `beta` are the geometric angles in the zone frame.
+/// They already include dihedral and sweep, because the caller projects the
+/// velocity into the local frame of the zone. The function adds three
+/// correction layers to these angles:
 ///
-/// A zone at spanwise station `y` (metres, positive starboard) sees a
-/// body-Z velocity increment `Δw = p · y` from roll rate `p` (rad/s).
-/// **Local angle-of-attack change from roll = roll rate (rad/s) × spanwise
-/// distance from roll axis (m) ÷ airspeed (m/s).**
+/// **Layer 1. Change of alpha from the roll rate (asymmetric stall, snap rolls, spins)**
+///
+/// A zone at the spanwise station `y` (meters, positive to starboard) gets a
+/// body-Z velocity increment `delta_w = p * y` from the roll rate `p` (rad/s).
+/// **Local change of the angle of attack from roll = roll rate (rad/s) ×
+/// spanwise distance from the roll axis (m) ÷ airspeed (m/s):**
 ///
 /// ```text
 /// delta_alpha_roll = p * y / V
 /// ```
 ///
-/// **Layer 2. Pitch-rate delta-alpha (pitch damping, tail effectiveness)**
+/// **Layer 2. Change of alpha from the pitch rate (pitch damping, tail effectiveness)**
 ///
-/// **Layer 2. Pitch-rate Δα (pitch damping, tail effectiveness)**
+/// A zone at the longitudinal station `x` (meters, positive forward of the
+/// CG) gets a body-Z velocity increment from the pitch rate `q` (rad/s). The
+/// cross product `omega × r` has the z-component `p*y − q*x`. Thus, the pitch
+/// contribution is `−q*x`. For the aft tail (x < 0), this value is positive
+/// when q > 0. During a pull-up, the tail turns INTO the airstream. Its AoA
+/// increases, and it makes more restoring lift. This is the physical cause of
+/// pitch damping (Cm_q). For a canard at the front (x > 0), the effect is the
+/// opposite.
 ///
-/// A zone at longitudinal station `x` (metres, positive forward from CG) sees
-/// a body-Z velocity increment from pitch rate `q` (rad/s). The cross product
-/// `ω × r` gives z-component `p·y − q·x`, so the pitch contribution is
-/// `−q·x`. For the aft tail (x < 0), this is positive when q > 0 - the tail
-/// rotates INTO the airstream during a pull, increasing its AoA and generating
-/// more restoring lift. This is the physical mechanism behind pitch damping
-/// (Cm_q). For a forward canard (x > 0) the effect is reversed.
-///
-/// The formula below follows directly from body-frame kinematics (ω × r):
+/// The formula comes directly from the body-frame kinematics (omega × r):
 ///
 /// ```text
 /// delta_alpha_pitch = -q * x / V
 /// ```
 ///
-/// **Layer 3. Yaw-rate delta-beta (yaw damping, Dutch roll)**
+/// **Layer 3. Change of beta from the yaw rate (yaw damping, Dutch roll)**
 ///
-/// A zone at longitudinal station `x` sees a body-Y velocity increment from
-/// yaw rate `r` (rad/s). The cross product `ω × r` gives y-component `r·x`
-/// (for a zone on the aircraft centerline, z ≈ 0). For the vertical tail
-/// (x < 0, aft), a right yaw (r > 0) produces a leftward lateral velocity at
-/// the tail, reducing β_local. The resulting side force at the aft position
-/// opposes the yaw, providing yaw damping.
-/// Dutch roll is a coupled yaw-roll oscillation. Yaw rate shifts the sideslip
-/// seen by aft surfaces, providing yaw damping:
+/// A zone at the longitudinal station `x` gets a body-Y velocity increment
+/// from the yaw rate `r` (rad/s). The cross product `omega × r` has the
+/// y-component `r*x` (for a zone on the aircraft centerline, z ≈ 0). At the
+/// vertical tail (x < 0, aft), a right yaw (r > 0) gives a lateral velocity
+/// to the left. This decreases beta_local. The side force at the aft
+/// position then opposes the yaw. This is yaw damping. The Dutch roll is a
+/// coupled oscillation in yaw and roll. The yaw damping from the aft surfaces
+/// is one part of it:
 ///
 /// ```text
 /// delta_beta_yaw = r * x / V
 /// ```
 ///
-/// Note: spanwise wing zones (y ≠ 0, x ≈ 0) see near-zero sideslip change
-/// from yaw rate because the yaw-induced lateral velocity is proportional to
-/// the longitudinal station x, not the spanwise station y.
+/// Note: for spanwise wing zones (y ≠ 0, x ≈ 0), the yaw rate changes the
+/// sideslip angle almost zero. The lateral velocity from the yaw is
+/// proportional to the longitudinal station x, not to the spanwise station y.
 ///
 /// # Arguments
 ///
-/// - `alpha`: zone-frame angle of attack (rad), from projecting body velocity
-///   into the zone's local coordinate frame. For zones with identity rotation
-///   this equals the whole-aircraft alpha.
-/// - `beta`: zone-frame sideslip (rad), same projection.
-/// - `p`, `q`, `r`: body-axis angular rates (rad/s).
-/// - `x`: zone body-frame longitudinal station (m) from CG; positive forward.
-/// - `y`: zone body-frame spanwise station (m) from CG; positive starboard.
-/// - `v`: true airspeed (m/s); must be > 0.
+/// - `alpha`: angle of attack in the zone frame (rad). It comes from the
+///   projection of the body velocity into the local frame of the zone. For a
+///   zone with no rotation, it is equal to the alpha of the full aircraft.
+/// - `beta`: sideslip angle in the zone frame (rad), from the same projection.
+/// - `p`, `q`, `r`: angular rates about the body axes (rad/s).
+/// - `x`: longitudinal station of the zone from the CG, in the body frame (m). Positive forward.
+/// - `y`: spanwise station of the zone from the CG, in the body frame (m). Positive to starboard.
+/// - `v`: true airspeed (m/s). It must be > 0.
 ///
 /// # Returns
 ///

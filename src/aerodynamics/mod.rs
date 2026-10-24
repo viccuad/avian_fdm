@@ -1,30 +1,30 @@
 //! Aerodynamic force pipeline.
 //!
-//! The pipeline is built from small, documented pure functions that each handle
-//! one step of the aerodynamic computation.  The Bevy system
-//! [`compute_aero_forces`] orchestrates them in order:
+//! The pipeline has small, documented, pure functions. Each function does one
+//! step of the aerodynamic calculation. The Bevy system
+//! [`compute_aero_forces`] calls them in this order:
 //!
 //! ```text
-//! For each aircraft root:
+//! For each aircraft root entity:
 //!   For each AeroZone child:
-//!     0. zone_local_angles           - per-zone effective alpha/beta from body rates
-//!     1. evaluate_zone_coefficients  - lookup CL/CD/... tables, apply scaling and damage
-//!     2. zone_force_world            - rotate stability-frame forces to world
+//!     0. zone_local_angles             - local alpha and beta of the zone, from the body rates
+//!     1. evaluate_zone_coefficients    - evaluate the CL, CD, ... tables, apply scaling and damage
+//!     2. zone_force_world              - turn the stability-frame forces into the world frame
 //!   For each EngineZone child:
-//!     3. accumulate_engine_force     - add pre-computed thrust and its moment-arm torque
+//!     3. accumulate_engine_force       - add the thrust and the torque from its moment arm
 //!   Once per aircraft:
-//!     4. induced_drag                - whole-aircraft CD_i = CL^2/(pi * e * AR)
+//!     4. induced_drag                  - full-aircraft CD_i = CL^2 / (pi * e * AR)
 //!     5. damping_torque (LOD fallback) - only when LodDamping is present
 //! ```
 //!
-//! ## Fidelity modes
+//! ## Detail modes
 //!
 //! | `LodDamping` | Step 0 | Step 5 | Best for |
 //! |---|---|---|---|
-//! | `None` (default) | per-zone local α/β | skipped | full-zone aircraft |
-//! | `Some(LodDamping)` | global α/β only | derivatives applied | sparse-zone bodies |
+//! | `None` (default) | local alpha and beta for each zone | skipped | full-zone aircraft |
+//! | `Some(LodDamping)` | global alpha and beta only | derivatives applied | sparse-zone bodies |
 //!
-//! Each step's physics are documented in its own module.
+//! The module of each step documents the physics of that step.
 
 pub(crate) mod coefficients;
 pub(crate) mod damping;
@@ -52,7 +52,7 @@ use crate::components::{
 use engine_coupling::accumulate_engine_force;
 use induced_drag::apply_induced_drag;
 
-/// Bevy system that orchestrates the aerodynamic pipeline each physics step.
+/// Bevy system that runs the aerodynamic pipeline in each physics step.
 #[allow(clippy::type_complexity)]
 pub fn compute_aero_forces(
     mut root_query: Query<(
