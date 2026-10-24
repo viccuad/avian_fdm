@@ -449,17 +449,18 @@
 //! ### Cross-coupling
 //!
 //! **Adverse yaw (Cnp: yaw from roll rate):**
-//! During a roll rate p, the descending wing makes more lift and more induced
-//! drag than the rising wing. This difference in drag yaws the nose toward the
-//! descending wing. The drag tables of each zone, evaluated at different local
-//! angles, give this effect. The local-angle correction gives a part of it.
-//! A per-zone qbar scaling (refer to the gaps below) will complete it.
+//! During a roll rate p, the relative wind at the descending wing comes more
+//! from below. Its local alpha increases, and its lift vector tilts forward.
+//! At the rising wing, the lift vector tilts aft. These tilted lift vectors
+//! yaw the nose toward the rising wing, opposite to the roll. Each zone
+//! calculates its lift perpendicular to its local velocity. Thus, the
+//! local-angle correction gives this effect.
 //!
 //! **Roll from yaw rate (Clr):**
 //! During a yaw rate r, the advancing wing moves faster and makes more lift.
-//! The difference in lift rolls the aircraft toward the advancing wing. The
-//! local-angle correction gives a part of this effect. The full effect needs
-//! a per-zone qbar scaling.
+//! The difference in lift raises the advancing wing, and the aircraft rolls
+//! toward the retreating wing. The local-angle correction gives a part of
+//! this effect. The full effect needs a per-zone qbar scaling.
 //!
 //! **Dutch roll:**
 //! Yaw and roll couple through Clr and Cnp. The yaw restoring moment of the
@@ -532,11 +533,12 @@
 //! damping (Cm_q). The geometry sets the frequency and the damping ratio.
 //!
 //! **Spiral mode:**
-//! In a bank, the aircraft yaws toward the low wing because of the sideslip.
-//! If the yaw stability is weaker than the roll stability, the bank increases,
-//! and the aircraft spirals. The balance between the yaw stiffness of the fin
-//! and the dihedral effect of the wing sets this mode. It also sets the
-//! stability of the mode (damped or divergent).
+//! In a bank, the aircraft slips toward the low wing. The fin turns the nose
+//! into the slip, and the dihedral effect of the wing rolls the aircraft back
+//! to level. If the yaw stiffness of the fin is strong compared to the
+//! dihedral effect, the bank increases, and the aircraft spirals. The balance
+//! between these two effects sets the stability of the mode (damped or
+//! divergent).
 //!
 //! ### Damage effects
 //!
@@ -715,8 +717,8 @@
 //! - Level cruise: `alpha_rad` is approximately 2–5° (small and positive).
 //!   `airspeed_ms` is stable.
 //! - Phugoid: `airspeed_ms` and `alpha_rad` oscillate slowly (period
-//!   approximately 2πV/g). This is a natural mode. It shows that the pitch
-//!   model works.
+//!   approximately π·√2·V/g, the Lanchester approximation). This is a natural
+//!   mode. It shows that the pitch model works.
 //! - Divergence: `alpha_rad` increases without limit. If this occurs, examine
 //!   the sign convention of the elevator CL. Also examine the moment arm of
 //!   the horizontal stabilizer.
