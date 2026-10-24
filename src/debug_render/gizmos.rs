@@ -1,8 +1,8 @@
-//! Debug gizmo systems for FDM overlays.
+//! Debug gizmo systems for the FDM overlays.
 //!
-//! Each `debug_render_*` function is a Bevy system added by [`AircraftFdmDebugPlugin`].
-//! They run in `PostUpdate`, after transform propagation, and are gated by the
-//! `FdmGizmos` config group being enabled.
+//! Each `debug_render_*` function is a Bevy system that [`AircraftFdmDebugPlugin`] adds.
+//! They run in `PostUpdate`, after transform propagation. They run only when the
+//! `FdmGizmos` configuration group is enabled.
 //!
 //! [`AircraftFdmDebugPlugin`]: super::AircraftFdmDebugPlugin
 
@@ -19,11 +19,12 @@ use crate::components::{
 // Centre of gravity
 //
 
-/// Draw a sphere at the aircraft's centre of gravity (CG).
+/// Draws a sphere at the center of gravity (CG) of the aircraft.
 ///
-/// Uses Avian's [`ComputedCenterOfMass`] (local offset from entity origin) and
-/// the entity's [`GlobalTransform`] rotation (synced from the physics rotation
-/// before `PostUpdate`) to compute the world-space CG position.
+/// It calculates the CG position in world space from two values. The first
+/// is the Avian [`ComputedCenterOfMass`] (a local offset from the entity
+/// origin). The second is the [`GlobalTransform`] rotation of the entity. Bevy
+/// copies the physics rotation into it before `PostUpdate`.
 pub(super) fn debug_render_cg(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
@@ -46,14 +47,14 @@ pub(super) fn debug_render_cg(
 // Aerodynamic centres
 //
 
-/// Draw a sphere at each zone's aerodynamic centre (AC).
+/// Draws a marker at the aerodynamic center (AC) of each zone.
 ///
-/// The AC is stored as [`AeroZone::ac_offset`] in the zone's local frame.
-/// `GlobalTransform::transform_point` converts it to world space.
+/// The AC is [`AeroZone::ac_offset`], in the local frame of the zone.
+/// `GlobalTransform::transform_point` changes it into world space.
 ///
-/// Rendered as a 3-axis cross (±X/Y/Z arms) so it remains clearly visible
-/// even when the AC coincides with the zone entity origin, where a sphere
-/// wireframe would blend into the zone outlines.
+/// The marker is a 3-axis cross (±X, ±Y, ±Z arms). The cross stays clearly
+/// visible when the AC is at the origin of the zone entity. At that position,
+/// a sphere wireframe is difficult to see among the zone outlines.
 pub(super) fn debug_render_ac(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
@@ -75,11 +76,12 @@ pub(super) fn debug_render_ac(
 // Force arrows
 //
 
-/// Draw a combined aero force arrow per zone, originating from the zone AC.
+/// Draws one combined aerodynamic force arrow for each zone, from the AC of
+/// the zone. It uses [`FdmGizmos::lift_color`].
 ///
-/// Uses [`AeroZone::ac_offset`] and the zone's [`GlobalTransform`] to find the
-/// world-space AC. Running in `PostUpdate` after transform propagation means
-/// there is no one-frame lag.
+/// It uses [`AeroZone::ac_offset`] and the [`GlobalTransform`] of the zone to
+/// find the AC in world space. The system runs in `PostUpdate`, after
+/// transform propagation. Thus, there is no lag of one frame.
 pub(super) fn debug_render_zone_forces(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
@@ -99,7 +101,7 @@ pub(super) fn debug_render_zone_forces(
     }
 }
 
-/// Draw thrust arrows on engine zones.
+/// Draws the thrust arrows on the engine zones.
 pub(super) fn debug_render_thrust(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
@@ -119,7 +121,7 @@ pub(super) fn debug_render_thrust(
     }
 }
 
-/// Draw the total aero+thrust force, weight, and net-force arrows from the CG.
+/// Draws three arrows from the CG: the total aerodynamic and thrust force, the weight, and the net force.
 #[allow(clippy::unnecessary_cast)]
 pub(super) fn debug_render_resultant(
     mut gizmos: Gizmos<FdmGizmos>,
@@ -163,11 +165,11 @@ pub(super) fn debug_render_resultant(
 // Moment arcs
 //
 
-/// Draw pitch, roll, and yaw moment arrows centered on the CG.
+/// Draws the pitch, roll, and yaw moment arrows from the CG.
 ///
-/// Each arrow points along the corresponding body axis (X = roll, Y = pitch,
-/// Z = yaw in Bevy convention) and is scaled by moment magnitude. Colors are
-/// taken from [`FdmGizmos::roll_moment_color`], `pitch_moment_color`, and
+/// Each arrow points along its body axis (X = roll, Y = pitch, Z = yaw). Its
+/// length is proportional to the moment. The colors come from
+/// [`FdmGizmos::roll_moment_color`], `pitch_moment_color`, and
 /// `yaw_moment_color`.
 pub(super) fn debug_render_moments(
     mut gizmos: Gizmos<FdmGizmos>,
@@ -218,21 +220,22 @@ pub(super) fn debug_render_moments(
 // Zone health wireframes
 //
 
-/// Draw zone outline wireframes using [`GizmoShape`] and [`GizmoContours`].
+/// Draws the zone outline wireframes from [`GizmoShape`] and [`GizmoContours`].
 ///
-/// Color is chosen by zone type unless overridden by [`FdmDebugRender`]:
-/// - Green: control surface (non-zero `control_role`)
-/// - Cyan: lifting surface (non-zero CL at a sample alpha)
-/// - Orange: non-aero zone (e.g. engine)
-/// - Grey: structural / drag-only
+/// It draws only the zones that have one of these components. The zone type
+/// sets the color, unless [`FdmDebugRender`] gives a different color:
+/// - Green: control surface (`control_role` is `Some`)
+/// - Cyan: lifting surface (CL is not zero at a sample alpha)
+/// - Orange: zone without aerodynamics (for example, an engine)
+/// - Gray: structural or drag-only zone
 ///
-/// Zones with a [`Failure`] component are tinted toward grey as damage
-/// accumulates. A fully failed zone (`remaining = 0.0`) is drawn grey
-/// regardless of its type.
+/// For a zone with a [`Failure`] component, the color changes toward gray as
+/// the damage increases. A fully failed zone (`remaining = 0.0`) is gray, for
+/// all zone types.
 ///
-/// The global [`FdmGizmos::zone_color`] acts as an on/off gate; set to `None`
-/// to disable. Per-entity [`FdmDebugRender::zone_color`] overrides the color
-/// (damage tint still applies on top).
+/// The global [`FdmGizmos::zone_color`] is an on/off switch. To disable the
+/// wireframes, set it to `None`. [`FdmDebugRender::zone_color`] on an entity
+/// replaces the color of the zone type. The damage tint applies on top.
 #[allow(clippy::unnecessary_cast)]
 #[allow(clippy::type_complexity)]
 pub(super) fn debug_render_zones(
@@ -297,10 +300,10 @@ fn zone_type_color(aero: Option<&AeroZone>) -> Color {
     }
 }
 
-/// Blend `color` toward grey proportional to damage (`remaining` 0 -> 1).
+/// Mixes `color` with gray, in proportion to the damage (`remaining` 0 -> 1).
 ///
-/// At `remaining = 1.0` the color is unchanged. At `remaining = 0.0` the
-/// result is fully grey (`srgba(0.55, 0.55, 0.55, 0.6)`).
+/// At `remaining = 1.0`, the color does not change. At `remaining = 0.0`, the
+/// result is fully gray (`srgba(0.55, 0.55, 0.55, 0.6)`).
 fn damage_tint(color: Color, remaining: f32) -> Color {
     let grey = Color::srgba(0.55, 0.55, 0.55, 0.6);
     color.mix(&grey, 1.0 - remaining)
@@ -367,14 +370,17 @@ fn draw_zone_shape(
 // Angle-of-attack / wind indicator
 //
 
-/// Draw the relative-wind arrow and angle-of-attack / sideslip indicators.
+/// Draws the relative-wind arrow and the nose arrow, to show the angle of
+/// attack and the sideslip angle.
 ///
-/// Draws from the CG:
-/// - A wind arrow in the freestream direction (opposite of velocity), length
-///   proportional to airspeed, colored by [`FdmGizmos::wind_color`].
-/// - A short body-axis forward arrow showing where the nose points.
-/// - A label line showing the AoA angle between the two (no text; the angle
-///   between nose-arrow and wind-arrow is the visual AoA).
+/// It draws two arrows from the CG, each 2 m long:
+/// - A wind arrow in the freestream direction (opposite to the velocity), in
+///   [`FdmGizmos::wind_color`].
+/// - A nose arrow along body X, in the same color with half alpha.
+///
+/// The wind arrow points almost opposite to the nose arrow. Its deviation
+/// from the line of the nose arrow shows the angle of attack and the sideslip
+/// angle. The view shows no text.
 #[allow(clippy::unnecessary_cast)]
 pub(super) fn debug_render_wind(
     mut gizmos: Gizmos<FdmGizmos>,
