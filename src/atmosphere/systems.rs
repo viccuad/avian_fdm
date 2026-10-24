@@ -1,17 +1,19 @@
 //! Bevy systems for the atmosphere subsystem.
 //!
-//! Bridges the pure ISA functions in [`super::isa`] to ECS data on aircraft
-//! entities. Currently exposes a single system, [`update_atmosphere`], which
-//! samples [`AtmosphereState`] from the world-space altitude.
+//! They connect the pure ISA functions in [`super::isa`] to the ECS data on
+//! aircraft entities. At this time, there is one system,
+//! [`update_atmosphere`]. It calculates [`AtmosphereState`] from the altitude
+//! in world space.
 
 use super::isa::atmosphere_at;
 use crate::_bevy::*;
 use crate::components::AtmosphereState;
 use avian3d::math::Scalar;
 
-/// Updates [`AtmosphereState`] on each aircraft from its world-space altitude.
+/// Updates [`AtmosphereState`] on each aircraft from its altitude in world space.
 ///
-/// Reads `GlobalTransform.translation().y` as geometric altitude above sea level.
+/// It uses `GlobalTransform.translation().y` as the geometric altitude above
+/// sea level.
 #[allow(clippy::unnecessary_cast)]
 pub fn update_atmosphere(mut query: Query<(&GlobalTransform, &mut AtmosphereState)>) {
     for (transform, mut atm) in &mut query {

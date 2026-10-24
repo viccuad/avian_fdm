@@ -1,23 +1,27 @@
-//! Flight kinematics: derive [`FlightState`] from velocity, attitude, wind, and atmosphere.
+//! Flight kinematics: calculates [`FlightState`] from the velocity, attitude, wind, and atmosphere.
 //!
-//! This module is the bridge between the rigid-body state owned by Avian
-//! (position, linear/angular velocity, orientation) and the aerodynamic
-//! reference frame consumed by the FDM (α, β, V, q̄, Mach, body rates p/q/r).
+//! This module connects two sides. One side is the rigid-body state that
+//! Avian owns (position, linear and angular velocity, orientation). The
+//! other side is the aerodynamic state that the FDM uses (alpha, beta, V,
+//! qbar, Mach, and the body rates p, q, r).
 //!
-//! It is deliberately *not* part of [`crate::atmosphere`]: the only atmospheric
-//! inputs are density (for q̄) and speed-of-sound (for Mach), both read from a
-//! pre-computed [`AtmosphereState`]. Everything else is pure kinematics —
-//! quaternion rotations and `atan2` calls — independent of any atmosphere model.
+//! It is intentionally *not* part of [`crate::atmosphere`]. It uses only two
+//! atmospheric inputs: the density (for qbar) and the speed of sound (for
+//! Mach). It reads both from an [`AtmosphereState`] that another system
+//! calculated before. All other calculations are pure kinematics, quaternion
+//! rotations and `atan2` calls. They do not depend on an atmosphere model.
 
 use crate::_bevy::*;
 use crate::atmosphere::WindResource;
 use crate::components::{AtmosphereState, FlightState};
 use avian3d::math::{Scalar, Vector};
 
-/// Updates [`FlightState`] on each aircraft from velocity and atmosphere.
+/// Updates [`FlightState`] on each aircraft from the velocity and the atmosphere.
 ///
-/// Reads [`avian3d::prelude::LinearVelocity`] and [`avian3d::prelude::AngularVelocity`],
-/// converts to body frame, and derives α, β, V, q̄, Re, Mach.
+/// It reads [`avian3d::prelude::LinearVelocity`] and
+/// [`avian3d::prelude::AngularVelocity`], and subtracts the wind from
+/// [`WindResource`] (if present). It turns the result into the body frame.
+/// Then it calculates alpha, beta, V, qbar, Mach, and the body rates.
 #[allow(clippy::unnecessary_cast)]
 pub fn update_flight_state(
     mut query: Query<(

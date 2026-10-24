@@ -4,11 +4,12 @@ use crate::_bevy::*;
 use avian3d::math::Vector;
 use serde::{Deserialize, Serialize};
 
-/// Optional uniform ambient wind resource. Insert into the Bevy [`World`] to
-/// add a global wind to all aircraft.
+/// Optional resource for a uniform ambient wind. Insert it into the Bevy
+/// [`World`] to add a global wind to all aircraft.
 ///
-/// If absent, relative wind = aircraft velocity only. Per-entity or
-/// altitude-varying wind is a post-v1 feature (see Group D roadmap).
+/// If this resource is absent, the relative wind comes only from the aircraft
+/// velocity. Wind for each entity, or wind that changes with altitude, is
+/// planned for a version after v1 (Group D of the roadmap).
 ///
 /// # Example
 /// ```rust,no_run
@@ -20,7 +21,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Resource, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
 #[reflect(Resource, Serialize, Deserialize)]
 pub struct WindResource {
-    /// Ambient wind velocity in world frame (m/s).
-    /// Positive X = wind blowing in world +X direction.
+    /// Ambient wind velocity in the world frame (m/s).
+    /// Positive X = the wind blows in the world +X direction.
     pub velocity_world_ms: Vector,
 }
