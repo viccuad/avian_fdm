@@ -1,9 +1,12 @@
-//! Parser for [foil.tools](https://foil.tools) XFoil polar CSV exports.
+//! Parser for XFoil polar CSV files that [foil.tools](https://foil.tools) exports.
 //!
-//! [foil.tools](https://foil.tools) exports a CSV with header `Re,alpha,CL,CD,CM`. The layout is
-//! Re-major: for each Re value, the full alpha sweep for Ncrit=1 appears first, then the full
-//! alpha sweep for Ncrit=4, then the full alpha sweep for Ncrit=9. Re blocks are sorted ascending;
-//! alpha is sorted ascending within each Ncrit sweep.
+//! [foil.tools](https://foil.tools) exports a CSV with the header `Re,alpha,CL,CD,CM`. The
+//! layout is Re-major. For each Re value, the full alpha sweep for Ncrit=1 comes first. The full
+//! alpha sweep for Ncrit=4 comes next, and then the full alpha sweep for Ncrit=9. The Re blocks
+//! are in ascending order. In each Ncrit sweep, alpha is in ascending order.
+//!
+//! Ncrit is the XFoil parameter for the transition from laminar to turbulent flow. A higher Ncrit
+//! means a cleaner free stream and a later transition.
 //!
 //! ## Usage
 //!
@@ -32,7 +35,7 @@
 //! 2000000,5,0.555,0.011,-0.01\n\
 //! ";
 //! let polars = parse_foil_tools_csv(csv).unwrap();
-//! // Use Ncrit=9 (clean atmospheric flight) slice:
+//! // Use the Ncrit=9 slice (clean atmospheric flight):
 //! let _foil = polars.ncrit9;
 //! ```
 
@@ -41,11 +44,12 @@ use crate::components::aero_coeff::AeroCoeff;
 use avian3d::math::Scalar as S;
 use thiserror::Error;
 
-/// All three Ncrit slices parsed from one foil.tools polar CSV.
+/// The three Ncrit slices from one foil.tools polar CSV.
 ///
-/// Each slice is a complete [`AirfoilData`] with `Table2D` CL, CD, and CM
-/// tables (alpha-major, Re columns). Post-stall extension is **not** applied;
-/// call [`AirfoilData::with_post_stall`] after selecting the slice you need.
+/// Each slice is a complete [`AirfoilData`] with `Table2D` tables for CL, CD,
+/// and CM (alpha rows, Re columns). The parser does **not** apply the
+/// post-stall extension. Select the slice that you need, and then call
+/// [`AirfoilData::with_post_stall`].
 #[derive(Debug, Clone)]
 pub struct FoilToolsPolars {
     /// Ncrit = 1 slice (very turbulent inflow, dirty conditions).
@@ -59,89 +63,89 @@ pub struct FoilToolsPolars {
 /// Errors returned by [`parse_foil_tools_csv`].
 #[derive(Debug, PartialEq, Error)]
 pub enum ParseError {
-    /// CSV has no non-empty lines.
+    /// The CSV has no non-empty lines.
     #[error("CSV is empty or has no data rows")]
     EmptyData,
-    /// First non-empty line is not the expected header.
+    /// The first non-empty line is not the expected header.
     #[error("expected header \"Re,alpha,CL,CD,CM\", got \"{got}\"")]
     BadHeader {
-        /// The actual first line found.
+        /// The first line that the parser found.
         got: String,
     },
     /// A data row has the wrong number of comma-separated fields.
     #[error("line {line}: expected {expected} fields, got {got}")]
     BadColumnCount {
-        /// 1-indexed line number in the source CSV.
+        /// Line number in the source CSV (starts at 1).
         line: usize,
-        /// Expected field count (5).
+        /// Expected number of fields (5).
         expected: usize,
-        /// Actual field count found.
+        /// Number of fields that the parser found.
         got: usize,
     },
-    /// A field could not be parsed as a number.
+    /// The parser cannot read a field as a number.
     #[error("line {line}: cannot parse field {column} from \"{value}\"")]
     BadField {
-        /// 1-indexed line number.
+        /// Line number (starts at 1).
         line: usize,
         /// Column name (`"Re"`, `"alpha"`, `"CL"`, `"CD"`, or `"CM"`).
         column: &'static str,
-        /// The raw string value that failed to parse.
+        /// The raw string that the parser cannot read.
         value: String,
     },
-    /// Total data row count is not a multiple of 3 (the CSV must contain
-    /// exactly three equal-sized blocks: one per Ncrit value).
+    /// The total number of data rows is not a multiple of 3. The CSV must
+    /// contain exactly three blocks of equal size, one for each Ncrit value.
     #[error("data row count {rows} is not a multiple of 3 (CSV must have three equal sequential blocks: Ncrit=1, Ncrit=4, Ncrit=9)")]
     NotMultipleOfThree {
-        /// Actual row count.
+        /// Number of rows that the parser found.
         rows: usize,
     },
-    /// Re values are not strictly increasing across Re blocks.
+    /// The Re values are not strictly increasing from one Re block to the next.
     #[error("Re values are not strictly increasing at index {at_index}")]
     NonMonotonicRe {
-        /// 0-indexed position in the Re breakpoint list where the violation occurs.
+        /// Position in the Re breakpoint list where the error occurs (starts at 0).
         at_index: usize,
     },
-    /// Alpha values within a Re block are not strictly increasing.
+    /// The alpha values in a Re block are not strictly increasing.
     #[error("alpha values in Re={re} block are not strictly increasing at index {at_index}")]
     NonMonotonicAlpha {
-        /// The Re value of the block where the violation was found.
+        /// The Re value of the block where the parser found the error.
         re: f64,
-        /// 0-indexed position within the block.
+        /// Position in the block (starts at 0).
         at_index: usize,
     },
-    /// The alpha grid is not identical across all Re blocks.
+    /// The alpha grid is not the same in all Re blocks.
     #[error("alpha grid for Re={re} differs from the first Re block")]
     InconsistentAlphaGrid {
-        /// The Re value of the block whose alpha grid differs from the first block.
+        /// The Re value of the block with an alpha grid that is different from the first block.
         re: f64,
     },
     /// A value is NaN or infinite.
     #[error("line {line}: field {column} is NaN or infinite")]
     NonFinite {
-        /// 1-indexed line number.
+        /// Line number (starts at 1).
         line: usize,
         /// Column name.
         column: &'static str,
     },
-    /// A CD value is negative, which is physically impossible.
+    /// A CD value is negative. This is physically not possible.
     #[error("Re={re}, alpha={alpha_deg} deg: CD={cd} is negative (physically impossible)")]
     NegativeCd {
-        /// Re value of the offending row.
+        /// Re value of the incorrect row.
         re: f64,
-        /// Alpha (degrees) of the offending row.
+        /// Alpha (degrees) of the incorrect row.
         alpha_deg: f64,
         /// The negative CD value.
         cd: f64,
     },
 }
 
-/// Parse a <https://foil.tools> XFoil polar CSV into all three Ncrit slices.
+/// Parses an XFoil polar CSV from <https://foil.tools> into the three Ncrit slices.
 ///
-/// foil.tools exports polars for all Ncrit values in a single CSV. The layout
-/// is Re-major: for each Re value, there are three consecutive alpha sweeps of
-/// equal length (one per Ncrit value, in order: Ncrit=1, Ncrit=4, Ncrit=9).
-/// Each sweep covers the same alpha range and is sorted alpha ascending. Re
-/// values are sorted ascending across the blocks.
+/// foil.tools exports the polars for all Ncrit values in one CSV. The layout
+/// is Re-major. For each Re value, there are three consecutive alpha sweeps
+/// of equal length. There is one sweep for each Ncrit value, in this order:
+/// Ncrit=1, Ncrit=4, Ncrit=9. Each sweep covers the same alpha range, in
+/// ascending order. The Re values are in ascending order from block to block.
 ///
 /// Example: for 2 Re values and 3 alpha points per sweep, the row order is:
 /// ```text
@@ -159,23 +163,25 @@ pub enum ParseError {
 ///
 /// # Ncrit boundary detection
 ///
-/// The CSV has no Ncrit column. The parser detects Ncrit boundaries purely by
-/// position: each Re block is divided into three equal thirds (rows
-/// `0..n_alpha` for Ncrit=1, `n_alpha..2*n_alpha` for Ncrit=4,
-/// `2*n_alpha..3*n_alpha` for Ncrit=9). If the block length is not divisible by
-/// 3, [`ParseError::NotMultipleOfThree`] is returned. No other validation of
-/// the Ncrit ordering is performed; a CSV with a different internal layout
-/// would be parsed silently into wrong data.
+/// The CSV has no Ncrit column. The parser finds the Ncrit boundaries only
+/// from the row position. It divides each Re block into three equal parts:
+/// rows `0..n_alpha` for Ncrit=1, `n_alpha..2*n_alpha` for Ncrit=4, and
+/// `2*n_alpha..3*n_alpha` for Ncrit=9. If the block length is not a multiple
+/// of 3, the parser returns [`ParseError::NotMultipleOfThree`]. The parser
+/// does no other check of the Ncrit order.
+///
+/// CAUTION: Use only the foil.tools layout. If the CSV has a different
+/// internal layout, the parser returns incorrect data without an error.
 ///
 /// # Errors
 ///
-/// Returns [`ParseError`] if the CSV is malformed or fails physical-sanity
-/// checks (negative CD, non-finite values).
+/// Returns [`ParseError`] if the CSV is malformed, or if a value is not
+/// physically possible (negative CD, non-finite values).
 ///
 /// # Post-stall
 ///
-/// Post-stall extension is **not** applied. Call [`AirfoilData::with_post_stall`]
-/// on the returned slice after selecting it.
+/// The parser does **not** apply the post-stall extension. Select a slice,
+/// and then call [`AirfoilData::with_post_stall`] on it.
 pub fn parse_foil_tools_csv(csv: &str) -> Result<FoilToolsPolars, ParseError> {
     // 1. Lex
     let rows = lex(csv)?;
@@ -342,9 +348,9 @@ fn lex(csv: &str) -> Result<Vec<RawRow>, ParseError> {
     Ok(rows)
 }
 
-/// Build one `AirfoilData` from a flat slice of rows that belong to a single
-/// Ncrit level. Rows must be in Re-major, alpha-ascending order (as produced
-/// by foil.tools).
+/// Builds one `AirfoilData` from a flat slice of rows for one Ncrit level.
+/// The rows must be in Re-major order, with alpha in ascending order (the
+/// foil.tools order).
 fn build_airfoil_data(rows: &[&RawRow]) -> Result<AirfoilData, ParseError> {
     // extract sorted unique Re values (Re-major order in input)
     let mut re_bps: Vec<f64> = Vec::new();

@@ -1,22 +1,26 @@
-//! [`AirfoilLibrary`] resource.
+//! [`AirfoilLibrary`] resource and airfoil registration.
 //!
-//! An airfoil section is used in [`crate::components::AeroZone`]. It provides three dimensionless
-//! coefficients as functions of angle of attack: lift (CL), drag (CD), and pitching moment (CM).
-//! The other three aircraft-level coefficients (CY, Croll, Cn) are geometry-emergent and are not
-//! meaningful at the 2-D section level.
+//! An [`crate::components::AeroZone`] can use an airfoil section. The section gives three
+//! dimensionless coefficients as functions of the angle of attack: lift (CL), drag (CD), and
+//! pitching moment (CM). The other three aircraft coefficients (CY, Croll, Cn) come from the
+//! geometry. They have no meaning for a 2-D section.
 //!
 //! ## Usage
 //!
-//! Register named airfoils at startup via [`RegisterAirfoil`], then set
-//! [`crate::components::AeroZone::airfoil_name`] to the registered name. A system running before
-//! the FDM resolves each zone's `Placeholder` cl/cd/cm fields from the library.
+//! At startup, register named airfoils with [`RegisterAirfoil`]. Then set
+//! [`crate::components::AeroZone::airfoil_name`] to the registered name. A system that runs before
+//! the FDM replaces the `Placeholder` fields `cl`, `cd`, and `cm` of each zone with the library
+//! data.
 //!
 //! ### With real polar data from [foil.tools](https://foil.tools)
 //!
-//! The recommended workflow for real aircraft is to export a polar CSV from
-//! [foil.tools](https://foil.tools), embed it at compile time with `include_str!`, parse it with
-//! [`foil_tools::parse_foil_tools_csv`], then optionally extend into the post-stall regime with
-//! [`AirfoilData::with_post_stall`] before registering.
+//! This is the recommended workflow for real aircraft:
+//!
+//! 1. Export a polar CSV from [foil.tools](https://foil.tools).
+//! 2. Embed the CSV at compile time with `include_str!`.
+//! 3. Parse it with [`foil_tools::parse_foil_tools_csv`].
+//! 4. Optionally, extend it into the post-stall range with [`AirfoilData::with_post_stall`].
+//! 5. Register the result.
 //!
 //! ```rust,no_run
 //! # use avian_fdm::prelude::*;
@@ -31,17 +35,17 @@
 //!         "MyFoil",
 //!         parse_foil_tools_csv(my_foil_csv)
 //!             .expect("embedded polar CSV must parse cleanly")
-//!             .ncrit9                         // pick the desired Ncrit slice
+//!             .ncrit9                         // select the Ncrit slice
 //!             .with_post_stall(7.0)           // aspect ratio of the lifting surface
 //!     );
 //! ```
 //!
-//! ### With hand-coded coefficients (prototyping)
+//! ### With coefficients that you write in the code (prototypes)
 //!
-//! For quick iteration or simple flat-plate approximations, coefficients can be
-//! specified directly. Any field left as [`crate::components::aero_coeff::AeroCoeff::Absent`] is
-//! silently zero; [`crate::components::aero_coeff::AeroCoeff::Placeholder`] emits a runtime
-//! warning so you notice it is still missing.
+//! For fast iteration or for simple flat-plate approximations, you can write the coefficients
+//! directly. A field that is [`crate::components::aero_coeff::AeroCoeff::Absent`] gives zero with
+//! no warning. A field that is [`crate::components::aero_coeff::AeroCoeff::Placeholder`] emits a
+//! warning at runtime, so that you see that it has no data yet.
 //!
 //! ```rust,no_run
 //! # use avian_fdm::prelude::*;
