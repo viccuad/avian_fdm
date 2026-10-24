@@ -1,28 +1,30 @@
-//! [`AeroCoeff::validate`] and the `is_strictly_increasing` helper.
+//! [`AeroCoeff::validate`] and the `is_strictly_increasing` helper function.
 
 use avian3d::math::Scalar as S;
 
 use super::types::AeroCoeff;
 
-/// Returns `true` if the slice is strictly increasing (each element > previous).
+/// Returns `true` if the slice is strictly increasing (each element > the previous element).
 pub(super) fn is_strictly_increasing(s: &[S]) -> bool {
     s.windows(2).all(|w| w[0] < w[1])
 }
 
 impl AeroCoeff {
-    /// Validate table structure. Returns a list of problems (empty = valid).
+    /// Validates the table structure. Returns a list of problems. An empty
+    /// list means that the coefficient is valid.
     ///
-    /// Checks performed:
-    /// - Table1D: `breakpoints` and `values` have equal length,
-    ///   breakpoints are strictly increasing, no NaN/Inf in either.
-    /// - Table2D: `data.len() == rows.len() * cols.len()`,
-    ///   rows and cols are strictly increasing, no NaN/Inf.
-    /// - Scalar: value is finite.
-    /// - Absent / Placeholder: always valid.
+    /// The checks:
+    /// - Table1D: `breakpoints` and `values` have the same length, and at
+    ///   least one entry. The breakpoints are strictly increasing. Neither
+    ///   contains NaN or Inf.
+    /// - Table2D: `data.len() == rows.len() * cols.len()`. `rows` and `cols`
+    ///   are not empty and are strictly increasing. No value is NaN or Inf.
+    /// - Scalar: the value is finite.
+    /// - Absent and Placeholder: always valid.
     ///
-    /// Call this at aircraft spawn time (e.g. in a startup system) to
-    /// catch data-entry mistakes before they produce silent garbage in
-    /// the hot path.
+    /// Call this method when the aircraft spawns (for example, in a startup
+    /// system). Then you find data-entry mistakes before they give incorrect
+    /// values in the hot path.
     pub fn validate(&self, label: &str) -> Vec<String> {
         let mut problems = Vec::new();
 
