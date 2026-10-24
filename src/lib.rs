@@ -47,6 +47,8 @@
 //! Spawn the reference J-3 Cub aircraft from `avian_fdm_j3cub_jsbsim`:
 //!
 //! ```rust,ignore
+//! use std::f32::consts::FRAC_PI_2;
+//!
 //! use avian_fdm::prelude::*;
 //! use avian_fdm_j3cub_jsbsim::presets::j3cub;
 //! use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
@@ -62,11 +64,13 @@
 //! }
 //!
 //! fn spawn(mut commands: Commands) {
+//!     // Turn body Z (down) to world -Y. Refer to "World frame" below.
+//!     let level = Quat::from_rotation_x(FRAC_PI_2);
 //!     let root = j3cub::spawn(
 //!         &mut commands,
-//!         Transform::from_xyz(0.0, 300.0, 0.0)
+//!         Transform::from_xyz(0.0, 300.0, 0.0).with_rotation(level),
 //!     );
-//!     // Override the default zero velocity to start at cruise airspeed.
+//!     // The default velocity is zero. Start at cruise airspeed.
 //!     commands.entity(root).insert(LinearVelocity(Vec3::new(27.0, 0.0, 0.0)));
 //! }
 //! ```
