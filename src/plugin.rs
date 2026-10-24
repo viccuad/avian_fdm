@@ -1,23 +1,26 @@
-//! Plugin registration and FDM system wiring.
+//! Plugin registration and the schedule of the FDM systems.
 //!
-//! ## Execution order within `PhysicsStepSystems::BroadPhase`
+//! ## Execution order in `PhysicsStepSystems::BroadPhase`
 //!
 //! ```text
 //! Atmosphere -> FlightState -> Forces
 //! ```
 //!
-//! The FDM chain runs in `BroadPhase` (not `First`) to avoid a Bevy static
-//! ambiguity with Avian's `update_child_collider_position`, which writes
-//! `Position`/`Rotation` for child colliders in `First`. Both systems operate
-//! on disjoint entity sets at runtime, but the static checker cannot prove this.
-//! `BroadPhase` runs after `First`, so the ordering is guaranteed.
+//! The FDM chain runs in `BroadPhase`, not in `First`. This prevents a static
+//! Bevy ambiguity with the Avian system `update_child_collider_position`. That
+//! system writes `Position` and `Rotation` for child colliders in `First`. At
+//! runtime, the two systems use different entities, but the static checker
+//! cannot prove this. `BroadPhase` runs after `First`, so the order is always
+//! correct.
 //!
-//! Avian's `ForceSystems::ApplyConstantForces` runs in `Solver` (after
-//! `BroadPhase`), so forces are always written before they are read.
+//! The Avian set `ForceSystems::ApplyConstantForces` runs in `Solver`, after
+//! `BroadPhase`. Thus, the FDM always writes the forces before Avian reads
+//! them.
 //!
-//! ## Adding a custom system (e.g. autopilot)
+//! ## Add a custom system (for example, an autopilot)
 //!
-//! Use [`AircraftFdmSystems`] to schedule relative to named sets:
+//! Use the named sets in [`AircraftFdmSystems`] to put your system in the
+//! correct position:
 //!
 //! ```rust,no_run
 //! # use bevy::prelude::*;
@@ -36,13 +39,13 @@ use crate::atmosphere::update_atmosphere;
 use crate::kinematics::update_flight_state;
 use crate::propulsion::compute_engine_zone_forces;
 
-/// Named system sets for the FDM pipeline. Use these to hook in custom systems.
+/// Named system sets for the FDM pipeline. Use them to add custom systems.
 ///
 /// Execution order: `Atmosphere` -> `FlightState` -> `Forces`
 ///
-/// All sets run inside `PhysicsStepSystems::BroadPhase`.
+/// All sets run in `PhysicsStepSystems::BroadPhase`.
 ///
-/// Example: autopilot that reads `FlightState` and writes `ControlInputs`:
+/// Example: an autopilot that reads `FlightState` and writes `ControlInputs`:
 ///
 /// ```rust,no_run
 /// # use bevy::prelude::*;
@@ -54,15 +57,15 @@ use crate::propulsion::compute_engine_zone_forces;
 /// ```
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum AircraftFdmSystems {
-    /// Update ISA atmosphere density, temperature, and dynamic pressure.
+    /// Updates the ISA atmosphere: density, pressure, temperature, and speed of sound.
     Atmosphere,
-    /// Derive FlightState (alpha, beta, airspeed, altitude) from physics state.
+    /// Calculates `FlightState` (alpha, beta, airspeed, altitude) from the physics state.
     FlightState,
-    /// Compute all zone forces (engine + aerodynamic) and accumulate onto the root body.
+    /// Calculates all zone forces (engine and aerodynamic) and adds them on the root entity.
     Forces,
 }
 
-/// Adds all FDM subsystems enabled by the active feature flags.
+/// Adds all FDM subsystems that the active feature flags enable.
 ///
 /// Add `PhysicsPlugins` before this plugin.
 ///
@@ -78,14 +81,16 @@ pub enum AircraftFdmSystems {
 ///
 /// # Startup validation
 ///
-/// In debug builds, a `PostStartup` system runs [`validate_aero_zones`] on
-/// every [`AeroZone`](crate::components::AeroZone) entity, logging warnings
-/// for table structure errors (unsorted breakpoints, dimension mismatches,
-/// NaN/Inf) and placeholder coefficients. Disable by setting
+/// In debug builds, a `PostStartup` system runs [`validate_aero_zones`] on each
+/// [`AeroZone`](crate::components::AeroZone) entity. It also runs
+/// [`validate_rigid_bodies`] on each aircraft root entity. The systems log a
+/// warning for each table structure error (unsorted breakpoints, dimension
+/// mismatches, NaN or Inf values). To disable these checks, set
 /// `AircraftFdmPlugin { validate_on_startup: false }`.
 pub struct AircraftFdmPlugin {
-    /// Run [`validate_aero_zones`] in `PostStartup`. Default: `true` in debug
-    /// builds, `false` in release.
+    /// Runs [`validate_aero_zones`] and [`validate_rigid_bodies`] in
+    /// `PostStartup`. Default: `true` in debug builds, `false` in release
+    /// builds.
     pub validate_on_startup: bool,
 }
 
@@ -167,14 +172,16 @@ fn register_fdm_systems(app: &mut App) {
     );
 }
 
-/// Startup validation system: warns if any [`crate::components::AircraftGeometry`] root entity
-/// does not have `RigidBody::Dynamic`.
+/// Startup validation system. It logs a warning for each
+/// [`crate::components::AircraftGeometry`] root entity that does not have
+/// `RigidBody::Dynamic`.
 ///
-/// A `RigidBody::Static` or `RigidBody::Kinematic` root will silently ignore
-/// all accumulated forces, so the aircraft will never move under aerodynamics.
+/// A `RigidBody::Static` or `RigidBody::Kinematic` root entity ignores all
+/// forces without a warning. Thus, the aerodynamic forces cannot move the
+/// aircraft.
 ///
-/// Registered automatically by [`AircraftFdmPlugin`] when
-/// `validate_on_startup` is `true` (default in debug builds).
+/// [`AircraftFdmPlugin`] adds this system automatically when
+/// `validate_on_startup` is `true` (the default in debug builds).
 pub fn validate_rigid_bodies(
     query: Query<(Entity, &avian3d::prelude::RigidBody), With<crate::components::AircraftGeometry>>,
 ) {
@@ -189,15 +196,15 @@ pub fn validate_rigid_bodies(
     }
 }
 
-/// Startup validation system: checks every [`crate::components::AeroZone`] for table structure
-/// errors and placeholder coefficients.
+/// Startup validation system. It examines each [`crate::components::AeroZone`]
+/// for table structure errors and negative dimensions.
 ///
-/// Runs in `PostStartup` (after all `Startup` systems have spawned entities).
-/// Logs warnings via `warn!` for each problem found. Does not
-/// panic; the aircraft will still run, but broken tables will produce garbage.
+/// It runs in `PostStartup`, after all `Startup` systems spawn their entities.
+/// It logs a `warn!` for each problem that it finds. It does not panic. The
+/// aircraft continues to run, but a broken table gives incorrect forces.
 ///
-/// Registered automatically by [`AircraftFdmPlugin`] when
-/// `validate_on_startup` is `true` (default in debug builds).
+/// [`AircraftFdmPlugin`] adds this system automatically when
+/// `validate_on_startup` is `true` (the default in debug builds).
 pub fn validate_aero_zones(query: Query<(Entity, &crate::components::AeroZone)>) {
     let mut total_problems = 0;
     for (entity, zone) in &query {
