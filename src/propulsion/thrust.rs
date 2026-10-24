@@ -1,4 +1,4 @@
-//! Engine thrust computation system (Gagg-Ferrar altitude model).
+//! System that calculates the engine thrust (Gagg-Ferrar altitude model).
 
 use crate::_bevy::*;
 use crate::math::{quat_to_quaternion, vector_to_vec3};
@@ -11,10 +11,12 @@ use crate::components::{
     get_remaining, AtmosphereState, ControlInputs, Failure, FlightState, ZoneForce,
 };
 
-/// Sea-level standard density (kg/m³).
+/// Standard air density at sea level (kg/m³).
 pub(super) const RHO_0: Scalar = 1.225;
 
-/// Phase 1: compute engine thrust and write `ZoneForce`.
+/// Calculates the thrust of each engine zone and writes it to its `ZoneForce`.
+///
+/// It runs before `compute_aero_forces`, which adds the thrust to the root entity.
 #[allow(clippy::type_complexity)]
 pub fn compute_engine_zone_forces(
     mut engine_query: Query<(
