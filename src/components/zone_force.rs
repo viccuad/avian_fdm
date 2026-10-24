@@ -1,24 +1,25 @@
-//! ZoneForce, per-zone force output written by the FDM
-//! `compute_aero_forces` system (and `compute_engine_zone_forces` for thrust).
-//! Also read by the debug visualisation for per-zone force arrows.
+//! `ZoneForce`: the force output of one zone. The FDM system
+//! `compute_aero_forces` writes it for aero zones, and
+//! `compute_engine_zone_forces` writes it for engine zones. The debug
+//! visualization reads it to draw a force arrow for each zone.
 
 use crate::_bevy::*;
 
-/// World-space force and application point for one zone.
+/// Force of one zone in world space, and the point where it acts.
 ///
-/// Written by `compute_aero_forces` / `compute_engine_zone_forces`.
-/// Read by `compute_aero_forces` (for engine zones during accumulation)
-/// and by the debug visualisation.
+/// `compute_aero_forces` and `compute_engine_zone_forces` write it.
+/// `compute_aero_forces` reads it for engine zones, when it adds up the
+/// forces. The debug visualization also reads it.
 ///
-/// Zero-initialised at spawn. Set to `default()` (zeroed) when the zone is
-/// fully failed (`Failure.remaining == 0.0`) or otherwise inactive.
+/// Its value is zero at spawn. It is set to `default()` (zero) when the zone
+/// has `Failure.remaining == 0.0` or is not active for another reason.
 ///
 /// **Do not read or write this component from game code.**
 #[derive(Component, Reflect, Default, Clone, Copy, Debug)]
 #[reflect(Component)]
 pub(crate) struct ZoneForce {
-    /// World-space force contribution (N), from CL, CD, CY coefficients.
+    /// Force contribution in world space (N), from the CL, CD, and CY coefficients.
     pub force: Vec3,
-    /// World-space point at which the force acts (for moment arm calculation).
+    /// Point in world space where the force acts (for the moment arm calculation).
     pub world_point: Vec3,
 }
