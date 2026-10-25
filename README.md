@@ -68,8 +68,8 @@ Add dependencies to `Cargo.toml`:
 [dependencies]
 avian_fdm              = "0.2"
 avian_fdm_j3cub_jsbsim = "0.2"
-avian3d                = "0.7"
-bevy                   = "0.19"
+avian3d                = "0.8"
+bevy                   = "0.20"
 ```
 
 Spawn the reference J-3 Cub aircraft:
@@ -122,6 +122,7 @@ The JSBSim-derived J-3 Cub reference aircraft is in the separate
 
 | avian_fdm | Bevy | avian3d |
 |---|---|---|
+| main | 0.20 | 0.8 |
 | 0.2 | 0.19 | 0.7 |
 | 0.1 | 0.18 | 0.6 |
 

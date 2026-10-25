@@ -46,8 +46,8 @@
 //! ```toml
 //! avian_fdm              = "0.2"
 //! avian_fdm_j3cub_jsbsim = { version = "0.2" }
-//! avian3d                = { version = "0.7" }
-//! bevy                   = { version = "0.19" }
+//! avian3d                = { version = "0.8" }
+//! bevy                   = { version = "0.20" }
 //! ```
 //!
 //! Spawn the reference J-3 Cub aircraft from `avian_fdm_j3cub_jsbsim`:
