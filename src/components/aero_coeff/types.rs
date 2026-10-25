@@ -1,65 +1,68 @@
-//! [`AeroCoeff`] enum and its trivial accessors.
+//! [`AeroCoeff`] enum and its simple accessors.
 
 use crate::_bevy::*;
 use avian3d::math::Scalar as S;
 use serde::{Deserialize, Serialize};
 
-/// An aerodynamic coefficient value: constant, 1-D table, or 2-D table.
+/// The value of one aerodynamic coefficient: a constant, a 1-D table, or a
+/// 2-D table.
 ///
-/// Used for CL, CD, CY, CM, Cl, Cn, any dimensionless coefficient that
-/// may depend on angle of attack and/or Reynolds number.
+/// The crate uses it for CL, CD, CY, CM, Croll, and Cn. It fits each
+/// dimensionless coefficient that can change with the angle of attack, the
+/// Reynolds number, or both.
 ///
-/// Call [`AeroCoeff::evaluate`] each frame to obtain a `Scalar` value at the
-/// current flight conditions.
+/// Call [`AeroCoeff::evaluate`] in each physics step to get a `Scalar` value
+/// at the current flight conditions.
 ///
-/// ## Completeness system, `Absent`, `Placeholder`, and data variants
+/// ## Completeness system: `Absent`, `Placeholder`, and the data variants
 ///
-/// Every coefficient field in [`crate::components::AeroZone`] is an `AeroCoeff`.
-/// Three variants carry distinct meaning for unmodelled coefficients:
+/// Each coefficient field in [`crate::components::AeroZone`] is an `AeroCoeff`.
+/// The variants have different meanings for coefficients without a model:
 ///
-/// | Variant | Meaning | Runtime |
+/// | Variant | Meaning | At runtime |
 /// |---|---|---|
-/// | `Absent` (default for secondary fields) | Not applicable by design, symmetric section, no CY, etc. | Silent 0.0 |
-/// | `Placeholder` (default for primary fields) | Should exist but not yet modelled | `warn_once!` + 0.0 |
-/// | `Scalar(0.0)` with [`crate::sourced!`] | Intentional explicit zero | Silent 0.0 |
-/// | `Table1D` / `Table2D` | Fully modelled | Interpolated value |
+/// | `Absent` (default for secondary fields) | Does not apply, by design (symmetric section, no CY) | 0.0, no warning |
+/// | `Placeholder` (default for primary fields) | Must exist, but has no model yet | `warn_once!` and 0.0 |
+/// | `Scalar(0.0)` with [`crate::sourced!`] | Intentional explicit zero | 0.0, no warning |
+/// | `Table1D` / `Table2D` | Full model | Interpolated value |
 ///
-/// `Placeholder` is the `Default` for `AeroCoeff`, so any primary field left
-/// unfilled automatically warns at runtime rather than silently producing zero.
+/// `Placeholder` is the `Default` for `AeroCoeff`. Thus, a primary field
+/// without data gives a warning at runtime. It does not give zero without a
+/// warning.
 #[derive(Reflect, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[reflect(Serialize, Deserialize)]
 pub enum AeroCoeff {
     /// Absent by design. This coefficient does not apply to this zone.
     ///
-    /// Evaluates to `0.0` silently (no warning). Use for secondary
-    /// coefficients that structurally don't exist on a given zone:
-    /// e.g. `cy` on a symmetric main wing, or `croll` when roll is
-    /// handled entirely by emergent geometry.
+    /// Evaluates to `0.0` with no warning. Use it for secondary coefficients
+    /// that do not exist on a zone because of its structure. Examples: `cy` on
+    /// a symmetric main wing, or `croll` when the roll comes fully from the
+    /// zone geometry.
     ///
-    /// This is the default for secondary `AeroZone` fields (`cy`, `cm`,
-    /// `croll`, `cn`). Set a field to `Absent` explicitly when you want
-    /// to document that the absence is intentional.
+    /// This is the default for the secondary `AeroZone` fields (`cy`, `cm`,
+    /// `croll`, `cn`). To show that the absence is intentional, set the field
+    /// to `Absent` explicitly.
     Absent,
 
-    /// Explicit "not yet modelled" sentinel.
+    /// Explicit sentinel for "no model yet".
     ///
-    /// Evaluates to `0.0` (same as `Scalar(0.0)`) but emits a
-    /// `warn_once!` on the first evaluation to notify the aircraft
-    /// author that this coefficient still needs data.
+    /// Evaluates to `0.0` (the same as `Scalar(0.0)`). On the first
+    /// evaluation, it also emits a `warn_once!`. The warning tells the
+    /// aircraft author that this coefficient still needs data.
     ///
-    /// This is the [`Default`] value for `AeroCoeff` and the default for
-    /// primary fields (`cl`, `cd`). Any `AeroZone` field that is not
-    /// explicitly set will be `Placeholder`, ensuring gaps are visible at
-    /// runtime rather than silently contributing zero.
+    /// This is the [`Default`] value for `AeroCoeff`. It is also the default
+    /// for the primary fields (`cl`, `cd`). Each `AeroZone` field that you do
+    /// not set explicitly is `Placeholder`. Thus, the gaps are visible at
+    /// runtime. They do not add a zero without a warning.
     ///
-    /// Replace with [`AeroCoeff::Scalar`] (annotated with [`crate::sourced!`])
-    /// or a lookup table once you have data.
+    /// When you have data, replace it with [`AeroCoeff::Scalar`] (with a
+    /// [`crate::sourced!`] note) or with a table.
     Placeholder,
 
-    /// Constant value. Suitable for simple linear models.
+    /// Constant value. Good for simple models.
     Scalar(S),
 
-    /// 1-D lookup table: coefficient as a function of angle of attack (rad).
+    /// 1-D table: the coefficient as a function of the angle of attack (rad).
     ///
     /// `breakpoints` and `values` must have the same length (>= 1).
     /// `breakpoints` must be strictly increasing.
@@ -70,9 +73,9 @@ pub enum AeroCoeff {
         values: Vec<S>,
     },
 
-    /// 2-D lookup table: coefficient as a function of angle of attack x Reynolds number.
+    /// 2-D table: the coefficient as a function of the angle of attack and the Reynolds number.
     ///
-    /// Stored row-major: `data[i * cols.len() + j]` is the value at
+    /// The storage is row-major: `data[i * cols.len() + j]` is the value at
     /// `rows[i]` (alpha) and `cols[j]` (Re).
     Table2D {
         /// Angle-of-attack breakpoints (rows), in radians, strictly increasing.
@@ -85,23 +88,23 @@ pub enum AeroCoeff {
 }
 
 impl Default for AeroCoeff {
-    /// Returns [`AeroCoeff::Placeholder`] so that any unset coefficient is
-    /// flagged at runtime rather than silently producing zero.
+    /// Returns [`AeroCoeff::Placeholder`]. Thus, each coefficient without data
+    /// gives a warning at runtime, not a zero without a warning.
     fn default() -> Self {
         AeroCoeff::Placeholder
     }
 }
 
 impl AeroCoeff {
-    /// Returns `true` if this coefficient is `Absent` (not applicable by design).
+    /// Returns `true` if this coefficient is `Absent` (does not apply, by design).
     pub fn is_absent(&self) -> bool {
         matches!(self, AeroCoeff::Absent)
     }
 
-    /// Returns `true` if this coefficient is `Placeholder` (not yet modelled).
+    /// Returns `true` if this coefficient is `Placeholder` (no model yet).
     ///
-    /// Useful for validation and tooling; the hot path should just call
-    /// [`evaluate`](Self::evaluate) which handles the warning automatically.
+    /// Use it for validation and tools. In the hot path, call
+    /// [`evaluate`](Self::evaluate). It gives the warning automatically.
     pub fn is_placeholder(&self) -> bool {
         matches!(self, AeroCoeff::Placeholder)
     }

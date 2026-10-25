@@ -8,25 +8,25 @@ use super::types::AirfoilData;
 
 /// Registry of named airfoil definitions.
 ///
-/// Populated at startup via [`super::plugin::RegisterAirfoil::register_airfoil`].
-/// The library starts empty; aircraft crates are responsible for parsing
-/// and registering their own airfoil data (e.g. via
+/// At startup, [`super::plugin::RegisterAirfoil::register_airfoil`] fills it.
+/// The library starts empty. Each aircraft crate must parse and register its
+/// own airfoil data (for example, with
 /// [`super::foil_tools::parse_foil_tools_csv`]).
 ///
-/// Looked up by the airfoil resolution system to populate
-/// [`crate::components::AeroZone`] fields at spawn time.
+/// At spawn time, the airfoil resolution system reads the library to fill the
+/// fields of each [`crate::components::AeroZone`].
 #[derive(Resource, Default)]
 pub struct AirfoilLibrary {
     pub(super) map: HashMap<String, AirfoilData>,
 }
 
 impl AirfoilLibrary {
-    /// Register an airfoil under `name`. Overwrites any existing entry.
+    /// Registers an airfoil under `name`. Replaces an entry with the same name.
     pub fn register(&mut self, name: impl Into<String>, data: AirfoilData) {
         self.map.insert(name.into(), data);
     }
 
-    /// Look up an airfoil by name. Returns `None` if not registered.
+    /// Finds an airfoil by name. Returns `None` if the name is not registered.
     pub fn lookup(&self, name: &str) -> Option<&AirfoilData> {
         self.map.get(name)
     }

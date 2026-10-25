@@ -1,10 +1,11 @@
 //! FDM debug rendering plugin.
 //!
-//! Renders aerodynamic force vectors, moment arcs, zone health wireframes, and
-//! angle-of-attack indicators as Bevy gizmos.
+//! It draws Bevy gizmos for the aerodynamic force vectors, the moment arrows,
+//! the zone health wireframes, and the angle-of-attack indicator.
 //!
-//! Only compiled with `features = ["debug-plugin"]`. Add alongside
-//! [`crate::plugin::AircraftFdmPlugin`], not included in it by default:
+//! The crate compiles this module only with `features = ["debug-plugin"]`.
+//! [`crate::plugin::AircraftFdmPlugin`] does not include it. Add it next to
+//! that plugin:
 //!
 //! ```rust,no_run
 //! use avian_fdm::plugin::AircraftFdmPlugin;
@@ -16,7 +17,7 @@
 //!     .run();
 //! ```
 //!
-//! Configure globally via [`GizmoConfigStore`] using [`FdmGizmos`]:
+//! To configure it for all entities, use [`FdmGizmos`] in [`GizmoConfigStore`]:
 //!
 //! ```rust,no_run
 //! use avian_fdm::debug_render::FdmGizmos;
@@ -29,7 +30,7 @@
 //!     );
 //! ```
 //!
-//! Override per zone entity with [`FdmDebugRender`].
+//! To change the color of one zone entity, use [`FdmDebugRender`].
 
 mod colliders;
 mod configuration;
@@ -45,8 +46,8 @@ use gizmos::*;
 
 /// Plugin that adds all FDM debug gizmo overlays.
 ///
-/// Must be added **separately** from [`crate::plugin::AircraftFdmPlugin`], it is not included
-/// by default (following Avian's `PhysicsDebugPlugin` convention).
+/// You must add it **separately** from [`crate::plugin::AircraftFdmPlugin`]. That plugin does not
+/// include it. This is the same convention as the Avian `PhysicsDebugPlugin`.
 ///
 /// [`AircraftFdmPlugin`]: crate::plugin::AircraftFdmPlugin
 #[derive(Default)]

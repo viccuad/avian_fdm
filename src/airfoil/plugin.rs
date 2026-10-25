@@ -6,7 +6,7 @@ use crate::components::aero_coeff::AeroCoeff;
 use super::library::AirfoilLibrary;
 use super::types::AirfoilData;
 
-/// Extension trait for [`App`] — register a named airfoil into [`AirfoilLibrary`].
+/// Extension trait for [`App`]: registers a named airfoil in [`AirfoilLibrary`].
 ///
 /// # Example
 ///
@@ -24,10 +24,11 @@ use super::types::AirfoilData;
 ///     });
 /// ```
 pub trait RegisterAirfoil {
-    /// Register `data` under `name` in the [`AirfoilLibrary`] resource.
+    /// Registers `data` under `name` in the [`AirfoilLibrary`] resource.
     ///
-    /// Call after [`AircraftFdmPlugin`](crate::plugin::AircraftFdmPlugin) has been added
-    /// (the plugin initialises the resource). Overwrites any existing entry.
+    /// Call it after you add [`AircraftFdmPlugin`](crate::plugin::AircraftFdmPlugin).
+    /// The plugin creates the resource. This method replaces an entry with
+    /// the same name.
     fn register_airfoil(&mut self, name: impl Into<String>, data: AirfoilData) -> &mut Self;
 }
 
@@ -40,15 +41,15 @@ impl RegisterAirfoil for App {
     }
 }
 
-/// System that resolves `AeroZone::airfoil_name` to coefficient tables.
+/// System that changes `AeroZone::airfoil_name` into coefficient tables.
 ///
-/// Runs in `PreUpdate` on every newly added `AeroZone`. For each zone with
-/// a non-empty `airfoil_name`, looks up the name in [`AirfoilLibrary`] and
-/// overwrites any [`AeroCoeff::Placeholder`] `cl`/`cd`/`cm` field with the
-/// corresponding data from the library. Explicit (non-`Placeholder`) fields
-/// are never overwritten.
+/// It runs in `PreUpdate` on each new `AeroZone`. For each zone with a
+/// non-empty `airfoil_name`, it finds the name in [`AirfoilLibrary`]. Then it
+/// replaces each [`AeroCoeff::Placeholder`] field in `cl`, `cd`, and `cm` with
+/// the matching library data. It never replaces an explicit
+/// (non-`Placeholder`) field.
 ///
-/// Emits a `warn_once!` if the name is not found in the library.
+/// If the library does not contain the name, it emits a `warn_once!`.
 pub fn resolve_airfoil_names(
     library: Res<AirfoilLibrary>,
     mut zones: Query<&mut crate::components::AeroZone, Added<crate::components::AeroZone>>,

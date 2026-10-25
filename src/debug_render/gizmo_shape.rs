@@ -1,42 +1,42 @@
-//! [`GizmoShape`], optional visual override for debug wireframe drawing.
+//! [`GizmoShape`]: the visual shape of a zone in the debug wireframe view.
 //!
 //! # Module location
 //!
-//! This file lives in `src/debug_render/` but is declared at the crate root
-//! (via `#[path]`) **without** the `debug-plugin` feature gate.  The reason is
-//! that [`crate::plugin::AircraftFdmPlugin`] (the core plugin) calls
-//! `.register_type::<GizmoShape>()` unconditionally so that these components
-//! remain scene-serializable even in builds where `debug-plugin` is disabled.
-//! Users can therefore store `GizmoShape` overrides in scene files and only
-//! enable [`crate::debug_render::AircraftFdmDebugPlugin`] in development builds.
+//! This file is in `src/debug_render/`, but the crate root declares it (with
+//! `#[path]`) **without** the `debug-plugin` feature gate. The core plugin,
+//! [`crate::plugin::AircraftFdmPlugin`], always calls
+//! `.register_type::<GizmoShape>()`. Thus, these components stay
+//! scene-serializable in builds without `debug-plugin`. You can keep
+//! `GizmoShape` values in scene files, and enable
+//! [`crate::debug_render::AircraftFdmDebugPlugin`] only in development builds.
 //!
-//! ## Hybrid visualisation approach
+//! ## Two wireframe views
 //!
-//! Most zones are drawn directly from their [`avian3d::prelude::Collider`]
-//! shape, no `GizmoShape` needed. This ensures the debug wireframe always
-//! matches what the physics engine sees.
+//! The debug plugin has two separate wireframe views:
 //!
-//! Attach `GizmoShape` **only** when the collider shape doesn't represent the
-//! desired visual:
+//! - **Zone wireframes** draw only the zones that have a `GizmoShape` or a
+//!   [`GizmoContours`]. The color shows the zone type and the damage.
+//! - **Collider wireframes** draw the raw [`avian3d::prelude::Collider`]
+//!   shape of each zone, when [`crate::debug_render::ShowColliders`] is
+//!   `true`. Use this view to make sure that the `GizmoShape` agrees with the
+//!   physics collider.
 //!
-//! | Use case              | Example           | GizmoShape variant |
-//! |-----------------------|-------------------|--------------------|
-//! | Tapered surface       | Vertical fin      | `Quad`             |
-//! | Line-like structure   | Wing strut        | `Strut`            |
-//! | Different shape class | Engine cowl       | `Cylinder`         |
-//! | Round instead of box  | Wheel             | `Sphere`           |
+//! Select the `GizmoShape` variant that looks most like the part:
 //!
-//! Aerodynamic surfaces (wings, h-stab, ailerons, elevator) use thin colliders
-//! (~ 2 cm) whose cuboid outline naturally looks like a flat panel, they need
-//! no `GizmoShape` at all.
+//! | Use case              | Example                       | GizmoShape variant |
+//! |-----------------------|-------------------------------|--------------------|
+//! | Flat panel            | Wing, horizontal stabilizer   | `Box`              |
+//! | Tapered surface       | Vertical fin                  | `Quad`             |
+//! | Line-like structure   | Wing strut                    | `Strut`            |
+//! | Round body            | Engine cowl                   | `Cylinder`         |
+//! | Round instead of box  | Wheel                         | `Sphere`           |
 //!
 //! ## Contour detail
 //!
-//! [`GizmoContours`] adds arbitrary linestrips to a zone for visual detail
-//! beyond what the collider shape shows, curved fuselage profiles, airfoil
-//! cross-sections, rounded wingtips. These are purely decorative but are
-//! zone-aware: they inherit damage colouring and disappear when the zone is
-//! destroyed.
+//! [`GizmoContours`] adds free linestrips to a zone. They give more visual
+//! detail than the shape: curved fuselage profiles, airfoil cross-sections,
+//! and rounded wing tips. They are only decorative, but they belong to the
+//! zone. They get the same damage color as the zone.
 
 use crate::_bevy::*;
 use serde::{Deserialize, Serialize};
@@ -45,15 +45,15 @@ fn default_cylinder_axis() -> Vec3 {
     Vec3::X
 }
 
-/// Describes how a zone entity should be drawn in the gizmo debug view.
+/// Sets how the gizmo debug view draws a zone entity.
 ///
-/// This is purely visual, it has no effect on physics or aerodynamics.
-/// Multiple shapes can approximate curved surfaces (fuselage cross-sections,
-/// rounded wingtips) that the physics collider doesn't need to model.
+/// It is only visual. It has no effect on the physics or the aerodynamics.
+/// You can use it to show a shape that the physics collider does not need to
+/// model.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
 pub enum GizmoShape {
-    /// Axis-aligned box (full extents in metres).
+    /// Box aligned with the local axes (full extents in meters).
     Box {
         /// Full extent along local X (forward).
         x: f32,
@@ -64,33 +64,33 @@ pub enum GizmoShape {
     },
     /// Cylinder aligned along a local axis.
     Cylinder {
-        /// Radius (metres).
+        /// Radius (meters).
         radius: f32,
-        /// Length along the axis (metres).
+        /// Length along the axis (meters).
         length: f32,
-        /// Local-frame axis the cylinder is aligned along. Default: `Vec3::X` (forward).
+        /// Axis of the cylinder in the local frame. Default: `Vec3::X` (forward).
         #[serde(default = "default_cylinder_axis")]
         axis: Vec3,
     },
-    /// Cone pointing along local +X (forward), base at −X.
+    /// Cone that points along local +X (forward), with its base at −X.
     Cone {
-        /// Base radius (metres).
+        /// Base radius (meters).
         radius: f32,
-        /// Length along local X (metres).
+        /// Length along local X (meters).
         length: f32,
     },
     /// Sphere.
     Sphere {
-        /// Radius (metres).
+        /// Radius (meters).
         radius: f32,
     },
-    /// Flat quadrilateral outline defined by four corners in local frame.
-    /// Used for tapered fins, control surfaces, or any non-rectangular panel.
+    /// Flat quadrilateral outline with four corners in the local frame.
+    /// Use it for tapered fins, control surfaces, or other panels that are not rectangular.
     Quad {
-        /// Four corner points in local coordinates, drawn as a closed loop.
+        /// Four corner points in local coordinates. The view draws them as a closed loop.
         corners: [Vec3; 4],
     },
-    /// Thin strut drawn as a single line from `start` to `end` in local frame.
+    /// Thin strut. The view draws it as one line from `start` to `end` in the local frame.
     Strut {
         /// Start point in local coordinates.
         start: Vec3,
@@ -99,15 +99,15 @@ pub enum GizmoShape {
     },
 }
 
-/// Additional linestrip contours for detailed aircraft outline rendering.
+/// More linestrip contours, for a detailed outline of the aircraft.
 ///
-/// Each entry is a polyline (sequence of points in zone-local coordinates)
-/// drawn as a connected linestrip. Use this to add curved profiles,
-/// cross-section rings, airfoil sections, or any detail that the collider
-/// shape doesn't capture.
+/// Each entry is a polyline (a sequence of points in the local coordinates of
+/// the zone). The view draws it as a connected linestrip. Use it to add curved
+/// profiles, cross-section rings, airfoil sections, or other details that the
+/// collider shape does not show.
 ///
-/// Contours inherit the zone's damage colour, they fade toward red as
-/// health decreases and vanish when the zone is destroyed.
+/// Contours get the damage color of the zone. As the health decreases, they
+/// change toward gray. At `remaining = 0.0`, they are fully gray.
 ///
 /// # Example
 /// ```rust
@@ -123,6 +123,6 @@ pub enum GizmoShape {
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct GizmoContours {
-    /// Each entry is a polyline drawn as a connected linestrip.
+    /// Each entry is a polyline. The view draws it as a connected linestrip.
     pub lines: Vec<Vec<Vec3>>,
 }

@@ -1,73 +1,76 @@
-//! Step 2: stability-frame forces and pure torques to world coordinates.
+//! Step 2: turns the stability-frame forces and the pure torques into world coordinates.
 
 use avian3d::math::{Quaternion, Scalar, Vector};
 
 use super::coefficients::ZoneCoefficients;
 
-/// World-space force and torque produced by a single zone.
+/// Force and torque of one zone, in world space.
 pub(crate) struct ZoneWorldForce {
     /// Aerodynamic force in world coordinates (N).
     pub force: Vector,
     /// Pure aerodynamic torque in world coordinates (N·m).
     ///
-    /// This is the couple that exists independently of the zone's position
-    /// (e.g. an airfoil's pitching moment about its own aerodynamic centre).
-    /// It is *not* the moment-arm torque, that is computed separately by the
-    /// caller using `(zone_position − CG) × force`.
+    /// This is the couple that does not depend on the position of the zone
+    /// (for example, the pitching moment of an airfoil about its own
+    /// aerodynamic center). It is *not* the torque from the moment arm. The
+    /// caller calculates that torque separately, with
+    /// `(zone_position − CG) × force`.
     pub torque: Vector,
 }
 
-/// Convert non-dimensional coefficients into a world-space force and torque.
+/// Changes non-dimensional coefficients into a force and a torque in world
+/// space.
 ///
-/// # Coordinate frame journey
+/// # Path through the coordinate frames
 ///
-/// Drag, lift, and side force live in different frames and are handled
-/// separately to keep each physically correct.
+/// Drag, lift, and side force use different frames. The function calculates
+/// them separately, so that each one is physically correct.
 ///
-/// **Drag** always opposes the full 3D velocity vector. Passing the unit
-/// velocity vector in zone frame and negating gives the drag direction
-/// regardless of sideslip. After rotating by `zone_to_world`, drag correctly
-/// opposes the velocity in world space regardless of dihedral or sweep:
-///
-/// ```text
-/// F_drag_zone = −CD · q̄ · S · vel_zone_unit
-/// ```
-///
-/// **Lift and side force** use the stability frame: the zone frame rotated
-/// by −α_zone about zone-Y. CY is the zone-lateral force (stability +Y equals
-/// zone +Y), so using the stability frame keeps CY rotating with the aircraft
-/// and zone. Using the wind frame (which also rotates by beta) would lock CY
-/// to a fixed world direction as the aircraft yaws.
+/// **Drag** always opposes the full 3-D velocity vector. The function takes
+/// the unit velocity vector in the zone frame and inverts it. The result is
+/// the drag direction, for all sideslip angles. After the rotation by
+/// `zone_to_world`, the drag opposes the velocity in world space, for all
+/// dihedral and sweep angles:
 ///
 /// ```text
-/// F_lift_side_stab = ( 0,  CY · q̄ · S,  −CL · q̄ · S )
-/// F_lift_side_zone  = R_y(−α_zone) · F_lift_side_stab
+/// F_drag_zone = −CD * qbar * S * vel_zone_unit
 /// ```
 ///
-/// Both are then rotated to world space using `zone_to_world`, which is the
-/// composition of the aircraft body rotation and the zone's own rotation:
+/// **Lift and side force** use the stability frame. The stability frame is
+/// the zone frame turned by −alpha_zone about zone Y. CY is the lateral force
+/// of the zone (stability +Y is the same as zone +Y). Thus, in the stability
+/// frame, CY turns with the aircraft and the zone. The wind frame also turns
+/// by beta. In the wind frame, CY stays in one world direction when the
+/// aircraft yaws, and this is not correct.
 ///
 /// ```text
-/// zone_to_world = body_to_world · zone_q
-/// F_drag_zone = -CD * q-bar * S * vel_zone_unit
-/// F_lift_side_stab = ( 0,  CY * q-bar * S,  -CL * q-bar * S )
-/// F_world = zone_to_world * (F_drag_zone + R_y(-alpha) * F_lift_side_stab)
+/// F_lift_side_stab = ( 0,  CY * qbar * S,  −CL * qbar * S )
+/// F_lift_side_zone = R_y(−alpha_zone) * F_lift_side_stab
 /// ```
 ///
-/// For zones with identity rotation (zone_q = identity), this reduces exactly
-/// to the previous body-frame formulation.
+/// Then the function turns both forces into world space with
+/// `zone_to_world`. This rotation is the aircraft body rotation, followed by
+/// the rotation of the zone:
+///
+/// ```text
+/// zone_to_world = body_to_world * zone_q
+/// F_world       = zone_to_world * (F_drag_zone + F_lift_side_zone)
+/// ```
+///
+/// For a zone with no rotation (zone_q = identity), the zone frame and the
+/// body frame are the same.
 ///
 /// # Pure aerodynamic torques
 ///
-/// Moment coefficients (CM, Croll, Cn) represent pure couples expressed in
-/// zone frame. **Roll and yaw use the aircraft wingspan `b` as the reference
-/// length (always the full span, not a zone span); pitch uses the zone's own
-/// chord `c̄`:**
+/// The moment coefficients (CM, Croll, Cn) are pure couples in the zone frame.
+/// **Roll and yaw use the aircraft wing span `b` as the reference length
+/// (always the full span, not the span of the zone). Pitch uses the chord of
+/// the zone, `c_bar_zone`:**
 ///
 /// ```text
-/// τ_zone = ( Croll · q̄ · S_zone · b,
-///            CM    · q̄ · S_zone · c̄_zone,
-///            Cn    · q̄ · S_zone · b )
+/// tau_zone = ( Croll * qbar * S_zone * b,
+///              CM    * qbar * S_zone * c_bar_zone,
+///              Cn    * qbar * S_zone * b )
 /// ```
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn zone_force_world(
@@ -80,12 +83,12 @@ pub(crate) fn zone_force_world(
     vel_zone_unit: Vector,
     zone_to_world: Quaternion,
 ) -> ZoneWorldForce {
-    // Drag: opposes the full 3D velocity vector in zone frame.
+    // Drag: opposes the full 3-D velocity vector in the zone frame.
     let drag_zone = vel_zone_unit * (-coeffs.cd * qbar * zone_area);
 
-    // Lift and side force: stability frame (alpha rotation about zone-Y only).
-    // CY = stability +Y = zone +Y, so this keeps side force rotating with the
-    // aircraft and zone instead of being locked to a world direction.
+    // Lift and side force: stability frame (rotation by -alpha about zone Y).
+    // CY = stability +Y = zone +Y, so the side force turns with the aircraft
+    // and the zone, instead of staying in one world direction.
     let stab_to_zone = Quaternion::from_rotation_y(-alpha);
     let lift_side_stab = Vector::new(
         0.0,
@@ -147,7 +150,7 @@ mod tests {
     #[test]
     fn drag_opposes_forward_motion() {
         let coeffs = unit_coeffs(0.0, 1.0, 0.0, 0.0);
-        // vel_body_unit = +X (flying forward at alpha=0, beta=0)
+        // vel_body_unit = +X (flying forward at alpha = 0, beta = 0)
         let wf = zone_force_world(
             &coeffs,
             1000.0,
@@ -170,12 +173,12 @@ mod tests {
     #[test]
     fn drag_opposes_velocity_not_nose_at_sideslip() {
         let coeffs = unit_coeffs(0.0, 1.0, 0.0, 0.0);
-        // Aircraft yawed 45 degrees right. Velocity is still world +X.
-        // In body frame, the velocity has a sideways (beta) component.
+        // The aircraft yaws 45 deg right. The velocity is still world +X.
+        // In the body frame, the velocity has a sideways (beta) component.
         let frac_pi_4 = avian3d::math::FRAC_PI_2 / 2.0;
         let beta: Scalar = -frac_pi_4;
         let vel_body_unit = Vector::new(beta.cos(), beta.sin(), 0.0);
-        // body_to_world: initial spawn rotation + 45 deg right yaw
+        // body_to_world: the initial spawn rotation, then a 45-deg right yaw.
         let body_to_world = Quaternion::from_rotation_y(-frac_pi_4)
             * Quaternion::from_rotation_x(avian3d::math::FRAC_PI_2);
         let wf = zone_force_world(
@@ -188,13 +191,13 @@ mod tests {
             vel_body_unit,
             body_to_world,
         );
-        // Drag must oppose velocity (world +X), so x-component is negative.
+        // Drag must oppose the velocity (world +X). Thus, the X component is negative.
         assert!(
             wf.force.x < 0.0,
             "drag x should be negative, got {}",
             wf.force.x
         );
-        // Drag must not have a significant world-Z component (not perpendicular to velocity).
+        // Drag must not have a large world-Z component. It must not be perpendicular to the velocity.
         assert!(
             wf.force.z.abs() < wf.force.x.abs() * 0.01,
             "drag should not push sideways, z={}",
@@ -223,10 +226,10 @@ mod tests {
             body_to_world_level,
         );
 
-        // Aircraft yawed 90 degrees right.
+        // The aircraft yaws 90 deg right.
         let body_to_world_yawed =
             Quaternion::from_rotation_y(-frac_pi_2) * Quaternion::from_rotation_x(frac_pi_2);
-        // At 90 deg yaw, velocity (world +X) is now body -Y, so beta = -90 deg.
+        // At 90 deg of yaw, the velocity (world +X) is now body -Y. Thus, beta = -90 deg.
         let beta_90: Scalar = -frac_pi_2;
         let vel_body_unit_yawed = Vector::new(beta_90.cos(), beta_90.sin(), 0.0);
         let wf_yawed = zone_force_world(
@@ -240,7 +243,7 @@ mod tests {
             body_to_world_yawed,
         );
 
-        // The force direction must differ between level and yawed (rotates with aircraft).
+        // The force direction must differ between level and yawed. It turns with the aircraft.
         let dir_level = wf_level.force.normalize();
         let dir_yawed = wf_yawed.force.normalize();
         let dot = dir_level.dot(dir_yawed);

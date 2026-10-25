@@ -4,43 +4,48 @@ use crate::_bevy::*;
 use avian3d::math::{Scalar, Vector};
 use serde::{Deserialize, Serialize};
 
-/// Piston engine configuration. Attach to the engine child entity alongside
-/// an Avian [`avian3d::prelude::Collider`] and
+/// Configuration of a piston engine. Attach it to the engine child entity,
+/// together with an Avian [`avian3d::prelude::Collider`] and
 /// [`avian3d::prelude::ColliderDensity`].
 ///
-/// Thrust is applied via `apply_force_at_point` at the engine's world
-/// position. Avian computes the torque contribution automatically.
+/// In each physics step, `compute_engine_zone_forces` writes the thrust and
+/// the world position of the engine into the `ZoneForce` of this entity.
+/// Then `compute_aero_forces` adds the thrust to the root entity. It also
+/// adds the torque from the moment arm between the CG and the engine.
 ///
-/// Failure state is read from [`crate::components::Failure`] if present on the same entity.
-/// When absent the engine is treated as fully intact.
+/// If the same entity has a [`crate::components::Failure`], the crate reads
+/// the damage state from it. If it has no `Failure`, the engine is fully
+/// intact.
 ///
-/// Lives on the **engine child entity**.
+/// It is on the **engine child entity**.
 ///
 /// ## Required components
 ///
-/// - ZoneForce: written by the FDM each frame; treat as read-only.
+/// - ZoneForce: the FDM writes it in each physics step. Do not change it.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
 #[require(crate::components::zone_force::ZoneForce)]
 pub struct EngineZone {
-    /// Sea-level static maximum thrust (N).
+    /// Maximum static thrust at sea level (N).
     pub max_thrust_n: Scalar,
-    /// Throttle-to-thrust-fraction lookup table. Each entry is `[throttle, fraction]`.
-    /// `throttle` in [0, 1]. Must be strictly increasing in throttle.
+    /// Table from the throttle position to the thrust fraction. Each entry is
+    /// `[throttle, fraction]`. `throttle` is in [0, 1]. The throttle values
+    /// must be strictly increasing.
     pub throttle_curve: Vec<[Scalar; 2]>,
-    /// Thrust direction in body frame (unit vector). Usually `Vector::X` (forward).
+    /// Thrust direction in the body frame (unit vector). Usually `Vector::X` (forward).
     pub thrust_axis_body: Vector,
 
-    /// Airspeed at which the propeller produces zero net thrust (m/s).
+    /// Airspeed at which the propeller makes zero net thrust (m/s).
     ///
-    /// Models the speed dependence of a fixed-pitch propeller. The thrust
-    /// multiplier is `max(0, 1 − (V / V_zero)²)`:
+    /// It models how the thrust of a fixed-pitch propeller changes with
+    /// speed. The thrust multiplier is `max(0, 1 − (V / V_zero)²)`:
     ///
     /// - At V = 0: factor = 1.0 (full static thrust)
-    /// - At V = V_zero: factor = 0.0 (propeller windmilling)
+    /// - At V = V_zero: factor = 0.0 (the propeller windmills)
     ///
-    /// `None` disables speed dependence (constant-thrust model).
-    /// Typical values for light GA: 70–90 m/s (J3 Cub ~ 80 m/s).
+    /// `None` disables the speed dependence (constant-thrust model).
+    /// Typical values for light general-aviation aircraft: 70–90 m/s
+    /// (J-3 Cub: approximately 80 m/s).
     pub zero_thrust_speed_ms: Option<Scalar>,
 }
 

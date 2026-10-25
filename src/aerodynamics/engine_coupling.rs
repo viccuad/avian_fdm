@@ -1,10 +1,10 @@
-//! Engine-zone force accumulation into the aircraft root totals.
+//! Adds the engine-zone forces to the totals of the aircraft root entity.
 //!
-//! Engine thrust is computed each frame by `compute_engine_zone_forces`
-//! (in `propulsion/`) and written into a [`crate::components::ZoneForce`]
-//! on each engine child entity. This module reads those pre-computed values
-//! and accumulates them — with their moment-arm torque — into the root
-//! force/torque accumulators.
+//! In each physics step, `compute_engine_zone_forces` (in `propulsion/`)
+//! calculates the engine thrust. It writes the thrust into a
+//! [`crate::components::ZoneForce`] on each engine child entity. This module
+//! reads these values. It adds them, and the torque from their moment arm, to
+//! the force and torque totals of the root entity.
 
 use avian3d::math::Vector;
 use bevy_math::Vec3;
@@ -12,11 +12,11 @@ use bevy_math::Vec3;
 use crate::components::ZoneForce;
 use crate::math::vec3_to_vector;
 
-/// Accumulate a pre-computed engine zone's thrust into the root force/torque.
+/// Adds the thrust of one engine zone to the root force and torque.
 ///
-/// The moment arm is measured from the aircraft's CG to the engine's world
-/// position. An off-centre engine naturally produces a yawing moment when
-/// thrust is asymmetric.
+/// The moment arm goes from the CG of the aircraft to the world position of
+/// the engine. If an engine is not on the centerline and the thrust is
+/// asymmetric, the engine makes a yawing moment.
 pub(super) fn accumulate_engine_force(
     zf: &ZoneForce,
     com_world: Vector,
@@ -26,7 +26,7 @@ pub(super) fn accumulate_engine_force(
     if zf.force != Vec3::ZERO {
         let force = vec3_to_vector(zf.force);
         *total_force += force;
-        // ZoneForce.world_point is Vec3 (always f32 for visualization).
+        // ZoneForce.world_point is Vec3 (always f32, for visualization).
         *total_torque += (vec3_to_vector(zf.world_point) - com_world).cross(force);
     }
 }
@@ -57,7 +57,7 @@ mod tests {
         };
         let (mut f, mut t) = (Vector::ZERO, Vector::ZERO);
         accumulate_engine_force(&zf, Vector::ZERO, &mut f, &mut t);
-        // arm=(0,2,0) × thrust=(500,0,0) → torque=(0,0,-1000)
+        // arm = (0, 2, 0), thrust = (500, 0, 0), torque = (0, 0, -1000)
         assert!(
             (t.z - (-1000.0)).abs() < 1e-4,
             "starboard engine → nose-left yaw, got z={}",

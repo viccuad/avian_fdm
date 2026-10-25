@@ -1,4 +1,4 @@
-//! All ECS components, bundles, and shared data types.
+//! All ECS components, bundles, and shared data types of the crate.
 
 pub mod aero_coeff;
 pub mod aero_zone;

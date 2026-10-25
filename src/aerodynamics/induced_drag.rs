@@ -1,11 +1,11 @@
-//! Induced drag: whole-aircraft CD_i = CL² / (π · e · AR).
+//! Induced drag of the full aircraft: CD_i = CL^2 / (pi * e * AR).
 //!
-//! This is a whole-aircraft correction applied once per frame after all
-//! per-zone aerodynamic forces have been accumulated. It models the drag
-//! penalty that arises from generating lift on a finite-span wing: the
-//! spanwise pressure gradient causes trailing vortices which tilt the
-//! local flow and increase the effective angle of attack, producing a
-//! rearward force component.
+//! This is a correction for the full aircraft. The crate applies it once per
+//! physics step, after it adds up the aerodynamic forces of all zones. It
+//! models the extra drag that lift causes on a wing with a finite span. The
+//! pressure gradient along the span causes trailing vortices. These vortices
+//! tilt the local flow and turn the lift vector aft. The result is a force
+//! component to the rear.
 //!
 //! Reference: Anderson, "Introduction to Flight", Chapter 5.
 
@@ -13,20 +13,20 @@ use avian3d::math::{Scalar, Vector, PI};
 
 use crate::components::InducedDrag;
 
-/// Apply induced drag to the aircraft's total force accumulator.
+/// Calculates the induced drag force for the total force of the aircraft.
 ///
-/// `total_cl_x_area` is the area-weighted sum of per-zone CLs (∑ CL_i · S_i).
-/// Divide by `s_ref` to get the whole-aircraft CL.
+/// `total_cl_x_area` is the area-weighted sum of the CL values of the zones
+/// (sum of CL_i * S_i). The function divides it by `s_ref` to get the CL of
+/// the full aircraft.
 ///
 /// The induced drag coefficient is:
 ///
 /// ```text
-/// CD_i = CL² / (π · e · AR)
+/// CD_i = CL^2 / (pi * e * AR)
 /// ```
 ///
-/// where AR = b² / S_ref and `e` is the Oswald span efficiency factor.
-/// The resulting drag force is applied along the negative velocity direction
-/// in world space.
+/// Here, AR = b^2 / S_ref, and `e` is the Oswald span efficiency factor.
+/// The drag force acts opposite to the velocity, in world space.
 pub(super) fn apply_induced_drag(
     id: &InducedDrag,
     total_cl_x_area: Scalar,
@@ -65,7 +65,7 @@ mod tests {
     #[test]
     fn induced_drag_opposes_velocity() {
         let id = InducedDrag { oswald_factor: 0.8 };
-        // Velocity in +X; induced drag should be in -X.
+        // The velocity is in +X. The induced drag must be in -X.
         let drag = apply_induced_drag(&id, 10.0, 10.0, 10.0, 100.0, Vector::X, identity_rot());
         assert!(
             drag.x < 0.0,
@@ -80,7 +80,7 @@ mod tests {
         let id = InducedDrag { oswald_factor: 0.8 };
         let drag1 = apply_induced_drag(&id, 10.0, 10.0, 10.0, 100.0, Vector::X, identity_rot());
         let drag2 = apply_induced_drag(&id, 20.0, 10.0, 10.0, 100.0, Vector::X, identity_rot());
-        // Doubling CL → 4x induced drag.
+        // Doubling CL gives 4 times the induced drag.
         let ratio = drag2.x / drag1.x;
         assert!((ratio - 4.0).abs() < 1e-5, "CD_i ∝ CL², ratio={ratio}");
     }

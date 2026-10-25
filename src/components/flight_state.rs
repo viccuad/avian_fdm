@@ -1,40 +1,41 @@
-//! Derived flight state and atmosphere state components.
+//! Components for the flight state and the atmosphere state.
 
 use crate::_bevy::*;
 use avian3d::math::Scalar;
 use serde::{Deserialize, Serialize};
 
-/// Derived aerodynamic state quantities. Written each frame by
-/// `update_flight_state`. Read-only for consumers (HUD, autopilot, debug).
+/// Aerodynamic state values that the crate calculates from the physics state.
+/// `update_flight_state` writes them in each physics step. Other systems (HUD,
+/// autopilot, debug) must only read them.
 ///
-/// Lives on the **aircraft root entity**.
+/// It is on the **aircraft root entity**.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct FlightState {
-    /// Angle of attack, alpha (rad). Positive = nose above relative wind.
+    /// Angle of attack, alpha (rad). Positive when the nose is above the relative wind.
     pub alpha_rad: Scalar,
-    /// Sideslip angle, beta (rad). Positive = nose left of relative wind.
+    /// Sideslip angle, beta (rad). Positive when the nose is left of the relative wind.
     pub beta_rad: Scalar,
     /// True airspeed V (m/s).
     pub airspeed_ms: Scalar,
-    /// Mach number = airspeed / speed of sound (dimensionless).
+    /// Mach number = airspeed ÷ speed of sound (dimensionless).
     pub mach: Scalar,
-    /// Dynamic pressure, q-bar = half * density * airspeed^2 (Pa).
+    /// Dynamic pressure, qbar = 0.5 * density * airspeed^2 (Pa).
     pub dynamic_pressure_pa: Scalar,
     /// Geometric altitude above sea level (m).
     pub altitude_m: Scalar,
-    /// Roll rate p in body frame (rad/s). Written by `update_flight_state`.
+    /// Roll rate p in the body frame (rad/s).
     pub p_rads: Scalar,
-    /// Pitch rate q in body frame (rad/s). Written by `update_flight_state`.
+    /// Pitch rate q in the body frame (rad/s).
     pub q_rads: Scalar,
-    /// Yaw rate r in body frame (rad/s). Written by `update_flight_state`.
+    /// Yaw rate r in the body frame (rad/s).
     pub r_rads: Scalar,
 }
 
-/// ISA atmosphere conditions at this entity's altitude.
-/// Written each frame by `update_atmosphere`.
+/// ISA atmosphere conditions at the altitude of this entity.
+/// `update_atmosphere` writes them in each physics step.
 ///
-/// Lives on the **aircraft root entity**.
+/// It is on the **aircraft root entity**.
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct AtmosphereState {

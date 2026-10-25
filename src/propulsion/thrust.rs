@@ -1,4 +1,4 @@
-//! Engine thrust computation system (Gagg-Ferrar altitude model).
+//! System that calculates the engine thrust (Gagg-Ferrar altitude model).
 
 use crate::_bevy::*;
 use crate::math::{quat_to_quaternion, vector_to_vec3};
@@ -11,10 +11,12 @@ use crate::components::{
     get_remaining, AtmosphereState, ControlInputs, Failure, FlightState, ZoneForce,
 };
 
-/// Sea-level standard density (kg/m³).
+/// Standard air density at sea level (kg/m³).
 pub(super) const RHO_0: Scalar = 1.225;
 
-/// Phase 1: compute engine thrust and write `ZoneForce`.
+/// Calculates the thrust of each engine zone and writes it to its `ZoneForce`.
+///
+/// It runs before `compute_aero_forces`, which adds the thrust to the root entity.
 #[allow(clippy::type_complexity)]
 pub fn compute_engine_zone_forces(
     mut engine_query: Query<(
@@ -43,15 +45,15 @@ pub fn compute_engine_zone_forces(
             continue;
         };
 
-        // 1. Throttle to thrust fraction.
+        // 1. Throttle position to thrust fraction.
         let throttle = ctrl.throttle.clamp(0.0, 1.0);
         let thrust_fraction = interp_curve(&engine.throttle_curve, throttle);
 
-        // 2. Gagg–Ferrar altitude correction.
+        // 2. Gagg-Ferrar altitude correction.
         let rho = atmos.density_kgm3;
         let density_ratio = (rho / RHO_0).max(0.0);
 
-        // 3. Speed-dependent thrust decay for fixed-pitch propellers.
+        // 3. Thrust decay with speed, for fixed-pitch propellers.
         let speed_factor = if let Some(v_zero) = engine.zero_thrust_speed_ms {
             let ratio = flight.airspeed_ms / v_zero;
             (1.0 - ratio * ratio).max(0.0)
@@ -65,7 +67,7 @@ pub fn compute_engine_zone_forces(
             * density_ratio.powf(0.7)
             * speed_factor;
 
-        // 4. Rotate thrust axis body to world and write ZoneForce.
+        // 4. Turns the thrust axis from the body frame to world space, and writes ZoneForce.
         let q = quat_to_quaternion(root_gt.rotation());
         let thrust_world = q * (engine.thrust_axis_body.normalize_or_zero() * thrust_n);
 

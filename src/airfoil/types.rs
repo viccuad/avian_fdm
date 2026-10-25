@@ -7,22 +7,23 @@ use serde::{Deserialize, Serialize};
 
 /// Aerodynamic coefficient data for a 2-D airfoil section.
 ///
-/// Contains the three coefficients that are meaningful at the section level:
+/// It contains the three coefficients that have a meaning for a section:
 /// lift (CL), drag (CD), and pitching moment about the quarter-chord (CM).
 ///
-/// Use [`AeroCoeff::Absent`] for `cm` when pitching moment is handled by tail
-/// geometry rather than airfoil data (the common case for symmetric sections).
+/// If the tail geometry gives the pitching moment, and not the airfoil data,
+/// use [`AeroCoeff::Absent`] for `cm`. This is usual for symmetric sections.
 #[derive(Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Serialize, Deserialize)]
 pub struct AirfoilData {
-    /// Lift coefficient vs angle of attack.
+    /// Lift coefficient as a function of the angle of attack.
     pub cl: AeroCoeff,
-    /// Drag coefficient vs angle of attack.
+    /// Drag coefficient as a function of the angle of attack.
     pub cd: AeroCoeff,
-    /// Pitching-moment coefficient vs angle of attack (about quarter-chord).
+    /// Pitching-moment coefficient (about the quarter-chord) as a function of
+    /// the angle of attack.
     ///
-    /// Defaults to [`AeroCoeff::Absent`]. Set to a `Table1D` or `Scalar` for
-    /// cambered sections (e.g. NACA 2412 has cm0 ≈ −0.05 at zero lift).
+    /// Default: [`AeroCoeff::Absent`]. For cambered sections, set a `Table1D`
+    /// or a `Scalar` (for example, NACA 2412 has cm0 ≈ −0.05 at zero lift).
     pub cm: AeroCoeff,
 }
 
@@ -37,15 +38,16 @@ impl Default for AirfoilData {
 }
 
 impl AirfoilData {
-    /// Apply Viterna-Corrigan post-stall extension to CL and CD.
+    /// Applies the Viterna-Corrigan post-stall extension to CL and CD.
     ///
-    /// Uses `aspect_ratio` (AR = span / chord) for the Viterna model.
-    /// CM is left unchanged — there is no standard Viterna analogue for
-    /// pitching-moment coefficients.
+    /// The Viterna model uses `aspect_ratio` (AR = span / chord, for a
+    /// rectangular surface). CM does not change, because no standard Viterna
+    /// model exists for pitching-moment coefficients.
     ///
-    /// Call this once per airfoil after importing from CSV, before passing
-    /// the data to zone constructors. See [`AeroCoeff::with_post_stall_lift`]
-    /// and [`AeroCoeff::with_post_stall_drag`] for the underlying algorithms.
+    /// Call this method once per airfoil, after the CSV import and before you
+    /// give the data to the zone constructors. Refer to
+    /// [`AeroCoeff::with_post_stall_lift`] and
+    /// [`AeroCoeff::with_post_stall_drag`] for the algorithms.
     pub fn with_post_stall(self, aspect_ratio: Scalar) -> Self {
         Self {
             cl: self.cl.with_post_stall_lift(aspect_ratio),
@@ -54,14 +56,14 @@ impl AirfoilData {
         }
     }
 
-    /// Validate the structure and contents of all three coefficient tables.
+    /// Validates the structure and the contents of the three coefficient tables.
     ///
-    /// Delegates to [`AeroCoeff::validate`] for each of `cl`, `cd`, and `cm`.
-    /// Returns a list of human-readable problem descriptions; an empty list
-    /// means the airfoil data is structurally sound.
+    /// It calls [`AeroCoeff::validate`] for `cl`, `cd`, and `cm`. It returns a
+    /// list of problem descriptions that a person can read. An empty list
+    /// means that the structure of the airfoil data is correct.
     ///
-    /// `label` is a descriptive name used as a prefix in each message (e.g.
-    /// the airfoil name or the zone it was registered under).
+    /// `label` is a descriptive name. Each message starts with it (for
+    /// example, the airfoil name, or the zone that uses the airfoil).
     pub fn validate(&self, label: &str) -> Vec<String> {
         let mut problems = Vec::new();
         problems.extend(self.cl.validate(&format!("{label}.cl")));

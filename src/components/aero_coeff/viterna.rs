@@ -3,10 +3,11 @@
 //! Reference: Viterna, L.A. & Corrigan, R.D. (1982), "Fixed Pitch Rotor
 //! Performance of Large Horizontal Axis Wind Turbines", NASA CP-2230.
 //!
-//! The model extends aerodynamic coefficient tables from their last data
-//! point out to +/-180 degrees using flat-plate theory. This prevents
-//! table clamping during post-stall flight, tumbling, or any orientation
-//! where the local angle of attack exceeds the wind-tunnel data range.
+//! Wind-tunnel data usually covers only a small range of angles of attack.
+//! The model extends a coefficient table from its last data point to +/-180
+//! degrees with flat-plate theory. Thus, the table does not clamp in
+//! post-stall flight or in a tumble. It also does not clamp in other
+//! orientations where the local angle of attack is outside the data range.
 
 use avian3d::math::Scalar as S;
 
@@ -16,20 +17,20 @@ use super::types::AeroCoeff;
 const PI: S = std::f64::consts::PI as S;
 const HALF_PI: S = PI / 2.0;
 
-/// Viterna CD_max for a finite-aspect-ratio surface.
+/// Viterna CD_max for a surface with a finite aspect ratio.
 fn viterna_cd_max(ar: S) -> S {
     1.11 + 0.018 * ar
 }
 
-/// Angles (in radians) at which to generate extension points.
-/// Covers 25 deg to 180 deg in 5-deg steps from 25 to 50, then 10-deg steps.
+/// Angles (in radians) of the extension points.
+/// They cover 25 deg to 180 deg: 5-deg steps from 25 to 50, then 10-deg steps.
 fn extension_angles() -> Vec<S> {
     let mut angles = Vec::new();
-    // Fine steps near stall transition (25-50 deg)
+    // Fine steps near the stall transition (25-50 deg).
     for deg in (25..=50).step_by(5) {
         angles.push((deg as S).to_radians());
     }
-    // Coarser steps for the rest (60-180 deg)
+    // Coarser steps for the rest of the range (60-180 deg).
     for deg in (60..=180).step_by(10) {
         angles.push((deg as S).to_radians());
     }
@@ -41,10 +42,9 @@ fn extension_angles() -> Vec<S> {
 /// For |a| <= pi/2: CL = A1 * sin(2a) + A2 * cos^2(a) / sin(a)
 /// For |a| > pi/2:  CL = A1 * sin(2a)   (flat plate only)
 ///
-/// The A2 * cos^2/sin term provides a smooth blend from the stall-angle
-/// value into flat-plate behavior. Beyond 90 deg, only the sin(2a) term
-/// remains because the A2 term would diverge as sin(a) approaches zero
-/// near 180 deg.
+/// The A2 * cos^2/sin term gives a smooth transition from the value at the
+/// stall angle to the flat-plate behavior. After 90 deg, only the sin(2a)
+/// term remains. Near 180 deg, sin(a) goes to zero, and the A2 term diverges.
 fn viterna_cl(a: S, a1: S, a2: S) -> S {
     let sa = a.sin();
     let flat = a1 * (2.0 * a).sin();
@@ -59,16 +59,16 @@ fn viterna_cl(a: S, a1: S, a2: S) -> S {
 ///
 ///   CD = CD_0_eff + (CD_max - CD_0_eff) * sin^2(a)
 ///
-/// This gives CD_0_eff at 0 and 180 deg, and CD_max at 90 deg.
+/// The result is CD_0_eff at 0 and 180 deg, and CD_max at 90 deg.
 fn viterna_cd(a: S, cd0_eff: S, cd_max: S) -> S {
     cd0_eff + (cd_max - cd0_eff) * a.sin().powi(2)
 }
 
-/// Compute the Viterna A2 coefficient for continuity at the stall angle.
+/// Calculates the Viterna A2 coefficient. A2 makes the curve continuous at the stall angle.
 ///
 ///   A2 = (CL_s - A1 * sin(2*alpha_s)) * sin(alpha_s) / cos^2(alpha_s)
 ///
-/// If alpha_s is close to 90 deg (cos^2 near zero), returns 0 (pure flat plate).
+/// If alpha_s is near 90 deg (cos^2 near zero), returns 0 (pure flat plate).
 fn viterna_a2(alpha_s: S, cl_s: S, a1: S) -> S {
     let cos2 = alpha_s.cos().powi(2);
     if cos2 < 1e-6 {
@@ -77,11 +77,11 @@ fn viterna_a2(alpha_s: S, cl_s: S, a1: S) -> S {
     (cl_s - a1 * (2.0 * alpha_s).sin()) * alpha_s.sin() / cos2
 }
 
-/// Compute effective CD_0 for continuity at the stall angle.
+/// Calculates the effective CD_0. It makes the curve continuous at the stall angle.
 ///
 ///   CD_0_eff = (CD_s - CD_max * sin^2(alpha_s)) / cos^2(alpha_s)
 ///
-/// If alpha_s is near 90 deg, falls back to CD_s (accept minor discontinuity).
+/// If alpha_s is near 90 deg, returns CD_s. A small discontinuity is then possible.
 fn effective_cd0(alpha_s: S, cd_s: S, cd_max: S) -> S {
     let cos2 = alpha_s.cos().powi(2);
     if cos2 < 1e-6 {
@@ -90,7 +90,7 @@ fn effective_cd0(alpha_s: S, cd_s: S, cd_max: S) -> S {
     (cd_s - cd_max * alpha_s.sin().powi(2)) / cos2
 }
 
-/// Extend a 1-D lift table to +/-pi.
+/// Extends a 1-D lift table to +/-pi.
 fn extend_1d_lift(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     if bp.is_empty() {
         return (bp.to_vec(), vals.to_vec());
@@ -112,7 +112,7 @@ fn extend_1d_lift(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     let mut new_bp = Vec::with_capacity(bp.len() + 40);
     let mut new_vals = Vec::with_capacity(bp.len() + 40);
 
-    // Negative side extension (from -pi up to alpha_min).
+    // Extension on the negative side, from -pi up to alpha_min.
     if alpha_min > -(PI - 0.01) {
         let a2_neg = viterna_a2(alpha_min.abs(), -cl_at_min, a1);
         for &a in ext_angles.iter().rev() {
@@ -127,7 +127,7 @@ fn extend_1d_lift(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     new_bp.extend_from_slice(bp);
     new_vals.extend_from_slice(vals);
 
-    // Positive side extension (from alpha_max up to +pi).
+    // Extension on the positive side, from alpha_max up to +pi.
     if alpha_max < PI - 0.01 {
         let a2_pos = viterna_a2(alpha_max, cl_at_max, a1);
         for &a in &ext_angles {
@@ -141,7 +141,7 @@ fn extend_1d_lift(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     (new_bp, new_vals)
 }
 
-/// Extend a 1-D drag table to +/-pi.
+/// Extends a 1-D drag table to +/-pi.
 fn extend_1d_drag(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     if bp.is_empty() {
         return (bp.to_vec(), vals.to_vec());
@@ -191,7 +191,7 @@ fn extend_1d_drag(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     (new_bp, new_vals)
 }
 
-/// Convert a scalar CD to a Table1D with flat-plate drag progression.
+/// Changes a scalar CD into a Table1D with flat-plate drag at high angles.
 fn scalar_to_drag_table(cd0: S, ar: S) -> (Vec<S>, Vec<S>) {
     let cd_max = viterna_cd_max(ar);
     let all_angles = extension_angles();
@@ -213,7 +213,7 @@ fn scalar_to_drag_table(cd0: S, ar: S) -> (Vec<S>, Vec<S>) {
     (bp, vals)
 }
 
-/// Extend a 2-D lift table to +/-pi. Each Reynolds-number column is extended independently.
+/// Extends a 2-D lift table to +/-pi. Each Reynolds-number column gets its own extension.
 fn extend_2d_lift(rows: &[S], cols: &[S], data: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     let nc = cols.len();
     if rows.is_empty() || nc == 0 {
@@ -235,7 +235,7 @@ fn extend_2d_lift(rows: &[S], cols: &[S], data: &[S], ar: S) -> (Vec<S>, Vec<S>)
     (new_rows, new_data)
 }
 
-/// Extend a 2-D drag table to +/-pi.
+/// Extends a 2-D drag table to +/-pi.
 fn extend_2d_drag(rows: &[S], cols: &[S], data: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     let nc = cols.len();
     if rows.is_empty() || nc == 0 {
@@ -258,34 +258,35 @@ fn extend_2d_drag(rows: &[S], cols: &[S], data: &[S], ar: S) -> (Vec<S>, Vec<S>)
 }
 
 impl AeroCoeff {
-    /// Extend a lift-type coefficient (CL or CY) to +/-180 deg using the
+    /// Extends a lift-type coefficient (CL or CY) to +/-180 deg with the
     /// Viterna-Corrigan post-stall model.
     ///
-    /// Takes the **aspect ratio** (AR) of the aerodynamic surface, defined as
-    /// span divided by chord: AR = b / c. For a rectangular wing with span
-    /// 10 m and chord 1.5 m, AR = 6.67. This parameter controls CD_max,
-    /// the flat-plate drag limit at 90 deg angle of attack:
+    /// The argument is the **aspect ratio** (AR) of the aerodynamic surface.
+    /// For a rectangular surface, AR is the span divided by the chord:
+    /// AR = b / c. For a rectangular wing with a span of 10 m and a chord of
+    /// 1.5 m, AR = 6.67. This parameter sets CD_max, the flat-plate drag limit
+    /// at a 90 deg angle of attack:
     ///
     ///   CD_max = 1.11 + 0.018 * AR    (Viterna & Corrigan 1982)
     ///
-    /// The extension blends smoothly from the last user-provided breakpoint
-    /// into flat-plate aerodynamics, then continues to +/-180 deg (fully
-    /// reversed flight). Within the original breakpoint range, values are
-    /// unchanged.
+    /// The extension starts smoothly at the last breakpoint that you supply.
+    /// It changes into flat-plate aerodynamics, and then continues to
+    /// +/-180 deg (fully reversed flight). In the original breakpoint range,
+    /// the values do not change.
     ///
     /// From the stall angle alpha_s to 90 deg, the Viterna lift formula is:
     ///
     ///   CL = A1 * sin(2*alpha) + A2 * cos(alpha)^2 / sin(alpha)
     ///
-    /// where A1 = CD_max / 2, and A2 is chosen for continuity at alpha_s.
-    /// From 90 to 180 deg (reversed flight), only the flat-plate term
-    /// remains: CL = A1 * sin(2*alpha).
+    /// Here, A1 = CD_max / 2. The method selects A2 so that the curve is
+    /// continuous at alpha_s. From 90 to 180 deg (reversed flight), only the
+    /// flat-plate term remains: CL = A1 * sin(2*alpha).
     ///
-    /// When a table covers the full +/-180 deg range, no clamping occurs
-    /// during coefficient evaluation regardless of how extreme the local
-    /// angle of attack becomes during post-stall flight or tumbling.
+    /// If a table covers the full +/-180 deg range, the evaluation never
+    /// clamps the angle. This is true for all local angles of attack, also in
+    /// post-stall flight or in a tumble.
     ///
-    /// Has no effect on `Absent`, `Placeholder`, or `Scalar` variants.
+    /// It has no effect on the `Absent`, `Placeholder`, or `Scalar` variants.
     ///
     /// # Example
     ///
@@ -296,7 +297,7 @@ impl AeroCoeff {
     ///     values: vec![-2.5, 0.0, 2.5],
     /// };
     /// let cl_full = cl.with_post_stall_lift(3.0);
-    /// // Original data is preserved; extension points added to +/-180 deg.
+    /// // The original data does not change. New points extend the table to +/-180 deg.
     /// // At 90 deg AoA, CL is near zero (flat plate).
     /// let cl_90 = cl_full.evaluate(std::f32::consts::FRAC_PI_2 as _, 0.0);
     /// assert!(cl_90.abs() < 0.01);
@@ -325,27 +326,29 @@ impl AeroCoeff {
         }
     }
 
-    /// Extend a drag coefficient (CD) to +/-180 deg using a flat-plate
-    /// drag model derived from Viterna-Corrigan.
+    /// Extends a drag coefficient (CD) to +/-180 deg with a flat-plate drag
+    /// model from Viterna-Corrigan.
     ///
-    /// Takes the **aspect ratio** (AR = span / chord) of the aerodynamic
-    /// surface. CD_max at 90 deg AoA is:
+    /// The argument is the **aspect ratio** (AR = span / chord, for a
+    /// rectangular surface) of the aerodynamic surface. CD_max at 90 deg AoA
+    /// is:
     ///
     ///   CD_max = 1.11 + 0.018 * AR
     ///
-    /// The model interpolates between the user's last breakpoint value and
-    /// CD_max using:
+    /// The model interpolates between the value at your last breakpoint and
+    /// CD_max with this formula:
     ///
     ///   CD = CD_0_eff + (CD_max - CD_0_eff) * sin(alpha)^2
     ///
-    /// where CD_0_eff is solved for continuity at the boundary.
+    /// The method solves CD_0_eff so that the curve is continuous at the
+    /// boundary.
     ///
-    /// For `Scalar(cd0)`, this converts to a `Table1D` that transitions
-    /// from cd0 at zero AoA to CD_max at 90 deg and back to cd0 at 180.
-    /// This is important because a constant CD is unphysical at high AoA:
-    /// a surface broadside to the wind has much higher drag.
+    /// For `Scalar(cd0)`, the result is a `Table1D`. The table goes from cd0
+    /// at zero AoA to CD_max at 90 deg, and back to cd0 at 180 deg. This is
+    /// important because a constant CD is not physical at a high AoA. A
+    /// surface that is broadside to the wind has much more drag.
     ///
-    /// Has no effect on `Absent` or `Placeholder` variants.
+    /// It has no effect on the `Absent` or `Placeholder` variants.
     ///
     /// # Example
     ///

@@ -1,11 +1,12 @@
-//! Collider wireframe overlay for physics verification.
+//! Collider wireframe overlay, to examine the physics colliders.
 //!
-//! When [`ShowColliders`] is true, draws the raw parry collider shapes
-//! (cuboids, spheres, cylinders, capsules) on top of the normal zone
-//! visuals so you can verify that a `GizmoShape` override matches the
-//! underlying physics collider.
+//! When [`ShowColliders`] is true, the overlay draws the raw parry collider
+//! shapes (cuboids, spheres, cylinders, capsules) on top of the zone
+//! wireframes. Use it to make sure that a `GizmoShape` agrees with the physics
+//! collider.
 //!
-//! Toggle from game code or a debug system:
+//! To turn it on or off, change the resource from game code or from a debug
+//! system:
 //!
 //! ```rust,no_run
 //! # use bevy::prelude::*;
@@ -26,18 +27,18 @@ use super::configuration::FdmGizmos;
 
 /// Controls the collider wireframe overlay.
 ///
-/// When `true`, [`AircraftFdmDebugPlugin`] draws the actual parry collider
-/// shape for every zone entity (orange wireframes). Use this to verify that
-/// `GizmoShape` visuals match the physics colliders.
+/// When `true`, [`AircraftFdmDebugPlugin`] draws the real parry collider
+/// shape of each zone entity (orange wireframes). Use it to make sure that
+/// the `GizmoShape` visuals agree with the physics colliders.
 ///
-/// Toggle from any system that has `ResMut<ShowColliders>`. The resource is
-/// registered by [`AircraftFdmDebugPlugin`] and defaults to `false`.
+/// Each system with `ResMut<ShowColliders>` can change it.
+/// [`AircraftFdmDebugPlugin`] registers the resource. The default is `false`.
 ///
 /// [`AircraftFdmDebugPlugin`]: super::AircraftFdmDebugPlugin
 #[derive(Resource, Default, Debug)]
 pub struct ShowColliders(pub bool);
 
-/// Orange tint used for collider wireframe overlays.
+/// Orange color for the collider wireframe overlay.
 const COLLIDER_COLOR: bevy_color::Color = bevy_color::Color::srgba(0.8, 0.5, 0.2, 0.8);
 
 pub(super) fn plugin(app: &mut App) {
@@ -52,11 +53,12 @@ pub(super) fn plugin(app: &mut App) {
     );
 }
 
-/// Draws each zone's raw collider shape as an orange wireframe.
+/// Draws the raw collider shape of each zone as an orange wireframe.
 ///
-/// Runs in `PostUpdate` after transform propagation so `GlobalTransform`
-/// reflects the current physics state. Uses `avian3d::parry` (re-exported
-/// by avian3d) so no direct parry dependency is needed in calling code.
+/// It runs in `PostUpdate`, after transform propagation. Thus,
+/// `GlobalTransform` has the current physics state. It uses `avian3d::parry`
+/// (a re-export from avian3d). Thus, the calling code does not need a direct
+/// parry dependency.
 #[allow(clippy::unnecessary_cast)]
 #[allow(clippy::type_complexity)]
 pub(super) fn debug_render_colliders(

@@ -3,9 +3,9 @@
 use crate::_bevy::*;
 use bevy_color::palettes::css::*;
 
-/// Gizmo configuration group for FDM debug rendering. See [`AircraftFdmDebugPlugin`].
+/// Gizmo configuration group for the FDM debug rendering. Refer to [`AircraftFdmDebugPlugin`].
 ///
-/// Register globally via [`GizmoConfigStore`]:
+/// To register it for all entities, use [`GizmoConfigStore`]:
 ///
 /// ```rust,no_run
 /// use avian_fdm::debug_render::FdmGizmos;
@@ -21,45 +21,51 @@ use bevy_color::palettes::css::*;
 ///     );
 /// ```
 ///
-/// Per-entity overrides are supported via the [`FdmDebugRender`] component.
+/// To change the zone color of one entity, use the [`FdmDebugRender`] component.
 ///
 /// [`AircraftFdmDebugPlugin`]: super::AircraftFdmDebugPlugin
 #[derive(Reflect, GizmoConfigGroup)]
 pub struct FdmGizmos {
-    /// Color for per-zone lift force arrows. `None` = disabled.
+    /// Color for the aerodynamic force arrow of each zone. The arrow shows the
+    /// sum of lift, drag, and side force. `None` = disabled.
     pub lift_color: Option<Color>,
-    /// Color for per-zone drag force arrows. `None` = disabled.
+    /// Color for separate drag arrows. The debug systems do not use it at this
+    /// time. `lift_color` draws one combined arrow for each zone.
     pub drag_color: Option<Color>,
-    /// Color for per-zone side-force arrows. `None` = disabled.
+    /// Color for separate side-force arrows. The debug systems do not use it
+    /// at this time. `lift_color` draws one combined arrow for each zone.
     pub side_force_color: Option<Color>,
-    /// Color for thrust arrows (engine zones). `None` = disabled.
+    /// Color for the thrust arrows (engine zones). `None` = disabled.
     pub thrust_color: Option<Color>,
-    /// Color for the total accumulated aero+thrust force arrow on the root. `None` = disabled.
+    /// Color for the arrow of the total aerodynamic and thrust force on the root entity. `None` = disabled.
     pub total_force_color: Option<Color>,
-    /// Color for the weight (gravity) arrow on the root. `None` = disabled.
+    /// Color for the weight (gravity) arrow on the root entity. `None` = disabled.
     pub weight_color: Option<Color>,
-    /// Color for the net-force arrow (aero+thrust+weight) on the root. `None` = disabled.
+    /// Color for the net-force arrow (aerodynamic + thrust + weight) on the root entity. `None` = disabled.
     pub resultant_color: Option<Color>,
-    /// Color for pitching-moment arcs. `None` = disabled.
+    /// Color for the pitching-moment arrow. `None` = disabled.
     pub pitch_moment_color: Option<Color>,
-    /// Color for rolling-moment arcs. `None` = disabled.
+    /// Color for the rolling-moment arrow. `None` = disabled.
     pub roll_moment_color: Option<Color>,
-    /// Color for yawing-moment arcs. `None` = disabled.
+    /// Color for the yawing-moment arrow. `None` = disabled.
     pub yaw_moment_color: Option<Color>,
-    /// Color for zone collider wireframes, tinted green to red by [`Failure::remaining`].
-    /// `None` = disabled.
+    /// On/off switch for the zone wireframes. `None` = disabled.
+    ///
+    /// The value of the color is not used. Each zone gets a color from its
+    /// zone type, or from [`FdmDebugRender`]. [`Failure::remaining`] then
+    /// changes this color toward gray.
     ///
     /// [`Failure::remaining`]: crate::components::Failure
     pub zone_color: Option<Color>,
-    /// Color for the relative-wind / angle-of-attack indicator arrow. `None` = disabled.
+    /// Color for the relative-wind arrow and the nose arrow (angle-of-attack indicator). `None` = disabled.
     pub wind_color: Option<Color>,
-    /// Color for the CG (centre of gravity) sphere. `None` = disabled.
+    /// Color for the CG (center of gravity) sphere. `None` = disabled.
     pub cg_color: Option<Color>,
-    /// Color for the aerodynamic-centre spheres on each zone. `None` = disabled.
+    /// Color for the aerodynamic-center cross on each zone. `None` = disabled.
     pub ac_color: Option<Color>,
-    /// Radius (metres) of the CG and AC marker spheres.
+    /// Radius (meters) of the CG sphere. Also the half-length of the arms of the AC cross.
     pub marker_radius: f32,
-    /// World-space metres per Newton for force arrow length.
+    /// Length of a force arrow in world space, in meters per newton.
     pub force_scale: f32,
 }
 
@@ -87,12 +93,12 @@ impl Default for FdmGizmos {
 }
 
 impl FdmGizmos {
-    /// All overlays enabled with default colours.
+    /// All overlays enabled, with the default colors.
     pub fn all() -> Self {
         Self::default()
     }
 
-    /// All overlays disabled. Use as a base for `..FdmGizmos::none()` patterns.
+    /// All overlays disabled. Use it as a base for the `..FdmGizmos::none()` pattern.
     pub fn none() -> Self {
         Self {
             lift_color: None,
@@ -114,7 +120,7 @@ impl FdmGizmos {
         }
     }
 
-    /// Only force arrows (lift, drag, side force, thrust, resultant) enabled.
+    /// Only the force arrows enabled (zone force, thrust, total force, weight, resultant).
     pub fn forces() -> Self {
         Self {
             lift_color: Some(LIME.into()),
@@ -128,7 +134,7 @@ impl FdmGizmos {
         }
     }
 
-    /// Only moment arcs (pitch, roll, yaw) enabled.
+    /// Only the moment arrows enabled (pitch, roll, yaw).
     pub fn moments() -> Self {
         Self {
             pitch_moment_color: Some(ORANGE.into()),
@@ -138,7 +144,7 @@ impl FdmGizmos {
         }
     }
 
-    /// Only zone health wireframes enabled.
+    /// Only the zone health wireframes enabled.
     pub fn zones() -> Self {
         Self {
             zone_color: Some(ORANGE.into()),
@@ -151,8 +157,8 @@ impl FdmGizmos {
 // Per-entity override
 //
 
-/// Per-zone debug render override. Attach to an [`AeroZone`] entity to
-/// override the global [`FdmGizmos`] colour for that zone's wireframe.
+/// Debug render override for one zone. Attach it to an [`AeroZone`] entity
+/// to replace the zone-type color of its wireframe.
 ///
 /// # Example
 ///
@@ -170,18 +176,21 @@ impl FdmGizmos {
 #[reflect(Component, PartialEq)]
 #[derive(Default)]
 pub struct FdmDebugRender {
-    /// Wireframe colour for this zone's collider. `None` = use global [`FdmGizmos::zone_color`].
+    /// Wireframe color for this zone. `None` = use the color of the zone type.
+    ///
+    /// The damage tint applies on top of this color. To disable all zone
+    /// wireframes, set [`FdmGizmos::zone_color`] to `None`.
     pub zone_color: Option<Color>,
 }
 
 impl FdmDebugRender {
-    /// Override the zone wireframe colour for this entity.
+    /// Sets the wireframe color of this zone.
     pub fn with_zone_color(mut self, color: Color) -> Self {
         self.zone_color = Some(color);
         self
     }
 
-    /// Disable zone wireframe rendering for this entity.
+    /// Removes the color override. The zone then uses the color of its zone type.
     pub fn without_zone(mut self) -> Self {
         self.zone_color = None;
         self

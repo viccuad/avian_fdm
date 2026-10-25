@@ -1,23 +1,25 @@
-//! ISA (International Standard Atmosphere) model, pure functions.
+//! ISA (International Standard Atmosphere) model, as pure functions.
 //!
-//! Implements the International Standard Atmosphere (ICAO Doc 7488) for the
-//! troposphere (0-11 km) and lower stratosphere (11-20 km), plus Sutherland's
-//! law for dynamic viscosity. Contains no Bevy types, see
-//! [`super::systems`] for the ECS plumbing that consumes these.
+//! This module implements the International Standard Atmosphere (ICAO Doc
+//! 7488) for the troposphere (0–11 km) and the lower stratosphere (11–20 km).
+//! It also implements Sutherland's law for the dynamic viscosity. It contains
+//! no Bevy types. Refer to [`super::systems`] for the ECS systems that use
+//! these functions.
 //!
-//! ## Why density matters
+//! ## Why density is important
 //!
-//! Every aerodynamic force scales with dynamic pressure (q-bar = half *
-//! density * airspeed^2). A 20% drop in density (roughly 2 500 m altitude)
-//! means 20% less lift and drag at the same speed. Reynolds number (density *
-//! speed * chord / viscosity) controls how air flows over the surface: at low
-//! Reynolds numbers the flow separates earlier, causing sharper stall and
-//! higher drag.
+//! Each aerodynamic force is proportional to the dynamic pressure (qbar =
+//! 0.5 * density * airspeed^2). If the density decreases by 20% (at
+//! approximately 2 500 m altitude), lift and drag also decrease by 20% at the
+//! same speed. The Reynolds number (density * speed * chord / viscosity)
+//! controls how the air flows over the surface. At low Reynolds numbers, the
+//! flow separates earlier. The stall is then sharper, and the drag is higher.
 //!
 //! ## ISA formulas (ICAO Doc 7488)
 //!
-//! **Troposphere (h <= 11 000 m)**: temperature drops linearly (6.5 K/km), pressure
-//! follows a power law from the temperature, density rho from the ideal gas law:
+//! **Troposphere (h <= 11 000 m)**: the temperature decreases linearly
+//! (6.5 K/km). The pressure obeys a power law of the temperature. The density
+//! rho comes from the ideal gas law:
 //!
 //! ```text
 //! T = 288.15 - 0.0065 * h          (K)
@@ -25,27 +27,29 @@
 //! rho = p / (287.053 * T)           (kg/m^3)
 //! ```
 //!
-//! **Stratosphere (11 000 m < h <= 20 000 m)**: temperature is constant (isothermal
-//! layer at -56.5 C), pressure decays exponentially with altitude (barometric formula),
-//! density again from the ideal gas law:
+//! **Stratosphere (11 000 m < h <= 20 000 m)**: the temperature is constant
+//! (isothermal layer at -56.5 °C). The pressure decreases exponentially with
+//! altitude (barometric formula). The density again comes from the ideal gas
+//! law:
 //!
 //! ```text
 //! T = 216.65                                    (K, isothermal)
-//! p = p₁₁ * exp(-g * (h−h₁₁) / (R * T₁₁))       (Pa)
+//! p = p_11 * exp(-g * (h - h_11) / (R * T_11))  (Pa)
 //! rho = p / (R * T)                             (kg/m^3)
 //! ```
 //!
 //! ## Sutherland's law (dynamic viscosity)
 //!
-//! Gas viscosity *increases* with temperature (unlike liquids, gas molecules
-//! collide more at higher T, transferring more momentum across flow layers).
-//! **Dynamic viscosity = reference viscosity × (T/273)^(3/2) corrected by
-//! Sutherland's constant (110.4 K) for real-gas behaviour. See:
-//! Sutherland's law viscosity.**
+//! The viscosity of a gas *increases* with the temperature. Liquids are
+//! different. At a higher T, gas molecules collide more frequently. Thus, they
+//! move more momentum between the flow layers. **Dynamic viscosity =
+//! reference viscosity × (T/T_ref)^(3/2), with a correction by Sutherland's
+//! constant (110.4 K) for real-gas behavior.** Related topic: Sutherland's law
+//! for viscosity.
 //!
 //! ```text
-//! mu = μ = μ_ref * (T/T_ref)^(3/2) * (T_ref + S) / (T + S)
-//! μ_ref = 1.716×10⁻⁵ kg/(m·s),  T_ref = 273.15 K,  S = 110.4 K
+//! mu     = mu_ref * (T/T_ref)^(3/2) * (T_ref + S) / (T + S)
+//! mu_ref = 1.716e-5 kg/(m·s),  T_ref = 273.15 K,  S = 110.4 K
 //! ```
 
 use crate::components::AtmosphereState;
@@ -83,10 +87,10 @@ const MU_REF_SUTH: Scalar = 1.716e-5;
 const S_SUTH: Scalar = 110.4;
 
 //
-// Pure ISA functions (public for testing and external use)
+// Pure ISA functions (public for tests and for external use)
 //
 
-/// Compute ISA temperature (K) at geometric altitude `h` (m).
+/// Calculates the ISA temperature (K) at the geometric altitude `h` (m).
 pub fn isa_temperature(h: Scalar) -> Scalar {
     if h <= H_TROP {
         T0 - L * h
@@ -95,7 +99,7 @@ pub fn isa_temperature(h: Scalar) -> Scalar {
     }
 }
 
-/// Compute ISA static pressure (Pa) at geometric altitude `h` (m).
+/// Calculates the ISA static pressure (Pa) at the geometric altitude `h` (m).
 pub fn isa_pressure(h: Scalar) -> Scalar {
     if h <= H_TROP {
         let t = isa_temperature(h);
@@ -107,7 +111,7 @@ pub fn isa_pressure(h: Scalar) -> Scalar {
     }
 }
 
-/// Compute ISA air density (kg/m³) at geometric altitude `h` (m).
+/// Calculates the ISA air density (kg/m³) at the geometric altitude `h` (m).
 #[cfg(test)]
 pub(crate) fn isa_density(h: Scalar) -> Scalar {
     let t = isa_temperature(h);
@@ -115,17 +119,17 @@ pub(crate) fn isa_density(h: Scalar) -> Scalar {
     p / (R_AIR * t)
 }
 
-/// Compute speed of sound (m/s) at temperature `t` (K).
+/// Calculates the speed of sound (m/s) at the temperature `t` (K).
 pub fn speed_of_sound(t: Scalar) -> Scalar {
     (GAMMA * R_AIR * t).sqrt()
 }
 
-/// Compute dynamic viscosity (kg/(m·s)) via Sutherland's law at temperature `t` (K).
+/// Calculates the dynamic viscosity (kg/(m·s)) with Sutherland's law at the temperature `t` (K).
 pub fn sutherland_viscosity(t: Scalar) -> Scalar {
     MU_REF_SUTH * (t / T_REF_SUTH).powf(1.5) * (T_REF_SUTH + S_SUTH) / (t + S_SUTH)
 }
 
-/// Populate an [`AtmosphereState`] for the given altitude (m).
+/// Returns an [`AtmosphereState`] for the given altitude (m).
 pub fn atmosphere_at(h: Scalar) -> AtmosphereState {
     let temperature_k = isa_temperature(h);
     let pressure_pa = isa_pressure(h);
@@ -159,7 +163,7 @@ mod tests {
 
     #[test]
     fn isa_sea_level() {
-        // ICAO: T=288.15 K, p=101325 Pa, ρ=1.2250 kg/m³
+        // ICAO: T = 288.15 K, p = 101325 Pa, rho = 1.2250 kg/m3
         let atm = atmosphere_at(0.0);
         assert!(
             pct_err(atm.temperature_k, 288.15) < TEMP_TOL,
@@ -180,7 +184,7 @@ mod tests {
 
     #[test]
     fn isa_1000m() {
-        // ICAO: T=281.65 K, p=89874 Pa, ρ=1.1117 kg/m³
+        // ICAO: T = 281.65 K, p = 89874 Pa, rho = 1.1117 kg/m3
         let atm = atmosphere_at(1_000.0);
         assert!(pct_err(atm.temperature_k, 281.65) < TEMP_TOL);
         assert!(pct_err(atm.pressure_pa, 89_874.0) < PRES_TOL);
@@ -189,7 +193,7 @@ mod tests {
 
     #[test]
     fn isa_5000m() {
-        // ICAO: T=255.65 K, p=54048 Pa, ρ=0.7364 kg/m³
+        // ICAO: T = 255.65 K, p = 54048 Pa, rho = 0.7364 kg/m3
         let atm = atmosphere_at(5_000.0);
         assert!(pct_err(atm.temperature_k, 255.65) < TEMP_TOL);
         assert!(pct_err(atm.pressure_pa, 54_048.0) < PRES_TOL);
@@ -198,7 +202,7 @@ mod tests {
 
     #[test]
     fn isa_11000m_tropopause() {
-        // ICAO: T=216.65 K, p=22632 Pa, ρ=0.3639 kg/m³
+        // ICAO: T = 216.65 K, p = 22632 Pa, rho = 0.3639 kg/m3
         let atm = atmosphere_at(11_000.0);
         assert!(pct_err(atm.temperature_k, 216.65) < TEMP_TOL);
         assert!(pct_err(atm.pressure_pa, 22_632.0) < PRES_TOL);
@@ -207,21 +211,21 @@ mod tests {
 
     #[test]
     fn isa_stratosphere_is_isothermal() {
-        // Above 11 km temperature must stay at 216.65 K.
+        // Above 11 km, the temperature must stay at 216.65 K.
         assert!((isa_temperature(15_000.0) - 216.65).abs() < 0.01);
         assert!((isa_temperature(20_000.0) - 216.65).abs() < 0.01);
     }
 
     #[test]
     fn speed_of_sound_sea_level() {
-        // ICAO: a₀ = 340.294 m/s at sea level
+        // ICAO: a_0 = 340.294 m/s at sea level
         let a = speed_of_sound(288.15);
         assert!((a - 340.294).abs() < 0.01, "a₀ = {a}");
     }
 
     #[test]
     fn sutherland_sea_level() {
-        // Standard value: μ ≈ 1.789×10⁻⁵ kg/(m·s) at 288.15 K
+        // Standard value: mu = approximately 1.789e-5 kg/(m*s) at 288.15 K
         let mu = sutherland_viscosity(288.15);
         assert!((mu - 1.789e-5).abs() / 1.789e-5 < 0.005, "μ = {mu:.4e}");
     }

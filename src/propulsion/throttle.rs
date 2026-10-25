@@ -1,11 +1,11 @@
-//! Throttle-to-thrust-fraction interpolation.
+//! Interpolation from the throttle position to the thrust fraction.
 
 use crate::math::lerp_1d;
 use avian3d::math::Scalar;
 
-/// Linear interpolation over a `[[throttle, fraction]; N]` lookup table.
+/// Linear interpolation in a `[[throttle, fraction]; N]` table.
 ///
-/// Clamps to the boundary values when `x` is outside the table range.
+/// If `x` is outside the table range, it clamps to the boundary values.
 pub(crate) fn interp_curve(curve: &[[Scalar; 2]], x: Scalar) -> Scalar {
     if curve.is_empty() {
         return 0.0;

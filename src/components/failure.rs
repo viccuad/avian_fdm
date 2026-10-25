@@ -1,54 +1,58 @@
-//! [`Failure`] component, fraction of a zone's capability that remains after damage.
-//! Written by the game's hit/damage system; read by domain systems independently.
+//! [`Failure`] component: the fraction of the capability of a zone that remains after damage.
+//! The hit or damage system of the game writes it. The FDM systems read it.
 
 use crate::_bevy::*;
 use avian3d::math::Scalar;
 use serde::{Deserialize, Serialize};
 
-/// Fraction of a zone's nominal capability that remains after damage or failure.
+/// Fraction of the nominal capability of a zone that remains after damage or
+/// a failure.
 ///
-/// This component is **cross-cutting**: it is written by one system (your
-/// projectile / collision damage handler) and read independently by multiple
-/// domain systems:
+/// This component is **cross-cutting**. One system writes it (your damage
+/// handler for projectiles or collisions). Many FDM systems read it
+/// independently:
 ///
-/// - `compute_aerodynamics`, scales coefficients and adds structural drag.
-/// - `compute_propulsion`, scales engine thrust.
-/// - `DetachPlugin` (optional), detaches the entity from the Bevy hierarchy
-///   when `remaining` reaches `0.0`.
+/// - `compute_aero_forces` scales the coefficients and adds structural drag.
+/// - `compute_engine_zone_forces` scales the engine thrust.
 ///
-/// The name `Failure` describes the *state* of the zone, not the *cause*.
-/// Future typed failure modes (`SurfaceBuckle`, `CylinderLoss`, ...) will sit
-/// alongside this component; a resolver system will combine them into domain
-/// state structs. For now this scalar covers the common case.
+/// The crate does not detach a zone when `remaining` is `0.0`. Detachment is
+/// the responsibility of the game.
 ///
-/// # Semantics
-/// - `1.0`, fully intact; no performance loss.
-/// - `0.0`, completely failed / detached from the airframe.
-///   Domain systems must treat `0.0` as **absent**: zero aerodynamic
-///   contribution, zero thrust, not maximum drag.
-/// - `(0.0, 1.0)`, partial failure; outputs are scaled by `remaining`.
-///   - An `AeroZone` at `0.4` produces 40 % of its nominal lift/drag.
-///   - An `EngineZone` at `0.4` produces 40 % of its nominal thrust.
+/// The name `Failure` describes the *state* of the zone, not the *cause*. In
+/// the future, the crate will add typed failure modes (`SurfaceBuckle`,
+/// `CylinderLoss`, and more) next to this component. A resolver system will
+/// then combine them into state structs for each domain. At this time, this
+/// one scalar covers the usual case.
+///
+/// # Meaning of the values
+/// - `1.0`: fully intact. No performance loss.
+/// - `0.0`: fully failed, or detached from the airframe.
+///   FDM systems must treat `0.0` as **absent**: zero aerodynamic
+///   contribution and zero thrust, not maximum drag.
+/// - `(0.0, 1.0)`: partial failure. `remaining` scales the outputs.
+///   - An `AeroZone` at `0.4` makes 40% of its nominal lift and drag.
+///   - An `EngineZone` at `0.4` makes 40% of its nominal thrust.
 ///
 /// # Example
 /// ```rust
 /// use avian_fdm::components::Failure;
 ///
-/// // Zone at full capability, the default state.
+/// // A zone at full capability. This is the default state.
 /// let f = Failure::default();
 /// assert_eq!(f.remaining, 1.0);
 ///
-/// // Zone at zero remaining capability contributes nothing.
+/// // A zone with zero remaining capability contributes nothing.
 /// let failed = Failure { remaining: 0.0 };
 /// assert_eq!(failed.remaining, 0.0);
 /// ```
 #[derive(Component, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct Failure {
-    /// Fraction of nominal capability remaining: `1.0` = intact, `0.0` = failed.
+    /// Fraction of the nominal capability that remains: `1.0` = intact, `0.0` = failed.
     ///
-    /// Multiply any output (force, torque, thrust) by this value before applying
-    /// it to the simulation. Write this from your projectile / collision system.
+    /// The FDM systems multiply their outputs (force, torque, thrust) by this
+    /// value before they apply them. Write it from your projectile or
+    /// collision system.
     pub remaining: Scalar,
 }
 
@@ -58,11 +62,11 @@ impl Default for Failure {
     }
 }
 
-/// Extract `Failure::remaining` from an optional component, defaulting to `1.0`
-/// (fully intact) when the component is absent.
+/// Returns `Failure::remaining` from an optional component. If the component
+/// is absent, it returns `1.0` (fully intact).
 ///
-/// This is the standard pattern used by all FDM domain systems: a zone without
-/// a `Failure` component is treated as undamaged.
+/// All FDM systems use this standard pattern. A zone without a `Failure`
+/// component is an intact zone.
 ///
 /// ```rust
 /// use avian_fdm::components::{Failure, get_remaining};

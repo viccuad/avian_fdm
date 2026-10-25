@@ -1,4 +1,4 @@
-//! [`AeroCoeff::evaluate`], bilinear interpolation, and clamping helpers.
+//! [`AeroCoeff::evaluate`], bilinear interpolation, and clamp helper functions.
 
 use avian3d::math::Scalar as S;
 use bevy_log::{warn, warn_once};
@@ -7,7 +7,7 @@ use crate::math::lerp_1d;
 
 use super::types::AeroCoeff;
 
-/// Clamp `v` to `[lo, hi]`, emitting `warn_once!` if clamping occurs.
+/// Clamps `v` to `[lo, hi]`. If the clamp changes the value, emits a `warn_once!`.
 pub(super) fn clamp_with_warn(v: S, lo: S, hi: S, label: &'static str) -> S {
     if v < lo {
         warn_once!("{label} = {v:.4} is below table minimum {lo:.4}; clamping");
@@ -20,12 +20,12 @@ pub(super) fn clamp_with_warn(v: S, lo: S, hi: S, label: &'static str) -> S {
     }
 }
 
-/// Bilinear interpolation in a 2-D flat row-major table.
-/// `angle_rad` and `re` must already be clamped to their respective ranges.
+/// Bilinear interpolation in a flat, row-major 2-D table.
+/// The caller must clamp `angle_rad` and `re` to their ranges first.
 pub(super) fn bilerp(angle_rad: S, re: S, rows: &[S], cols: &[S], data: &[S]) -> S {
     let nc = cols.len();
 
-    // saturating_sub(2) handles the single-row / single-col degenerate case.
+    // saturating_sub(2) handles the degenerate case of a single row or a single column.
     let ri = rows
         .partition_point(|&r| r <= angle_rad)
         .saturating_sub(1)
@@ -35,7 +35,7 @@ pub(super) fn bilerp(angle_rad: S, re: S, rows: &[S], cols: &[S], data: &[S]) ->
         .saturating_sub(1)
         .min(cols.len().saturating_sub(2));
 
-    // If only one row or one column, the "next" index is the same, t = 0.
+    // If there is only one row or one column, the "next" index is the same, and t = 0.
     let ri1 = (ri + 1).min(rows.len() - 1);
     let ci1 = (ci + 1).min(cols.len() - 1);
 
@@ -61,23 +61,25 @@ pub(super) fn bilerp(angle_rad: S, re: S, rows: &[S], cols: &[S], data: &[S]) ->
 }
 
 impl AeroCoeff {
-    /// Evaluate the coefficient at the given primary angle (rad) and Reynolds number.
+    /// Evaluates the coefficient at the given primary angle (rad) and Reynolds number.
     ///
-    /// The primary angle is the first table axis:
-    /// - For CL, CD, CM, Croll, Cn: pass the local angle of attack `alpha_local`.
-    /// - For CY (side force): pass the local sideslip angle `beta_local`.
+    /// The primary angle is the first axis of the table:
+    /// - For CL, CD, CM, Croll, and Cn: give the local angle of attack `alpha_local`.
+    /// - For CY (side force): give the local sideslip angle `beta_local`.
     ///
-    /// - [`AeroCoeff::Absent`]: returns `0.0` silently (not applicable by design).
+    /// The result for each variant:
+    /// - [`AeroCoeff::Absent`]: returns `0.0` with no warning (does not apply, by design).
     /// - [`AeroCoeff::Placeholder`]: emits `warn_once!` and returns `0.0`.
-    /// - [`AeroCoeff::Scalar`]: returns the constant; ignores both inputs.
-    /// - [`AeroCoeff::Table1D`]: linearly interpolates on `angle_rad`; `re` is ignored.
-    ///   Clamps to the first/last breakpoint with a `warn_once!` if
-    ///   out of range.
-    /// - [`AeroCoeff::Table2D`]: bilinearly interpolates on `(angle_rad, re)`.
-    ///   Clamps both axes independently with a `warn_once!` if out of range.
+    /// - [`AeroCoeff::Scalar`]: returns the constant. It ignores both inputs.
+    /// - [`AeroCoeff::Table1D`]: linear interpolation on `angle_rad`. It ignores `re`.
+    ///   If the angle is out of range, it clamps to the first or last
+    ///   breakpoint and emits a `warn_once!`.
+    /// - [`AeroCoeff::Table2D`]: bilinear interpolation on `(angle_rad, re)`.
+    ///   If an input is out of range, it clamps each axis independently and
+    ///   emits a `warn_once!`.
     ///
-    /// Never panics in release builds. Returns `0.0` on a degenerate table
-    /// (empty breakpoints) after a `warn!`.
+    /// It never panics in release builds. For a degenerate table (no
+    /// breakpoints), it emits a `warn!` and returns `0.0`.
     pub fn evaluate(&self, angle_rad: S, re: S) -> S {
         match self {
             AeroCoeff::Absent => 0.0,
