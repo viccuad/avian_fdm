@@ -3,8 +3,6 @@
 //! Verifies that `resolve_airfoil_names` correctly populates AeroZone fields
 //! from the AirfoilLibrary at spawn time.
 
-#![cfg(feature = "f32")]
-
 use avian3d::prelude::*;
 use avian_fdm::airfoil::{AirfoilData, RegisterAirfoil};
 use avian_fdm::components::aero_coeff::AeroCoeff;
@@ -24,7 +22,7 @@ fn make_app() -> App {
     app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(
         1.0 / 60.0,
     )));
-    app.insert_resource(Gravity(Vec3::ZERO));
+    app.insert_resource(Gravity::ZERO);
     app.finish();
     app
 }
