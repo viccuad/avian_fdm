@@ -1,7 +1,6 @@
 //! Components for the full aircraft: geometry, damping, induced drag, and the core spawn bundle.
 
 use crate::_bevy::*;
-use avian3d::math::Scalar;
 use avian3d::prelude::{AngularVelocity, ConstantForce, ConstantTorque, LinearVelocity, RigidBody};
 use serde::{Deserialize, Serialize};
 
@@ -117,12 +116,12 @@ pub struct AircraftCoreBundle {
 #[reflect(Component, Serialize, Deserialize)]
 pub struct AircraftGeometry {
     /// Reference wing area S (m²).
-    pub wing_area_m2: Scalar,
+    pub wing_area_m2: f32,
     /// Wing span b (m). The reference length for rolling and yawing moments.
-    pub wing_span_m: Scalar,
+    pub wing_span_m: f32,
     /// Mean aerodynamic chord c_bar (m). The reference length for the pitching
     /// moment in [`LodDamping`].
-    pub chord_m: Scalar,
+    pub chord_m: f32,
 }
 
 /// Damping derivatives for the angular rates of the full aircraft. LOD means
@@ -162,13 +161,13 @@ pub struct AircraftGeometry {
 pub struct LodDamping {
     /// Roll damping derivative ∂Cl/∂p_hat, where p_hat = p * b / (2V).
     /// Typical range for light aircraft: −0.4 to −0.5.
-    pub cl_p: Scalar,
+    pub cl_p: f32,
     /// Pitch damping derivative ∂Cm/∂q_hat, where q_hat = q * c_bar / (2V).
     /// Typical range for light aircraft: −10 to −20.
-    pub cm_q: Scalar,
+    pub cm_q: f32,
     /// Yaw damping derivative ∂Cn/∂r_hat, where r_hat = r * b / (2V).
     /// Typical range for light aircraft: −0.1 to −0.15.
-    pub cn_r: Scalar,
+    pub cn_r: f32,
 }
 
 /// Model of the lift-induced drag.
@@ -212,5 +211,5 @@ pub struct InducedDrag {
     /// elliptical shape. A value of 1.0 is perfect (no lost energy). Lower
     /// values include real losses from the wing shape and from fuselage
     /// interference.
-    pub oswald_factor: Scalar,
+    pub oswald_factor: f32,
 }

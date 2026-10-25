@@ -2,8 +2,6 @@
 
 use crate::_bevy::*;
 use crate::components::aero_coeff::AeroCoeff;
-use crate::math::scalar_to_f32;
-use avian3d::math::Scalar;
 use avian3d::prelude::Collider;
 use serde::{Deserialize, Serialize};
 
@@ -106,7 +104,7 @@ pub struct AeroZone {
     /// `remaining`, the extra drag coefficient is
     /// `damage_drag_coeff * (1 - remaining) / qbar`. The extra drag is zero
     /// for an intact zone and for a fully detached zone.
-    pub damage_drag_coeff: Option<Scalar>,
+    pub damage_drag_coeff: Option<f32>,
 
     /// Aerodynamic planform area of this zone (m²).
     ///
@@ -114,7 +112,7 @@ pub struct AeroZone {
     /// self-contained. For a wing zone, use the physical planform area.
     /// Default: 0.0 (no aerodynamic force). This is correct for zones that
     /// only add mass.
-    pub area_m2: Scalar,
+    pub area_m2: f32,
 
     /// Reference chord of this zone (m). The crate uses it to change the
     /// pitching-moment coefficient into a moment:
@@ -123,7 +121,7 @@ pub struct AeroZone {
     ///
     /// For a wing zone, use the mean aerodynamic chord. Default: 0.0. Then the
     /// zone adds no pitching moment, and its Reynolds number is 0.
-    pub chord_m: Scalar,
+    pub chord_m: f32,
 }
 
 impl AeroZone {
@@ -174,7 +172,7 @@ impl AeroZone {
         if self.chord_m <= 0.0 || self.area_m2 <= 0.0 {
             return self;
         }
-        let ar = scalar_to_f32(self.area_m2 / (self.chord_m * self.chord_m));
+        let ar = self.area_m2 / (self.chord_m * self.chord_m);
         self.cl = self.cl.with_post_stall_lift(ar);
         self.cd = self.cd.with_post_stall_drag(ar);
         self.cy = self.cy.with_post_stall_lift(ar);

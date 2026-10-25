@@ -14,7 +14,6 @@
 use crate::_bevy::*;
 use crate::atmosphere::WindResource;
 use crate::components::{AtmosphereState, FlightState};
-use avian3d::math::Vector;
 use avian3d::prelude::{Position, Rotation};
 
 /// Updates [`FlightState`] on each aircraft from the velocity and the atmosphere.
@@ -35,25 +34,23 @@ pub fn update_flight_state(
     )>,
     wind: Option<Res<WindResource>>,
 ) {
-    use crate::math::{f32_to_scalar, vec3_to_vector, world_to_body};
+    use crate::math::{quaternion_to_quat, scalar_to_f32, vector_to_vec3, world_to_body};
 
-    let wind_world = wind
-        .map(|w| vec3_to_vector(w.velocity_world_ms))
-        .unwrap_or(Vector::ZERO);
+    let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vec3::ZERO);
 
     for (pos, rot, lin_vel, ang_vel, atm, mut fs) in &mut query {
-        let altitude_m = pos.0.y;
+        let altitude_m = scalar_to_f32(pos.0.y);
 
         // Body angular rates: turns the world AngularVelocity into the body frame.
-        let q = rot.0;
-        let av_world = ang_vel.0;
+        let q = quaternion_to_quat(rot.0);
+        let av_world = vector_to_vec3(ang_vel.0);
         let omega_body = q.inverse() * av_world;
         let p_rads = omega_body.x;
         let q_rads = omega_body.y;
         let r_rads = omega_body.z;
 
         // Velocity in world space, relative to the air mass.
-        let vel_world = lin_vel.0 - wind_world;
+        let vel_world = vector_to_vec3(lin_vel.0) - wind_world;
 
         let airspeed_ms = vel_world.length();
 
@@ -80,8 +77,8 @@ pub fn update_flight_state(
         // Sideslip angle, beta: atan2(v, sqrt(u^2 + w^2))
         let beta_rad = v.atan2((u * u + w * w).sqrt());
 
-        let dynamic_pressure_pa = 0.5 * f32_to_scalar(atm.density_kgm3) * airspeed_ms * airspeed_ms;
-        let mach = airspeed_ms / f32_to_scalar(atm.speed_of_sound_ms);
+        let dynamic_pressure_pa = 0.5 * atm.density_kgm3 * airspeed_ms * airspeed_ms;
+        let mach = airspeed_ms / atm.speed_of_sound_ms;
 
         *fs = FlightState {
             alpha_rad,

@@ -1,12 +1,11 @@
 //! Interpolation from the throttle position to the thrust fraction.
 
-use crate::math::{f32_to_scalar, lerp_1d, scalar_to_f32};
-use avian3d::math::Scalar;
+use crate::math::lerp_1d;
 
 /// Linear interpolation in a `[[throttle, fraction]; N]` table.
 ///
 /// If `x` is outside the table range, it clamps to the boundary values.
-pub(crate) fn interp_curve(curve: &[[Scalar; 2]], x: Scalar) -> Scalar {
+pub(crate) fn interp_curve(curve: &[[f32; 2]], x: f32) -> f32 {
     if curve.is_empty() {
         return 0.0;
     }
@@ -14,9 +13,9 @@ pub(crate) fn interp_curve(curve: &[[Scalar; 2]], x: Scalar) -> Scalar {
         return curve[0][1];
     }
     let x = x.clamp(curve[0][0], curve[curve.len() - 1][0]);
-    let bp: Vec<f32> = curve.iter().map(|p| scalar_to_f32(p[0])).collect();
-    let vals: Vec<f32> = curve.iter().map(|p| scalar_to_f32(p[1])).collect();
-    f32_to_scalar(lerp_1d(scalar_to_f32(x), &bp, &vals))
+    let bp: Vec<f32> = curve.iter().map(|p| p[0]).collect();
+    let vals: Vec<f32> = curve.iter().map(|p| p[1]).collect();
+    lerp_1d(x, &bp, &vals)
 }
 
 #[cfg(test)]
@@ -24,7 +23,7 @@ mod tests {
     use super::*;
 
     // The interpolation runs in f32.
-    const EPSILON_TOLERANCE: Scalar = 1e-6;
+    const EPSILON_TOLERANCE: f32 = 1e-6;
 
     #[test]
     fn linear_throttle_curve_midpoint() {

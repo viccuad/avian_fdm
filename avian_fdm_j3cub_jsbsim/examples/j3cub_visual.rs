@@ -29,7 +29,6 @@
 //!
 //! Press **Escape** to quit.
 
-use avian3d::math::Scalar;
 use avian3d::prelude::{AngularVelocity, LinearVelocity, PhysicsPlugins, Rotation};
 use avian_fdm::prelude::*;
 use avian_fdm_j3cub_jsbsim::presets::j3cub;
@@ -302,11 +301,11 @@ fn handle_input(
         .next()
         .map(|pad| {
             // Left stick: aileron (X) + elevator (Y, push forward = nose up).
-            let aileron = pad.get(GamepadAxis::LeftStickX).unwrap_or(0.0) as Scalar;
-            let elevator = -pad.get(GamepadAxis::LeftStickY).unwrap_or(0.0) as Scalar;
-            let rudder = pad.get(GamepadAxis::RightStickX).unwrap_or(0.0) as Scalar;
+            let aileron = pad.get(GamepadAxis::LeftStickX).unwrap_or(0.0);
+            let elevator = -pad.get(GamepadAxis::LeftStickY).unwrap_or(0.0);
+            let rudder = pad.get(GamepadAxis::RightStickX).unwrap_or(0.0);
             // Right trigger (RightZ): range [0, 1].
-            let throttle = pad.get(GamepadAxis::RightZ).unwrap_or(-1.0) as Scalar;
+            let throttle = pad.get(GamepadAxis::RightZ).unwrap_or(-1.0);
             (elevator, aileron, rudder, throttle)
         })
         .unwrap_or((0.0, 0.0, 0.0, -1.0)); // -1 on throttle = no gamepad connected
@@ -314,21 +313,21 @@ fn handle_input(
     for mut ctrl in &mut query {
         // Deflection: keyboard overrides gamepad when both active.
         ctrl.elevator = if kb_elevator != 0 {
-            kb_elevator as Scalar
+            kb_elevator as f32
         } else {
             gp_elevator
         }
         .clamp(-1.0, 1.0);
 
         ctrl.aileron = if kb_aileron != 0 {
-            kb_aileron as Scalar
+            kb_aileron as f32
         } else {
             gp_aileron
         }
         .clamp(-1.0, 1.0);
 
         ctrl.rudder = if kb_rudder != 0 {
-            kb_rudder as Scalar
+            kb_rudder as f32
         } else {
             gp_rudder
         }

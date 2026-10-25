@@ -1,8 +1,7 @@
 //! System that calculates the engine thrust (Gagg-Ferrar altitude model).
 
 use crate::_bevy::*;
-use crate::math::{f32_to_scalar, vec3_to_vector, vector_to_vec3};
-use avian3d::math::Scalar;
+use crate::math::{quaternion_to_quat, vec3_to_vector, vector_to_vec3};
 use avian3d::prelude::{ColliderOf, Position, Rotation};
 
 use super::engine_zone::EngineZone;
@@ -12,7 +11,7 @@ use crate::components::{
 };
 
 /// Standard air density at sea level (kg/m³).
-pub(super) const RHO_0: Scalar = 1.225;
+pub(super) const RHO_0: f32 = 1.225;
 
 /// Calculates the thrust of each engine zone and writes it to its `ZoneForce`.
 ///
@@ -53,7 +52,7 @@ pub fn compute_engine_zone_forces(
         let thrust_fraction = interp_curve(&engine.throttle_curve, throttle);
 
         // 2. Gagg-Ferrar altitude correction.
-        let rho = f32_to_scalar(atmos.density_kgm3);
+        let rho = atmos.density_kgm3;
         let density_ratio = (rho / RHO_0).max(0.0);
 
         // 3. Thrust decay with speed, for fixed-pitch propellers.
@@ -71,7 +70,7 @@ pub fn compute_engine_zone_forces(
             * speed_factor;
 
         // 4. Turns the thrust axis from the body frame to world space, and writes ZoneForce.
-        let q = rot.0;
+        let q = quaternion_to_quat(rot.0);
         let thrust_world = q * (engine.thrust_axis_body.normalize_or_zero() * thrust_n);
 
         if !thrust_world.is_finite() {
@@ -79,9 +78,9 @@ pub fn compute_engine_zone_forces(
             continue;
         }
 
-        zone_force.force = vector_to_vec3(thrust_world);
+        zone_force.force = thrust_world;
         zone_force.world_point =
-            vector_to_vec3(pos.0 + q * vec3_to_vector(engine_transform.translation));
+            vector_to_vec3(pos.0 + vec3_to_vector(q * engine_transform.translation));
     }
 }
 

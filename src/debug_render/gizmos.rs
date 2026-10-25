@@ -237,7 +237,6 @@ pub(super) fn debug_render_moments(
 /// The global [`FdmGizmos::zone_color`] is an on/off switch. To disable the
 /// wireframes, set it to `None`. [`FdmDebugRender::zone_color`] on an entity
 /// replaces the color of the zone type. The damage tint applies on top.
-#[allow(clippy::unnecessary_cast)]
 #[allow(clippy::type_complexity)]
 pub(super) fn debug_render_zones(
     mut gizmos: Gizmos<FdmGizmos>,
@@ -263,7 +262,7 @@ pub(super) fn debug_render_zones(
         let base_color = dbg_render
             .and_then(|d| d.zone_color)
             .unwrap_or_else(|| zone_type_color(aero));
-        let remaining = failure.map_or(1.0, |f| f.remaining as f32);
+        let remaining = failure.map_or(1.0, |f| f.remaining);
         let color = damage_tint(base_color, remaining);
 
         let wt = zone_gt.compute_transform();
@@ -382,7 +381,6 @@ fn draw_zone_shape(
 /// The wind arrow points almost opposite to the nose arrow. Its deviation
 /// from the line of the nose arrow shows the angle of attack and the sideslip
 /// angle. The view shows no text.
-#[allow(clippy::unnecessary_cast)]
 pub(super) fn debug_render_wind(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
@@ -408,8 +406,8 @@ pub(super) fn debug_render_wind(
         // from alpha and beta in the body frame, and then turns it into world
         // space. Body-frame velocity components from alpha and beta:
         // u = cos(alpha) * cos(beta), v = sin(beta), w = sin(alpha) * cos(beta)
-        let (sa, ca) = (fs.alpha_rad.sin() as f32, fs.alpha_rad.cos() as f32);
-        let (sb, cb) = (fs.beta_rad.sin() as f32, fs.beta_rad.cos() as f32);
+        let (sa, ca) = (fs.alpha_rad.sin(), fs.alpha_rad.cos());
+        let (sb, cb) = (fs.beta_rad.sin(), fs.beta_rad.cos());
         let vel_body_dir = Vec3::new(ca * cb, sb, sa * cb); // unit vector
         let vel_world_dir = tf.rotation * vel_body_dir;
 

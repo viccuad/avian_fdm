@@ -233,8 +233,8 @@
 //! zone_to_world    = body_to_world * zone_rotation
 //! ```
 //!
-//! All internal calculations use the native precision of avian3d (`Scalar`).
-//! `Scalar` is `f32` or `f64`. The active feature flag selects the type.
+//! All FDM calculations use `f32`, in both precision modes. The FDM converts
+//! values only where it reads from or writes to Avian components.
 //!
 //! ---
 //!

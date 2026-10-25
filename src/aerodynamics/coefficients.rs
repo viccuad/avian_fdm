@@ -1,25 +1,23 @@
 //! Step 1: coefficient evaluation. Table evaluation, control-surface scaling, and damage.
 
 use crate::components::{AeroZone, ControlInputs, ControlSurfaceRole};
-use crate::math::{f32_to_scalar, scalar_to_f32};
-use avian3d::math::Scalar;
 
 /// Six non-dimensional aerodynamic coefficients with all scaling applied. To
 /// get the forces, multiply them by the dynamic pressure and the reference
 /// area.
 pub(crate) struct ZoneCoefficients {
     /// Lift coefficient (positive = up in the stability frame).
-    pub cl: Scalar,
+    pub cl: f32,
     /// Drag coefficient (positive = opposite to the motion).
-    pub cd: Scalar,
+    pub cd: f32,
     /// Side-force coefficient (positive = starboard).
-    pub cy: Scalar,
+    pub cy: f32,
     /// Pitching-moment coefficient (positive = nose up).
-    pub cm: Scalar,
+    pub cm: f32,
     /// Rolling-moment coefficient (positive = starboard wing down).
-    pub croll: Scalar,
+    pub croll: f32,
     /// Yawing-moment coefficient (positive = nose right).
-    pub cn: Scalar,
+    pub cn: f32,
 }
 
 /// Evaluates the coefficient tables of an [`AeroZone`]. Then applies the
@@ -32,7 +30,7 @@ pub(crate) struct ZoneCoefficients {
 ///    the body-rate corrections from
 ///    [`zone_local_angles`][super::local_angles::zone_local_angles]. It
 ///    evaluates CY (side force) at `beta_local`. A table can be a constant
-///    (`Scalar`), a 1-D function of the primary angle (`Table1D`), or a 2-D
+///    (`f32`), a 1-D function of the primary angle (`Table1D`), or a 2-D
 ///    function of (angle, Re) (`Table2D`).
 ///
 /// 2. **Control-surface scaling**. If the zone has a [`ControlSurfaceRole`],
@@ -61,21 +59,18 @@ pub(crate) struct ZoneCoefficients {
 pub(crate) fn evaluate_zone_coefficients(
     zone: &AeroZone,
     ctrl: &ControlInputs,
-    alpha_local: Scalar,
-    beta_local: Scalar,
-    re: Scalar,
-    qbar: Scalar,
-    remaining: Scalar,
+    alpha_local: f32,
+    beta_local: f32,
+    re: f32,
+    qbar: f32,
+    remaining: f32,
 ) -> ZoneCoefficients {
-    let alpha = scalar_to_f32(alpha_local);
-    let beta = scalar_to_f32(beta_local);
-    let re = scalar_to_f32(re);
-    let cl_base = f32_to_scalar(zone.cl.evaluate(alpha, re));
-    let cd_base = f32_to_scalar(zone.cd.evaluate(alpha, re));
-    let cy_base = f32_to_scalar(zone.cy.evaluate(beta, re));
-    let cm_base = f32_to_scalar(zone.cm.evaluate(alpha, re));
-    let croll_base = f32_to_scalar(zone.croll.evaluate(alpha, re));
-    let cn_base = f32_to_scalar(zone.cn.evaluate(alpha, re));
+    let cl_base = zone.cl.evaluate(alpha_local, re);
+    let cd_base = zone.cd.evaluate(alpha_local, re);
+    let cy_base = zone.cy.evaluate(beta_local, re);
+    let cm_base = zone.cm.evaluate(alpha_local, re);
+    let croll_base = zone.croll.evaluate(alpha_local, re);
+    let cn_base = zone.cn.evaluate(alpha_local, re);
 
     let (scale, cd_scale) = match &zone.control_role {
         Some(ControlSurfaceRole::Elevator) => (ctrl.elevator, ctrl.elevator.abs()),

@@ -110,7 +110,7 @@
 //!
 //! All zones are tiled without collider overlap. No double-counted mass.
 
-use avian3d::math::{Scalar, Vector};
+use avian3d::math::Scalar;
 use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
 use bevy_ecs::prelude::*;
 use bevy_math::prelude::*;
@@ -126,20 +126,19 @@ use avian_fdm::sourced;
 // ── Aircraft reference constants ─────────────────────────────────────────────
 
 /// JSBSim J3Cub reference wing area (m²): 178.50 ft² × 0.0929.
-pub const WING_AREA_M2: Scalar = sourced!(
+pub const WING_AREA_M2: f32 = sourced!(
     16.584,
     "JSBSim:J3Cub.xml: wing_area 178.50 ft² × 0.0929 m²/ft²"
 );
 
 /// JSBSim J3Cub wingspan (m): 35.25 ft × 0.3048.
-pub const WING_SPAN_M: Scalar =
-    sourced!(10.742, "JSBSim:J3Cub.xml: wingspan 35.25 ft × 0.3048 m/ft");
+pub const WING_SPAN_M: f32 = sourced!(10.742, "JSBSim:J3Cub.xml: wingspan 35.25 ft × 0.3048 m/ft");
 
 /// JSBSim J3Cub mean aerodynamic chord (m): 5.25 ft × 0.3048.
-pub const CHORD_M: Scalar = sourced!(1.600, "JSBSim:J3Cub.xml: chord 5.25 ft × 0.3048 m/ft");
+pub const CHORD_M: f32 = sourced!(1.600, "JSBSim:J3Cub.xml: chord 5.25 ft × 0.3048 m/ft");
 
 /// Horizontal tail moment arm (m): 13.20 ft from J3Cub FlightGear repo (rev 1.26).
-const H_TAIL_ARM_M: Scalar = sourced!(
+const H_TAIL_ARM_M: f32 = sourced!(
     4.023,
     "JSBSim:J3Cub_FlightGear.xml: htailarm = 13.20 ft × 0.3048 m/ft"
 );
@@ -147,19 +146,19 @@ const H_TAIL_ARM_M: Scalar = sourced!(
 // ── Horizontal tail geometry ─────────────────────────────────────────────────
 
 /// H-stab span (m): ~10 ft measured from J3 Cub three-view drawings.
-const HSTAB_SPAN_M: Scalar = sourced!(
+const HSTAB_SPAN_M: f32 = sourced!(
     3.05,
     "Geometry: J3 Cub h-stab span, approx 10 ft from type certificate drawings"
 );
 
 /// H-stab chord (m): ~2 ft constant chord.
-const HSTAB_CHORD_M: Scalar = sourced!(
+const HSTAB_CHORD_M: f32 = sourced!(
     0.61,
     "Geometry: J3 Cub h-stab chord, approx 2 ft from type certificate drawings"
 );
 
 /// H-stab planform area (m2): span * chord.
-const HSTAB_AREA_M2: Scalar = HSTAB_SPAN_M * HSTAB_CHORD_M; // 1.86 m2
+const HSTAB_AREA_M2: f32 = HSTAB_SPAN_M * HSTAB_CHORD_M; // 1.86 m2
 
 /// H-stab lift curve slope (per radian).
 ///
@@ -181,19 +180,19 @@ const HSTAB_AREA_M2: Scalar = HSTAB_SPAN_M * HSTAB_CHORD_M; // 1.86 m2
 /// downwash reduction, body pitching moment, and fuselage interference.
 ///
 /// We use CL_alpha_eff = 7.2/rad to preserve the calibrated pitch dynamics.
-const HSTAB_CL_ALPHA: Scalar = sourced!(
+const HSTAB_CL_ALPHA: f32 = sourced!(
     7.2,
     "Calibration: CL_alpha_eff = CM_alpha_JSBSim × S_ref × c_ref / (S_tail × l_t) = 2.033 × 16.584 × 1.6 / (1.86 × 4.023); includes downwash and body effects"
 );
 
 /// Elevator chord (m): ~1.15 ft, trailing edge of h-stab.
-const ELEVATOR_CHORD_M: Scalar = sourced!(
+const ELEVATOR_CHORD_M: f32 = sourced!(
     0.35,
     "Geometry: J3 Cub elevator chord, approx 1.15 ft from type certificate drawings"
 );
 
 /// Elevator planform area (m2): same span as h-stab times elevator chord.
-const ELEVATOR_AREA_M2: Scalar = HSTAB_SPAN_M * ELEVATOR_CHORD_M; // 1.07 m2
+const ELEVATOR_AREA_M2: f32 = HSTAB_SPAN_M * ELEVATOR_CHORD_M; // 1.07 m2
 
 /// Elevator CL per radian of deflection.
 ///
@@ -205,7 +204,7 @@ const ELEVATOR_AREA_M2: Scalar = HSTAB_SPAN_M * ELEVATOR_CHORD_M; // 1.07 m2
 ///             = 1.2004 * 16.584 * 1.6 / (1.07 * 4.023) = 7.40/rad.
 ///
 /// Negative: positive elevator (nose-up stick) produces downward tail force.
-const ELEVATOR_CL_DELTA: Scalar = sourced!(
+const ELEVATOR_CL_DELTA: f32 = sourced!(
     -7.40,
     "Calibration: CL_elev = |CM_de| × S_ref × c / (S_elev × l_t) = 1.2004 × 16.584 × 1.6 / (1.07 × 4.023); negative for nose-up convention"
 );
@@ -213,23 +212,23 @@ const ELEVATOR_CL_DELTA: Scalar = sourced!(
 // ── Vertical tail geometry ───────────────────────────────────────────────────
 
 /// Vertical fin height (m): from three-view drawings, root to tip.
-const VFIN_HEIGHT_M: Scalar = sourced!(
+const VFIN_HEIGHT_M: f32 = sourced!(
     0.85,
     "Geometry: J3 Cub vertical fin height from three-view drawings"
 );
 
 /// Vertical fin mean chord (m): average of root (~0.65m) and tip (~0.35m).
-const VFIN_MEAN_CHORD_M: Scalar = sourced!(
+const VFIN_MEAN_CHORD_M: f32 = sourced!(
     0.50,
     "Geometry: J3 Cub vertical fin mean chord, (root 0.65 + tip 0.35) / 2"
 );
 
 /// Vertical fin planform area (m2): height * mean chord.
-const VFIN_AREA_M2: Scalar = VFIN_HEIGHT_M * VFIN_MEAN_CHORD_M; // 0.425 m2
+const VFIN_AREA_M2: f32 = VFIN_HEIGHT_M * VFIN_MEAN_CHORD_M; // 0.425 m2
 
 /// Vertical fin moment arm from CG (m). The fin AC is roughly at 25% of the
 /// mean chord, which places it at about x = -3.6 m in body frame.
-const VFIN_ARM_M: Scalar = sourced!(
+const VFIN_ARM_M: f32 = sourced!(
     3.6,
     "Geometry: J3 Cub vertical fin aerodynamic center, approx 25% mean chord aft of fin LE"
 );
@@ -245,25 +244,25 @@ const VFIN_ARM_M: Scalar = sourced!(
 ///
 /// Negative: positive beta (wind from right) produces leftward force at the
 /// tail, restoring the nose toward the wind (weathercock stability).
-const VFIN_CY_BETA: Scalar = sourced!(
+const VFIN_CY_BETA: f32 = sourced!(
     -7.01,
     "Calibration: CY_fin = CN_beta × S_ref × b / (S_fin × x_arm) = 0.0602 × 16.584 × 10.742 / (0.425 × 3.6); negative for restoring (weathercock) convention"
 );
 
 /// Rudder height (m): extends slightly beyond the fin (horn balance).
-const RUDDER_HEIGHT_M: Scalar = sourced!(
+const RUDDER_HEIGHT_M: f32 = sourced!(
     0.95,
     "Geometry: J3 Cub rudder height from three-view drawings"
 );
 
 /// Rudder mean chord (m): average of root (~0.45m) and tip (~0.30m).
-const RUDDER_MEAN_CHORD_M: Scalar = sourced!(
+const RUDDER_MEAN_CHORD_M: f32 = sourced!(
     0.375,
     "Geometry: J3 Cub rudder mean chord, (root 0.45 + tip 0.30) / 2"
 );
 
 /// Rudder planform area (m2): height * mean chord.
-const RUDDER_AREA_M2: Scalar = RUDDER_HEIGHT_M * RUDDER_MEAN_CHORD_M; // 0.356 m2
+const RUDDER_AREA_M2: f32 = RUDDER_HEIGHT_M * RUDDER_MEAN_CHORD_M; // 0.356 m2
 
 /// Rudder CY per radian of deflection.
 ///
@@ -275,7 +274,7 @@ const RUDDER_AREA_M2: Scalar = RUDDER_HEIGHT_M * RUDDER_MEAN_CHORD_M; // 0.356 m
 ///            = 0.0565 * 16.584 * 10.742 / (0.356 * 3.6) = 7.86/rad.
 ///
 /// Negative: positive rudder (nose-right) produces leftward force at tail.
-const RUDDER_CY_DELTA: Scalar = sourced!(
+const RUDDER_CY_DELTA: f32 = sourced!(
     -7.86,
     "Calibration: CY_rud = |CN_dr| × S_ref × b / (S_rud × x_arm) = 0.0565 × 16.584 × 10.742 / (0.356 × 3.6); negative for −Y force convention"
 );
@@ -283,7 +282,7 @@ const RUDDER_CY_DELTA: Scalar = sourced!(
 // ── Aileron geometry ─────────────────────────────────────────────────────────
 
 /// Aileron span per side (m): occupies the outboard wing tip region.
-const AILERON_SPAN_M: Scalar = sourced!(
+const AILERON_SPAN_M: f32 = sourced!(
     0.86,
     "Geometry: J3 Cub aileron span per side, from wing zone layout"
 );
@@ -293,7 +292,7 @@ const AILERON_SPAN_M: Scalar = sourced!(
 /// The aileron changes the effective camber over the full wing chord, not just
 /// the trailing-edge strip. The influenced wing panel area is the correct
 /// reference for the lift increment.
-const AILERON_AREA_M2: Scalar = AILERON_SPAN_M * CHORD_M; // 1.376 m2
+const AILERON_AREA_M2: f32 = AILERON_SPAN_M * CHORD_M; // 1.376 m2
 
 /// Aileron CL per radian of deflection.
 ///
@@ -304,7 +303,7 @@ const AILERON_AREA_M2: Scalar = AILERON_SPAN_M * CHORD_M; // 1.376 m2
 ///
 /// So: CL_ail = Cl_da * S_ref * b / (2 * S_ail * y_arm)
 ///            = 0.3498 * 16.584 * 10.742 / (2 * 1.376 * 4.05) = 5.59/rad.
-const AILERON_CL_DELTA: Scalar = sourced!(
+const AILERON_CL_DELTA: f32 = sourced!(
     5.59,
     "Calibration: CL_ail = Cl_da × S_ref × b / (2 × S_ail × y_arm) = 0.3498 × 16.584 × 10.742 / (2 × 1.376 × 4.05)"
 );
@@ -312,7 +311,7 @@ const AILERON_CL_DELTA: Scalar = sourced!(
 // ── Landing gear geometry ────────────────────────────────────────────────────
 
 /// Gear leg frontal area (m2): exposed axle/bungee strut, approx 0.6m long * 0.04m diameter.
-const GEAR_LEG_AREA_M2: Scalar = sourced!(
+const GEAR_LEG_AREA_M2: f32 = sourced!(
     0.024,
     "Geometry: J3 Cub gear leg frontal area, 0.6 m × 0.04 m exposed axle + bungee"
 );
@@ -322,13 +321,13 @@ const GEAR_LEG_AREA_M2: Scalar = sourced!(
 /// From JSBSim Drag_gear: each leg contributes CD = 0.001 against S_ref.
 /// Physical: CD_leg = 0.001 * S_ref / S_leg = 0.001 * 16.584 / 0.024 = 0.691.
 /// Typical for a partially faired strut (bare cylinder ~ 1.0-1.2).
-const GEAR_LEG_CD: Scalar = sourced!(
+const GEAR_LEG_CD: f32 = sourced!(
     0.691,
     "Calibration: CD_leg = 0.001 × S_ref / S_leg = 0.001 × 16.584 / 0.024; partially faired strut"
 );
 
 /// Wheel frontal area (m2): circle with radius 0.15m (8-inch tyre).
-const WHEEL_AREA_M2: Scalar = sourced!(
+const WHEEL_AREA_M2: f32 = sourced!(
     0.0707,
     "Geometry: J3 Cub main wheel frontal area, pi × 0.15^2"
 );
@@ -338,7 +337,7 @@ const WHEEL_AREA_M2: Scalar = sourced!(
 /// From JSBSim Drag_gear: each wheel contributes CD = 0.001 against S_ref.
 /// Physical: CD_wheel = 0.001 * S_ref / S_wheel = 0.001 * 16.584 / 0.0707 = 0.235.
 /// Lower than a bare disc (~0.4-0.6) because JSBSim models it as residual drag.
-const WHEEL_CD: Scalar = sourced!(
+const WHEEL_CD: f32 = sourced!(
     0.235,
     "Calibration: CD_wheel = 0.001 × S_ref / S_wheel = 0.001 × 16.584 / 0.0707; JSBSim residual"
 );
@@ -347,14 +346,14 @@ const WHEEL_CD: Scalar = sourced!(
 /// The Avian-computed CG lands at ≈ −0.172 m (fuselage centroid at −0.45 m),
 /// so the wing AC is ≈ 0.072 m **forward** of the CG. This is 4.5 % MAC, matching
 /// the J3Cub's documented forward-of-neutral-point CG range.
-const WING_AC_X: Scalar = sourced!(
+const WING_AC_X: f32 = sourced!(
     -0.10,
     "Geometry: AC at 25% MAC; tuned so Avian CG sits 4.5% MAC forward of AC"
 );
 
 /// Wing height above CG in body frame (m, negative = up since +Z = down).
 /// JSBSim: CG at z = −23.23 in, wing datum at z = 0 in: 23.23 in = 0.590 m above CG.
-const WING_Z: Scalar = sourced!(
+const WING_Z: f32 = sourced!(
     -0.590,
     "JSBSim:J3Cub_FlightGear.xml: CG z = −23.23 in; wing datum z = 0 -> 23.23 in = 0.590 m"
 );
@@ -364,7 +363,7 @@ const WING_Z: Scalar = sourced!(
 /// `Transform` is rotated by this angle about the body X axis so that velocity
 /// projection into the zone's local frame naturally captures the dihedral
 /// effect (more alpha on the upwind wing at sideslip, providing Cl_beta < 0).
-const WING_DIHEDRAL_RAD: Scalar = sourced!(
+const WING_DIHEDRAL_RAD: f32 = sourced!(
     0.0698,
     "Geometry: J3 Cub wing dihedral approximately 4 deg; provides Cl_beta lateral stability"
 );
@@ -618,9 +617,9 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
             // Mass/structural contribution; drag included in wing CD_basic.
             for (sign, _name) in [(-1.0_f32, "L-strut"), (1.0, "R-strut")] {
                 let strut_y = 3.2_f32;
-                let wing_z = (WING_Z - strut_y as Scalar * WING_DIHEDRAL_RAD.sin()) as f32;
-                let fuse_attach = Vec3::new(WING_AC_X as f32, 0.30 * sign, 0.15);
-                let wing_attach = Vec3::new(WING_AC_X as f32, strut_y * sign, wing_z);
+                let wing_z = WING_Z - strut_y * WING_DIHEDRAL_RAD.sin();
+                let fuse_attach = Vec3::new(WING_AC_X, 0.30 * sign, 0.15);
+                let wing_attach = Vec3::new(WING_AC_X, strut_y * sign, wing_z);
                 let mid = (fuse_attach + wing_attach) * 0.5;
                 let dir = wing_attach - fuse_attach;
                 let length = dir.length();
@@ -814,17 +813,17 @@ pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
 #[allow(clippy::too_many_arguments)]
 pub fn wing_zone(
     _name: &str,
-    x_m: Scalar,
-    ac_x_m: Scalar,
-    y_m: Scalar,
-    fraction: Scalar,
+    x_m: f32,
+    ac_x_m: f32,
+    y_m: f32,
+    fraction: f32,
     airfoil: AirfoilData,
     collider: Collider,
     density: ColliderDensity,
 ) -> impl Bundle {
-    let ac_offset = Vec3::new((ac_x_m - x_m) as f32, 0.0, 0.0);
+    let ac_offset = Vec3::new(ac_x_m - x_m, 0.0, 0.0);
     let z_m = WING_Z - y_m.abs() * WING_DIHEDRAL_RAD.sin();
-    let dihedral_rot = Quat::from_rotation_x(-(WING_DIHEDRAL_RAD * y_m.signum()) as f32);
+    let dihedral_rot = Quat::from_rotation_x(-(WING_DIHEDRAL_RAD * y_m.signum()));
     (
         AeroZoneBundle {
             zone: AeroZone {
@@ -837,8 +836,7 @@ pub fn wing_zone(
             }
             .with_post_stall_extension(),
             collider,
-            transform: Transform::from_xyz(x_m as f32, y_m as f32, z_m as f32)
-                .with_rotation(dihedral_rot),
+            transform: Transform::from_xyz(x_m, y_m, z_m).with_rotation(dihedral_rot),
             global_transform: GlobalTransform::default(),
         },
         density,
@@ -854,16 +852,16 @@ pub fn wing_zone(
 /// so there is no collider overlap with the tip panel.
 pub fn aileron_zone(
     _name: &str,
-    y_m: Scalar,
+    y_m: f32,
     role: ControlSurfaceRole,
     collider: Collider,
     density: ColliderDensity,
 ) -> impl Bundle {
     // Wing TE is at WING_AC_X - chord/2 = -0.10 - 0.40 = -0.50.
     // Aileron chord = 0.35, center = -0.50 + 0.175 = -0.325.
-    let aileron_x = (WING_AC_X - 0.40 + 0.175) as f32; // -0.325
+    let aileron_x = WING_AC_X - 0.40 + 0.175; // -0.325
     let z_m = WING_Z - y_m.abs() * WING_DIHEDRAL_RAD.sin();
-    let dihedral_rot = Quat::from_rotation_x(-(WING_DIHEDRAL_RAD * y_m.signum()) as f32);
+    let dihedral_rot = Quat::from_rotation_x(-(WING_DIHEDRAL_RAD * y_m.signum()));
     (
         AeroZoneBundle {
             zone: AeroZone {
@@ -875,8 +873,7 @@ pub fn aileron_zone(
                 ..Default::default()
             },
             collider,
-            transform: Transform::from_xyz(aileron_x, y_m as f32, z_m as f32)
-                .with_rotation(dihedral_rot),
+            transform: Transform::from_xyz(aileron_x, y_m, z_m).with_rotation(dihedral_rot),
             global_transform: GlobalTransform::default(),
         },
         density,
@@ -938,7 +935,7 @@ pub fn hstab_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
             }
             .with_post_stall_extension(),
             collider,
-            transform: Transform::from_xyz(-(H_TAIL_ARM_M as f32), 0.0, -0.10),
+            transform: Transform::from_xyz(-H_TAIL_ARM_M, 0.0, -0.10),
             global_transform: GlobalTransform::default(),
         },
         density,
@@ -968,7 +965,7 @@ pub fn elevator_zone(collider: Collider, density: ColliderDensity) -> impl Bundl
                 ..Default::default()
             },
             collider,
-            transform: Transform::from_xyz(elevator_center_x as f32, 0.0, -0.10),
+            transform: Transform::from_xyz(elevator_center_x, 0.0, -0.10),
             global_transform: GlobalTransform::default(),
         },
         density,
@@ -1010,7 +1007,7 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
             }
             .with_post_stall_extension(),
             collider,
-            transform: Transform::from_xyz(-(VFIN_ARM_M as f32), 0.0, -0.60),
+            transform: Transform::from_xyz(-VFIN_ARM_M, 0.0, -0.60),
             global_transform: GlobalTransform::default(),
         },
         density,
@@ -1042,7 +1039,7 @@ pub fn rudder_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
             // VFIN_MEAN_CHORD_M/2 aft, so rudder LE = -(VFIN_ARM_M + VFIN_MEAN_CHORD_M/2).
             // Rudder center = rudder LE - RUDDER_MEAN_CHORD_M/2.
             transform: Transform::from_xyz(
-                -((VFIN_ARM_M + VFIN_MEAN_CHORD_M / 2.0 + RUDDER_MEAN_CHORD_M / 2.0) as f32),
+                -(VFIN_ARM_M + VFIN_MEAN_CHORD_M / 2.0 + RUDDER_MEAN_CHORD_M / 2.0),
                 0.0,
                 -0.45,
             ),
@@ -1069,7 +1066,7 @@ pub fn engine_zone(collider: Collider, density: ColliderDensity) -> impl Bundle 
                 vec![[0.0, 0.0], [0.5, 0.42], [0.75, 0.64], [1.0, 1.0]],
                 "Calibration:JSBSim: nonlinear throttle response matching JSBSim thrust vs throttle setting (prop efficiency drop at low opening)"
             ),
-            thrust_axis_body: Vector::X, // +X = forward
+            thrust_axis_body: Vec3::X, // +X = forward
             // prop_74in_2f_NACA, fixed-pitch ~22° cruise setting, maxrpm 2300.
             // J_zero ≈ 1.1 at 22° pitch: V_zero = J × n × D ≈ 1.1 × (2300/60) × 1.880 ≈ 79 m/s.
             zero_thrust_speed_ms: Some(sourced!(80.0, "Estimate:J3Cub FlightGear: prop_74in_2f_NACA; J_zero ≈ 1.1 at 22° pitch, maxrpm 2300 -> V = 1.1 × (2300/60) × 1.880 ≈ 79 m/s, rounded to 80")),
@@ -1265,8 +1262,8 @@ mod tests {
     /// Wing zone fractions must sum to 1.0 (cover the full wing area).
     #[test]
     fn wing_fractions_sum_to_one() {
-        let fractions: [Scalar; 6] = [0.175, 0.175, 0.150, 0.175, 0.175, 0.150];
-        let sum: Scalar = fractions.iter().sum();
+        let fractions: [f32; 6] = [0.175, 0.175, 0.150, 0.175, 0.175, 0.150];
+        let sum: f32 = fractions.iter().sum();
         assert!((sum - 1.0).abs() < 1e-10, "wing fractions sum = {sum}");
     }
 
@@ -1317,7 +1314,7 @@ mod tests {
     ///          = 2 * 5.59 * q * 1.376 * 4.05
     #[test]
     fn aileron_roll_moment_matches_jsbsim() {
-        let y_arm: Scalar = 4.05;
+        let y_arm: f32 = 4.05;
         let our_coeff = 2.0 * AILERON_CL_DELTA * AILERON_AREA_M2 * y_arm;
 
         let jsbsim_coeff = 0.3498 * WING_SPAN_M * WING_AREA_M2;
@@ -1335,7 +1332,7 @@ mod tests {
     fn elevator_pitch_moment_matches_jsbsim() {
         let our_moment = ELEVATOR_CL_DELTA * ELEVATOR_AREA_M2 * H_TAIL_ARM_M;
 
-        let cm_de: Scalar = -1.2004;
+        let cm_de: f32 = -1.2004;
         let jsbsim_moment = cm_de * WING_AREA_M2 * CHORD_M;
         assert!(
             (our_moment - jsbsim_moment).abs() / jsbsim_moment.abs() < 0.01,
@@ -1366,7 +1363,7 @@ mod tests {
             * (HSTAB_AREA_M2 / WING_AREA_M2)
             * (H_TAIL_ARM_M / CHORD_M).powi(2);
 
-        let datcom_cmq: Scalar = -6.0;
+        let datcom_cmq: f32 = -6.0;
 
         // Our emergent value should be more negative than Datcom (no downwash lag).
         // Factor of ~1.7 is expected.

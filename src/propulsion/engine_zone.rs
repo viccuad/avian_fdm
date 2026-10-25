@@ -1,7 +1,6 @@
 //! Engine zone component.
 
 use crate::_bevy::*;
-use avian3d::math::{Scalar, Vector};
 use serde::{Deserialize, Serialize};
 
 /// Configuration of a piston engine. Attach it to the engine child entity,
@@ -27,13 +26,13 @@ use serde::{Deserialize, Serialize};
 #[require(crate::components::zone_force::ZoneForce)]
 pub struct EngineZone {
     /// Maximum static thrust at sea level (N).
-    pub max_thrust_n: Scalar,
+    pub max_thrust_n: f32,
     /// Table from the throttle position to the thrust fraction. Each entry is
     /// `[throttle, fraction]`. `throttle` is in [0, 1]. The throttle values
     /// must be strictly increasing.
-    pub throttle_curve: Vec<[Scalar; 2]>,
-    /// Thrust direction in the body frame (unit vector). Usually `Vector::X` (forward).
-    pub thrust_axis_body: Vector,
+    pub throttle_curve: Vec<[f32; 2]>,
+    /// Thrust direction in the body frame (unit vector). Usually `Vec3::X` (forward).
+    pub thrust_axis_body: Vec3,
 
     /// Airspeed at which the propeller makes zero net thrust (m/s).
     ///
@@ -46,7 +45,7 @@ pub struct EngineZone {
     /// `None` disables the speed dependence (constant-thrust model).
     /// Typical values for light general-aviation aircraft: 70–90 m/s
     /// (J-3 Cub: approximately 80 m/s).
-    pub zero_thrust_speed_ms: Option<Scalar>,
+    pub zero_thrust_speed_ms: Option<f32>,
 }
 
 impl Default for EngineZone {
@@ -54,7 +53,7 @@ impl Default for EngineZone {
         Self {
             max_thrust_n: 0.0,
             throttle_curve: vec![[0.0, 0.0], [1.0, 1.0]],
-            thrust_axis_body: Vector::X,
+            thrust_axis_body: Vec3::X,
             zero_thrust_speed_ms: None,
         }
     }

@@ -6,11 +6,9 @@
 //! reads these values. It adds them, and the torque from their moment arm, to
 //! the force and torque totals of the root entity.
 
-use avian3d::math::Vector;
 use bevy_math::Vec3;
 
 use crate::components::ZoneForce;
-use crate::math::vec3_to_vector;
 
 /// Adds the thrust of one engine zone to the root force and torque.
 ///
@@ -19,14 +17,13 @@ use crate::math::vec3_to_vector;
 /// asymmetric, the engine makes a yawing moment.
 pub(super) fn accumulate_engine_force(
     zf: &ZoneForce,
-    arm_world: Vector,
-    total_force: &mut Vector,
-    total_torque: &mut Vector,
+    arm_world: Vec3,
+    total_force: &mut Vec3,
+    total_torque: &mut Vec3,
 ) {
     if zf.force != Vec3::ZERO {
-        let force = vec3_to_vector(zf.force);
-        *total_force += force;
-        *total_torque += arm_world.cross(force);
+        *total_force += zf.force;
+        *total_torque += arm_world.cross(zf.force);
     }
 }
 
@@ -45,9 +42,9 @@ mod tests {
     #[test]
     fn engine_at_cg_no_moment() {
         let zf = thrust(Vec3::new(500.0, 0.0, 0.0));
-        let (mut f, mut t) = (Vector::ZERO, Vector::ZERO);
-        accumulate_engine_force(&zf, Vector::ZERO, &mut f, &mut t);
-        assert!((f - Vector::new(500.0, 0.0, 0.0)).length() < 1e-5);
+        let (mut f, mut t) = (Vec3::ZERO, Vec3::ZERO);
+        accumulate_engine_force(&zf, Vec3::ZERO, &mut f, &mut t);
+        assert!((f - Vec3::new(500.0, 0.0, 0.0)).length() < 1e-5);
         assert!(t.length() < 1e-5, "on-axis engine must not produce torque");
     }
 
@@ -55,8 +52,8 @@ mod tests {
     #[test]
     fn engine_offset_right_produces_yaw_torque() {
         let zf = thrust(Vec3::new(500.0, 0.0, 0.0));
-        let (mut f, mut t) = (Vector::ZERO, Vector::ZERO);
-        accumulate_engine_force(&zf, Vector::new(0.0, 2.0, 0.0), &mut f, &mut t);
+        let (mut f, mut t) = (Vec3::ZERO, Vec3::ZERO);
+        accumulate_engine_force(&zf, Vec3::new(0.0, 2.0, 0.0), &mut f, &mut t);
         // arm = (0, 2, 0), thrust = (500, 0, 0), torque = (0, 0, -1000)
         assert!(
             (t.z - (-1000.0)).abs() < 1e-4,
@@ -69,9 +66,9 @@ mod tests {
     #[test]
     fn engine_zero_force_no_accumulation() {
         let zf = thrust(Vec3::ZERO);
-        let (mut f, mut t) = (Vector::new(100.0, 0.0, 0.0), Vector::new(0.0, 50.0, 0.0));
-        accumulate_engine_force(&zf, Vector::new(0.0, 5.0, 0.0), &mut f, &mut t);
-        assert!((f - Vector::new(100.0, 0.0, 0.0)).length() < 1e-5);
-        assert!((t - Vector::new(0.0, 50.0, 0.0)).length() < 1e-5);
+        let (mut f, mut t) = (Vec3::new(100.0, 0.0, 0.0), Vec3::new(0.0, 50.0, 0.0));
+        accumulate_engine_force(&zf, Vec3::new(0.0, 5.0, 0.0), &mut f, &mut t);
+        assert!((f - Vec3::new(100.0, 0.0, 0.0)).length() < 1e-5);
+        assert!((t - Vec3::new(0.0, 50.0, 0.0)).length() < 1e-5);
     }
 }
