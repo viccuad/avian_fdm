@@ -1,4 +1,3 @@
-#![allow(clippy::unnecessary_cast)]
 //! Piper J-3 Cub reference preset.
 //!
 //! All aerodynamic coefficients are transcribed from the JSBSim `J3Cub.xml`
