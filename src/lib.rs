@@ -808,9 +808,14 @@
 //!
 //! | Feature        | Default | Description |
 //! |----------------|---------|-------------|
-//! | `f32`          | yes     | Enables the avian3d f32 backend and collider shapes. |
-//! | `f64`          | --      | Enables the avian3d f64 backend. You cannot use it together with `f32`. |
+//! | `parry-f32`    | yes     | Enables the avian3d collider backend for f32 world positions. |
+//! | `parry-f64`    | --      | Enables the avian3d collider backend for f64 world positions. Also enables `f64`. |
+//! | `f64`          | --      | Enables f64 world positions in avian3d. The FDM still calculates in f32. |
 //! | `debug-plugin` | yes     | Bevy gizmo overlays for forces, moments, and zones ([`debug_render`]) |
+//!
+//! These features mirror the precision features of avian3d. Enable exactly one
+//! of `parry-f32` and `parry-f64`. For f64, use
+//! `default-features = false, features = ["parry-f64", "debug-plugin"]`.
 //!
 //! The JSBSim-derived reference aircraft (J-3 Cub) is in the separate
 //! `avian_fdm_j3cub_jsbsim` crate (GPL-3.0-only).
@@ -864,6 +869,14 @@
 //! [JSBSim]: https://jsbsim.sourceforge.net/
 
 #![deny(missing_docs)]
+
+// avian3d reports a missing backend only for its `default-collider` feature.
+// Without a backend, `Collider` does not exist, and the errors come from inside
+// this crate.
+#[cfg(not(any(feature = "parry-f32", feature = "parry-f64")))]
+compile_error!(
+    "avian_fdm requires the feature \"parry-f32\" or \"parry-f64\"; please disable default features, and choose only one of them"
+);
 
 /// Records the data source of a value.
 ///

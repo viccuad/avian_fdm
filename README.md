@@ -47,7 +47,7 @@ emergent behaviors appear when computing the AeroZones together.
 - Zone-based damage/failure model with graceful degradation
 - Automatic mass, CG, and inertia tensor from collider geometry
 - Debug gizmo overlays for forces, moments, zones, and colliders
-- Supports both avian3d f32 and f64 backends
+- Supports the avian3d `f64` feature for large worlds (world positions in f64)
 
 ### Emergent behavior
 
@@ -108,12 +108,14 @@ fn spawn(mut commands: Commands) {
 
 | Feature | Default | Description |
 |---|---|---|
-| `f32` | yes | Avian3d f32 physics backend (standard Bevy precision) |
-| `f64` | -- | Avian3d f64 physics backend (mutually exclusive with f32) |
+| `parry-f32` | yes | Avian3d collider backend for f32 world positions |
+| `parry-f64` | -- | Avian3d collider backend for f64 world positions. Enables `f64` |
+| `f64` | -- | Avian3d f64 world positions. The FDM still calculates in f32 |
 | `debug-plugin` | yes | Bevy Gizmo overlays for forces, moments, and zones |
 
-Exactly one of `f32` or `f64` must be enabled. They are mutually exclusive.
-For f64, use `default-features = false, features = ["f64"]`.
+The features mirror the precision features of avian3d. Enable exactly one of
+`parry-f32` and `parry-f64`. For f64, use
+`default-features = false, features = ["parry-f64", "debug-plugin"]`.
 
 The JSBSim-derived J-3 Cub reference aircraft is in the separate
 `avian_fdm_j3cub_jsbsim` crate (GPL-3.0-only, due to JSBSim data provenance).

@@ -15,8 +15,6 @@
 //! All lift slopes use the Helmbold finite-wing correction:
 //!   a = a0 * AR / (AR + 2), where a0 = 2*pi.
 
-#![cfg(feature = "f32")]
-
 use avian3d::prelude::*;
 use avian_fdm::components::*;
 use avian_fdm::plugin::AircraftFdmPlugin;
