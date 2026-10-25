@@ -26,28 +26,29 @@ default = ["f32", "debug-plugin"]
 #
 # `f64` — double-precision backend. Use when simulation accuracy matters more than
 #          Bevy rendering integration, e.g. pure headless FDM or large-world sims.
-f32 = ["avian3d/default-collider", "avian3d/f32", "avian3d/parry-f32"]
+f32 = ["avian3d/default-collider", "avian3d/parry-f32"]
 f64 = ["avian3d/default-collider", "avian3d/f64", "avian3d/parry-f64"]
-debug-plugin = ["dep:bevy_color", "dep:bevy_gizmos"]
+debug-plugin = ["dep:bevy_color", "dep:bevy_gizmos", "dep:bevy_shape"]
 
 [dependencies]
 # collider-from-mesh is excluded: avian_fdm uses only analytic shapes (boxes, spheres,
 # capsules) for AeroZone colliders. Mesh-based colliders would require AssetPlugin +
 # MeshPlugin in headless apps, and are never needed for a flight dynamics library.
-avian3d = { version = "0.7", default-features = false, features = ["3d"] }
-bevy_app = { version = "0.19", default-features = false }
-bevy_ecs = { version = "0.19", default-features = false }
-bevy_math = { version = "0.19", default-features = false }
-bevy_transform = { version = "0.19", default-features = false }
-bevy_reflect = { version = "0.19", default-features = false }
-bevy_color = { version = "0.19", default-features = false, optional = true }
-bevy_gizmos = { version = "0.19", default-features = false, optional = true }
-bevy_log = { version = "0.19", default-features = false }
+avian3d = { version = "0.8", default-features = false, features = ["3d"] }
+bevy_app = { version = "0.20", default-features = false }
+bevy_ecs = { version = "0.20", default-features = false }
+bevy_math = { version = "0.20", default-features = false }
+bevy_transform = { version = "0.20", default-features = false }
+bevy_reflect = { version = "0.20", default-features = false }
+bevy_color = { version = "0.20", default-features = false, optional = true }
+bevy_gizmos = { version = "0.20", default-features = false, optional = true }
+bevy_shape = { version = "0.20", default-features = false, optional = true }
+bevy_log = { version = "0.20", default-features = false }
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 
 [dev-dependencies]
-bevy = { version = "0.19", features = [
+bevy = { version = "0.20", features = [
     "bevy_winit",
     "bevy_pbr",
     "bevy_gizmos",

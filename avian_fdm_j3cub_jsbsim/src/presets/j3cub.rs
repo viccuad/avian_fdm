@@ -110,7 +110,6 @@
 //!
 //! All zones are tiled without collider overlap. No double-counted mass.
 
-use avian3d::math::Scalar;
 use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
 use bevy_ecs::prelude::*;
 use bevy_math::prelude::*;
@@ -632,7 +631,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                             cd: AeroCoeff::Scalar(0.0),
                             ..Default::default()
                         },
-                        collider: Collider::cuboid(length as Scalar, 0.04, 0.04),
+                        collider: Collider::cuboid(length, 0.04, 0.04),
                         transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
                     },
@@ -661,7 +660,7 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
                             area_m2: GEAR_LEG_AREA_M2,
                             ..Default::default()
                         },
-                        collider: Collider::cuboid(length as Scalar, 0.04, 0.04),
+                        collider: Collider::cuboid(length, 0.04, 0.04),
                         transform: Transform::from_translation(mid).with_rotation(rot),
                         global_transform: GlobalTransform::default(),
                     },
@@ -994,11 +993,15 @@ pub fn vtail_zone(collider: Collider, density: ColliderDensity) -> impl Bundle {
                     "Estimate: symmetric airfoil profile drag at low beta"
                 )),
                 cy: AeroCoeff::Table1D {
-                    breakpoints: vec![-avian3d::math::FRAC_PI_2, 0.0, avian3d::math::FRAC_PI_2],
-                    values: vec![
-                        -VFIN_CY_BETA * avian3d::math::FRAC_PI_2,
+                    breakpoints: vec![
+                        -std::f32::consts::FRAC_PI_2,
                         0.0,
-                        VFIN_CY_BETA * avian3d::math::FRAC_PI_2,
+                        std::f32::consts::FRAC_PI_2,
+                    ],
+                    values: vec![
+                        -VFIN_CY_BETA * std::f32::consts::FRAC_PI_2,
+                        0.0,
+                        VFIN_CY_BETA * std::f32::consts::FRAC_PI_2,
                     ],
                 },
                 area_m2: VFIN_AREA_M2,

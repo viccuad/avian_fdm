@@ -39,8 +39,7 @@ pub use local_angles::zone_local_angles;
 pub(crate) use world_forces::zone_force_world;
 
 use crate::_bevy::*;
-use crate::math::{quaternion_to_quat, vec3_to_vector, vector_to_vec3};
-use avian3d::math::Vector;
+use crate::math::{vec3_to_vector, vector_to_vec3};
 use avian3d::prelude::{ComputedCenterOfMass, ConstantForce, ConstantTorque, Position, Rotation};
 
 use crate::components::EngineZone;
@@ -87,8 +86,8 @@ pub fn compute_aero_forces(
         induced_drag,
     ) in root_query.iter_mut()
     {
-        cf.0 = Vector::ZERO;
-        ct.0 = Vector::ZERO;
+        cf.0 = Vec3::ZERO;
+        ct.0 = Vec3::ZERO;
 
         if flight.airspeed_ms < 1e-4 {
             continue;
@@ -107,9 +106,8 @@ pub fn compute_aero_forces(
         let mu = crate::atmosphere::sutherland_viscosity(atm.temperature_k);
         let rho = atm.density_kgm3;
 
-        // Avian state, read once at the Avian boundary.
-        let body_to_world = quaternion_to_quat(rot.0);
-        let com_body = vector_to_vec3(com.0);
+        let body_to_world = rot.0;
+        let com_body = com.0;
 
         let (sa, ca) = (alpha.sin(), alpha.cos());
         let (sb, cb) = (beta.sin(), beta.cos());
@@ -243,7 +241,7 @@ pub fn compute_aero_forces(
             }
         }
 
-        cf.0 = vec3_to_vector(total_force);
-        ct.0 = vec3_to_vector(total_torque);
+        cf.0 = total_force;
+        ct.0 = total_torque;
     }
 }

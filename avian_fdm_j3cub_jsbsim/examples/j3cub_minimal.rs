@@ -13,7 +13,6 @@
 //! mode), and gradually converges on trim. AoA remains bounded near −2°,
 //! demonstrating pitch stability from the horizontal stabiliser.
 
-use avian3d::math::Vector;
 use avian3d::prelude::{LinearVelocity, PhysicsPlugins};
 use avian_fdm::prelude::*;
 use avian_fdm_j3cub_jsbsim::presets::j3cub;
@@ -48,7 +47,7 @@ fn spawn_aircraft(mut commands: Commands) {
     );
     commands
         .entity(root)
-        .insert(LinearVelocity(Vector::new(27.0, 0.0, 0.0)));
+        .insert(LinearVelocity(Vec3::new(27.0, 0.0, 0.0)));
 }
 
 /// Linearly ramp throttle from 50% → 75% over the first 12.5 seconds.

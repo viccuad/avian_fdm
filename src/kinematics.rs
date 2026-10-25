@@ -34,7 +34,7 @@ pub fn update_flight_state(
     )>,
     wind: Option<Res<WindResource>>,
 ) {
-    use crate::math::{quaternion_to_quat, scalar_to_f32, vector_to_vec3, world_to_body};
+    use crate::math::{scalar_to_f32, world_to_body};
 
     let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vec3::ZERO);
 
@@ -42,15 +42,15 @@ pub fn update_flight_state(
         let altitude_m = scalar_to_f32(pos.0.y);
 
         // Body angular rates: turns the world AngularVelocity into the body frame.
-        let q = quaternion_to_quat(rot.0);
-        let av_world = vector_to_vec3(ang_vel.0);
+        let q = rot.0;
+        let av_world = ang_vel.0;
         let omega_body = q.inverse() * av_world;
         let p_rads = omega_body.x;
         let q_rads = omega_body.y;
         let r_rads = omega_body.z;
 
         // Velocity in world space, relative to the air mass.
-        let vel_world = vector_to_vec3(lin_vel.0) - wind_world;
+        let vel_world = lin_vel.0 - wind_world;
 
         let airspeed_ms = vel_world.length();
 

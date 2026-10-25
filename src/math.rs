@@ -1,12 +1,12 @@
 //! Shared math utilities: rotations between the body frame and the world
 //! frame, and other helper functions for the subsystems.
 //!
-//! All FDM math uses `f32`, `Vec3`, and `Quat`. The helpers `*_to_*` convert
-//! at the Avian boundary. Avian components use the active avian3d precision
-//! (`Scalar`, `Vector`, `Quaternion`): `f32`, `Vec3`, and `Quat` with the
-//! `f32` feature, and `f64`, `DVec3`, and `DQuat` with the `f64` feature.
+//! All FDM math uses `f32`, `Vec3`, and `Quat`. Avian components are also
+//! `f32`, except `Position`. `Position` uses the active avian3d precision
+//! (`Real`, `RVector`): `f32` and `Vec3` by default, and `f64` and `DVec3`
+//! with the `f64` feature. The helpers `*_to_*` convert at this boundary.
 
-use avian3d::math::{Quaternion, Scalar, Vector};
+use avian3d::math::{RVector, Real};
 use bevy_math::{Quat, Vec3};
 
 /// Linear interpolation in a 1-D breakpoint table.
@@ -30,31 +30,24 @@ pub(crate) fn lerp_1d(x: f32, bp: &[f32], vals: &[f32]) -> f32 {
     vals[idx] + t * (vals[idx + 1] - vals[idx])
 }
 
-/// Changes a Bevy `Vec3` (always f32) into a `Vector` of the active precision.
+/// Changes a Bevy `Vec3` (always f32) into an `RVector` of the active precision.
 #[inline]
 #[allow(clippy::unnecessary_cast)]
-pub(crate) fn vec3_to_vector(v: Vec3) -> Vector {
-    Vector::new(v.x as Scalar, v.y as Scalar, v.z as Scalar)
+pub(crate) fn vec3_to_vector(v: Vec3) -> RVector {
+    RVector::new(v.x as Real, v.y as Real, v.z as Real)
 }
 
-/// Changes a `Vector` of the active precision back into a Bevy `Vec3` (always f32).
+/// Changes an `RVector` of the active precision back into a Bevy `Vec3` (always f32).
 #[inline]
 #[allow(clippy::unnecessary_cast)]
-pub(crate) fn vector_to_vec3(v: Vector) -> Vec3 {
+pub(crate) fn vector_to_vec3(v: RVector) -> Vec3 {
     Vec3::new(v.x as f32, v.y as f32, v.z as f32)
 }
 
-/// Changes a `Quaternion` of the active precision into a Bevy `Quat` (always f32).
+/// Changes a `Real` of the active precision into an `f32`.
 #[inline]
 #[allow(clippy::unnecessary_cast)]
-pub(crate) fn quaternion_to_quat(q: Quaternion) -> Quat {
-    Quat::from_array(q.to_array().map(|x| x as f32))
-}
-
-/// Changes a `Scalar` of the active precision into an `f32`.
-#[inline]
-#[allow(clippy::unnecessary_cast)]
-pub(crate) fn scalar_to_f32(x: Scalar) -> f32 {
+pub(crate) fn scalar_to_f32(x: Real) -> f32 {
     x as f32
 }
 
