@@ -7,7 +7,6 @@
 //! [`AircraftFdmDebugPlugin`]: super::AircraftFdmDebugPlugin
 
 use crate::_bevy::*;
-use crate::math::vector_to_vec3;
 use avian3d::prelude::{ComputedCenterOfMass, ComputedMass, ConstantForce, ConstantTorque};
 use bevy_shape::{Cone, Cuboid, Cylinder, Sphere};
 
@@ -35,7 +34,7 @@ pub(super) fn debug_render_cg(
     let Some(color) = config.cg_color else { return };
 
     for (gt, com) in &query {
-        let cg = gt.translation() + gt.rotation() * vector_to_vec3(com.0);
+        let cg = gt.translation() + gt.rotation() * com.0;
         gizmos.sphere(
             Isometry3d::from_translation(cg),
             config.marker_radius,
@@ -123,7 +122,6 @@ pub(super) fn debug_render_thrust(
 }
 
 /// Draws three arrows from the CG: the total aerodynamic and thrust force, the weight, and the net force.
-#[allow(clippy::unnecessary_cast)]
 pub(super) fn debug_render_resultant(
     mut gizmos: Gizmos<FdmGizmos>,
     store: Res<GizmoConfigStore>,
@@ -140,21 +138,21 @@ pub(super) fn debug_render_resultant(
     let config = store.config::<FdmGizmos>().1;
 
     for (tf, cf, mass, com) in &query {
-        let cg = tf.translation + tf.rotation * vector_to_vec3(com.0);
+        let cg = tf.translation + tf.rotation * com.0;
         let scale = config.force_scale;
 
         if let Some(color) = config.total_force_color {
-            gizmos.arrow(cg, cg + vector_to_vec3(cf.0) * scale, color);
+            gizmos.arrow(cg, cg + cf.0 * scale, color);
         }
 
-        let weight = Vec3::new(0.0, -mass.value() as f32 * 9.806_65, 0.0);
+        let weight = Vec3::new(0.0, -mass.value() * 9.806_65, 0.0);
 
         if let Some(color) = config.weight_color {
             gizmos.arrow(cg, cg + weight * scale, color);
         }
 
         if let Some(net_color) = config.resultant_color {
-            let net = vector_to_vec3(cf.0) + weight;
+            let net = cf.0 + weight;
             if net.length_squared() > 1.0 {
                 gizmos.arrow(cg, cg + net * scale, net_color);
             }
@@ -180,13 +178,13 @@ pub(super) fn debug_render_moments(
     let config = store.config::<FdmGizmos>().1;
 
     for (tf, com, torque) in &query {
-        let cg = tf.translation + tf.rotation * vector_to_vec3(com.0);
+        let cg = tf.translation + tf.rotation * com.0;
         let scale = config.force_scale;
 
         // Splits the torque into body-frame components, and draws each axis.
         // The torque is already in world space. The function projects it onto
         // the body axes to draw it.
-        let t = vector_to_vec3(torque.0);
+        let t = torque.0;
         if t.length_squared() < 1.0 {
             continue;
         }
@@ -393,7 +391,7 @@ pub(super) fn debug_render_wind(
             continue;
         }
 
-        let cg = tf.translation + tf.rotation * vector_to_vec3(com.0);
+        let cg = tf.translation + tf.rotation * com.0;
 
         // Forward direction of the body frame (the nose) in world space.
         let nose_dir = tf.rotation * Vec3::X;
