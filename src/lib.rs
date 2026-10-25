@@ -34,8 +34,9 @@
 //!     - [Collider strategy](#collider-strategy)
 //! 11. [Reading Simulation Output](#reading-simulation-output)
 //! 12. [Data Flow](#data-flow)
-//! 13. [Feature Flags](#feature-flags)
-//! 14. [Further Reading](#further-reading)
+//! 13. [Numeric Precision](#numeric-precision)
+//! 14. [Feature Flags](#feature-flags)
+//! 15. [Further Reading](#further-reading)
 //!
 //! ---
 //!
@@ -233,8 +234,8 @@
 //! zone_to_world    = body_to_world * zone_rotation
 //! ```
 //!
-//! All FDM calculations use `f32`, in both precision modes. The FDM converts
-//! values only where it reads from or writes to Avian components.
+//! All FDM calculations use `f32`, in both precision modes. Refer to
+//! [Numeric Precision](#numeric-precision).
 //!
 //! ---
 //!
@@ -801,6 +802,53 @@
 //! //         .in_set(PhysicsStepSystems::BroadPhase),
 //! // );
 //! ```
+//!
+//! ---
+//!
+//! ## Numeric Precision
+//!
+//! `avian_fdm` uses the precision model of Avian 0.8:
+//!
+//! - The FDM calculates in `f32`. This includes all public components, the
+//!   coefficient tables, and the aerodynamic, atmosphere, and propulsion
+//!   math. Avian also stores the rotation, the velocities, the forces, the
+//!   torques, and the mass properties in `f32`.
+//! - Only the world position ([`avian3d::prelude::Position`]) uses
+//!   `avian3d::math::Real`. `Real` is `f32` by default, and `f64` with the
+//!   `f64` feature.
+//!
+//! An `f32` value has about 7 significant digits. This is much more than the
+//! accuracy of the aerodynamic data. The FDM does not lose precision far from
+//! the origin, because it never subtracts two world positions:
+//!
+//! - It calculates the moment arm of each zone in the body frame, relative to
+//!   the center of mass. Then it rotates the arm to world orientation.
+//! - It reads the altitude from `Position`, and converts it to `f32` once. At
+//!   10 km, the rounding is about 1 mm.
+//!
+//! Use the `parry-f64` feature when bodies move far from the origin. At
+//! 10,000 km, an `f32` position has a resolution of about 1 m. With `f64`,
+//! Avian keeps positions and contact points in `f64`, and it calculates
+//! contacts with `f64` poses. The broad phase stores its bounding boxes in
+//! `f32`, but it rounds them outward. Far from the origin, this costs
+//! performance, but it does not miss contacts. Bevy `Transform` is `f32`, so
+//! the rendering of a large world needs a floating origin.
+//!
+//! ### Precision is not tunneling
+//!
+//! A fast body can pass through a thin body if it moves farther in one
+//! physics step than the thickness of the thin body. This depends on the
+//! speed and the time step, not on the precision. For example, two aircraft
+//! with a closing speed of 500 m/s move 8.3 m in one step at 60 Hz.
+//!
+//! - By default, Avian 0.8 sweeps fast bodies only against static and
+//!   kinematic bodies. For contact between aircraft, add
+//!   [`avian3d::prelude::SweptCcd`] with [`avian3d::prelude::CcdFilter::DYNAMIC`].
+//! - Two fast bodies on crossing paths can still miss each other. For this
+//!   case, also add [`avian3d::prelude::SpeculativeCcd`].
+//! - For bullets and missiles, do not use rigid-body contacts. Use a hit-scan
+//!   with the relative motion of the two bodies, for example
+//!   [`time_of_impact`](avian3d::collision::collider::contact_query::time_of_impact).
 //!
 //! ---
 //!

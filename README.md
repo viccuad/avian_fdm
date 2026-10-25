@@ -117,6 +117,19 @@ The features mirror the precision features of avian3d. Enable exactly one of
 `parry-f32` and `parry-f64`. For f64, use
 `default-features = false, features = ["parry-f64", "debug-plugin"]`.
 
+## Numeric precision
+
+The FDM calculates in `f32`, like Avian 0.8. Only world positions use `f64`
+when the `f64` feature is on. The FDM never subtracts two world positions:
+it calculates moment arms in the body frame, relative to the center of mass.
+Thus, it keeps its precision far from the origin. Use `parry-f64` when bodies
+move far from the origin. At 10,000 km, an `f32` position has a resolution of
+about 1 m.
+
+Fast bodies that pass through each other are a time-step problem, not a
+precision problem. Refer to the "Numeric Precision" section of the crate
+documentation for the CCD setup between aircraft, and for projectiles.
+
 The JSBSim-derived J-3 Cub reference aircraft is in the separate
 `avian_fdm_j3cub_jsbsim` crate (GPL-3.0-only, due to JSBSim data provenance).
 
