@@ -195,14 +195,17 @@ pub fn compute_aero_forces(
 
                 let force = wf.force;
                 let torque = wf.torque;
-                let ac_world = pos.0
-                    + body_to_world * vec3_to_vector(zone_transform.translation + zone.ac_offset);
+                let ac_body = vec3_to_vector(zone_transform.translation + zone.ac_offset);
+                // The arm is calculated in body frame and then rotated. A
+                // difference of two world positions loses precision far from
+                // the origin.
+                let ac_from_cg_world = body_to_world * (ac_body - com.0);
 
                 zone_force.force = vector_to_vec3(force);
-                zone_force.world_point = vector_to_vec3(ac_world);
+                zone_force.world_point = vector_to_vec3(pos.0 + body_to_world * ac_body);
 
                 cf.0 += force;
-                ct.0 += (ac_world - com_world).cross(force) + torque;
+                ct.0 += ac_from_cg_world.cross(force) + torque;
                 continue;
             }
 
