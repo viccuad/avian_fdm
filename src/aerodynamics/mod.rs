@@ -130,7 +130,7 @@ pub fn compute_aero_forces(
                 let zone_body_from_cg: Vector = vec3_to_vector(zone_transform.translation) - com.0;
                 let zone_q = quat_to_quaternion(zone_transform.rotation);
 
-                // Step 0: per-zone local α/β (skipped in LOD mode).
+                // Step 0: local alpha and beta for the zone (skipped in LOD mode).
                 let (alpha_local, beta_local, vel_zone_unit_local, zone_to_world) = if use_lod {
                     (alpha, beta, vel_body_unit_global, body_to_world)
                 } else {
@@ -176,7 +176,7 @@ pub fn compute_aero_forces(
                 );
                 total_cl_x_area += coeffs.cl * zone.area_m2;
 
-                // Step 2: world-space force and torque.
+                // Step 2: force and torque in world space.
                 let wf = zone_force_world(
                     &coeffs,
                     qbar,
@@ -206,7 +206,7 @@ pub fn compute_aero_forces(
                 continue;
             }
 
-            // Step 3: engine zone thrust accumulation.
+            // Step 3: adds the thrust of the engine zone.
             if let Ok(zf) = engine_zone_query.get(child) {
                 let mut ef = Vector::ZERO;
                 let mut et = Vector::ZERO;

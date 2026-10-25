@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn world_to_body_inverts_rotation_y() {
         let rot = Quaternion::from_rotation_y(FRAC_PI_2);
-        // After 90° +Y rotation, world −Z is body +X.
+        // After a 90-deg rotation about +Y, world -Z is body +X.
         let result = world_to_body(rot, -Vector::Z);
         assert!(
             approx_eq(result, Vector::X),

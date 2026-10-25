@@ -191,9 +191,9 @@ mod tests {
     /// All three rate layers combine additively.
     #[test]
     fn all_layers_combine_additively() {
-        // p=1, q=1, r=1; x=2, y=3; V=10
-        // α_local = 0.1 + (1·3 − 1·2)/10 = 0.2
-        // β_local = 0.05 + 1·2/10 = 0.25
+        // p = 1, q = 1, r = 1; x = 2, y = 3; V = 10
+        // alpha_local = 0.1 + (1*3 - 1*2)/10 = 0.2
+        // beta_local  = 0.05 + 1*2/10 = 0.25
         let (a, b) = zone_local_angles(0.1, 0.05, 1.0, 1.0, 1.0, 2.0, 3.0, 10.0);
         assert!((a - 0.2).abs() < EPS, "combined α layers, got {a}");
         assert!((b - 0.25).abs() < EPS, "combined β layers, got {b}");
@@ -213,19 +213,19 @@ mod tests {
         let alpha_body: Scalar = 0.05;
         let beta: Scalar = 0.2; // wind from the right
 
-        // Body velocity unit vector.
+        // Unit velocity vector in the body frame.
         let vel_body = Vector::new(
             alpha_body.cos() * beta.cos(),
             beta.sin(),
             alpha_body.sin() * beta.cos(),
         );
 
-        // Starboard wing: tip UP means from_rotation_x(-gamma).
+        // Starboard wing: a tip-up rotation is from_rotation_x(-gamma).
         let zone_q_stbd = Quaternion::from_rotation_x(-gamma);
         let vel_stbd = zone_q_stbd.inverse() * vel_body;
         let alpha_stbd = vel_stbd.z.atan2(vel_stbd.x);
 
-        // Port wing: tip UP means from_rotation_x(+gamma).
+        // Port wing: a tip-up rotation is from_rotation_x(+gamma).
         let zone_q_port = Quaternion::from_rotation_x(gamma);
         let vel_port = zone_q_port.inverse() * vel_body;
         let alpha_port = vel_port.z.atan2(vel_port.x);
@@ -238,8 +238,8 @@ mod tests {
             alpha_port < alpha_body,
             "port dihedral zone sees LESS alpha at positive beta: {alpha_port:.5} vs body {alpha_body:.5}"
         );
-        // The asymmetry should be close to the small-angle approximation Γ·β
-        // (not exact because alpha is non-zero and the projection is 3D).
+        // The asymmetry must be near the small-angle approximation, gamma * beta.
+        // It is not exact, because alpha is not zero and the projection is in 3-D.
         let expected_delta = gamma * beta.sin();
         assert!(
             (alpha_stbd - alpha_body - expected_delta).abs() < 5e-4,

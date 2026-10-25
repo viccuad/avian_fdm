@@ -201,7 +201,7 @@ pub fn parse_foil_tools_csv(csv: &str) -> Result<FoilToolsPolars, ParseError> {
     }
     let n_re = re_blocks.len();
 
-    // Validate Re monotonicity.
+    // Makes sure that the Re values are strictly increasing.
     for i in 1..n_re {
         if re_blocks[i].0 <= re_blocks[i - 1].0 {
             return Err(ParseError::NonMonotonicRe { at_index: i });
@@ -234,10 +234,10 @@ pub fn parse_foil_tools_csv(csv: &str) -> Result<FoilToolsPolars, ParseError> {
     }
     let n_alpha = block_len / 3;
 
-    // 3. Extract per-Ncrit rows from each Re block
-    // Ncrit=1: first n_alpha rows of each block.
-    // Ncrit=4: next n_alpha rows.
-    // Ncrit=9: last n_alpha rows.
+    // 3. Extracts the rows of each Ncrit level from each Re block.
+    // Ncrit=1: the first n_alpha rows of each block.
+    // Ncrit=4: the next n_alpha rows.
+    // Ncrit=9: the last n_alpha rows.
     let mut ncrit1_rows: Vec<&RawRow> = Vec::with_capacity(n_re * n_alpha);
     let mut ncrit4_rows: Vec<&RawRow> = Vec::with_capacity(n_re * n_alpha);
     let mut ncrit9_rows: Vec<&RawRow> = Vec::with_capacity(n_re * n_alpha);
@@ -280,7 +280,7 @@ fn lex(csv: &str) -> Result<Vec<RawRow>, ParseError> {
             continue;
         }
         if !header_seen {
-            // Normalise: strip UTF-8 BOM if present, lower-case, remove spaces.
+            // Normalizes the header: removes a UTF-8 BOM if present, and removes spaces and the case.
             let norm: String = trimmed
                 .trim_start_matches('\u{feff}')
                 .chars()
@@ -352,7 +352,7 @@ fn lex(csv: &str) -> Result<Vec<RawRow>, ParseError> {
 /// The rows must be in Re-major order, with alpha in ascending order (the
 /// foil.tools order).
 fn build_airfoil_data(rows: &[&RawRow]) -> Result<AirfoilData, ParseError> {
-    // extract sorted unique Re values (Re-major order in input)
+    // Extracts the unique Re values, in ascending order (the input is Re-major).
     let mut re_bps: Vec<f64> = Vec::new();
     for r in rows {
         if re_bps.last() != Some(&r.re) {
@@ -361,7 +361,7 @@ fn build_airfoil_data(rows: &[&RawRow]) -> Result<AirfoilData, ParseError> {
     }
     let n_re = re_bps.len();
 
-    // Validate Re monotonicity.
+    // Makes sure that the Re values are strictly increasing.
     for i in 1..n_re {
         if re_bps[i] <= re_bps[i - 1] {
             return Err(ParseError::NonMonotonicRe { at_index: i });
@@ -373,11 +373,11 @@ fn build_airfoil_data(rows: &[&RawRow]) -> Result<AirfoilData, ParseError> {
         return Err(ParseError::EmptyData);
     }
 
-    // extract alpha breakpoints from the first Re block
+    // Extracts the alpha breakpoints from the first Re block.
     let first_block = &rows[..n_alpha];
     let alpha_bps: Vec<f64> = first_block.iter().map(|r| r.alpha_deg).collect();
 
-    // Validate alpha monotonicity in the first block.
+    // Makes sure that alpha is strictly increasing in the first block.
     for i in 1..alpha_bps.len() {
         if alpha_bps[i] <= alpha_bps[i - 1] {
             return Err(ParseError::NonMonotonicAlpha {
@@ -387,7 +387,7 @@ fn build_airfoil_data(rows: &[&RawRow]) -> Result<AirfoilData, ParseError> {
         }
     }
 
-    // Validate that every subsequent Re block has the same alpha grid.
+    // Makes sure that each later Re block has the same alpha grid.
     for re_idx in 1..n_re {
         let block = &rows[re_idx * n_alpha..(re_idx + 1) * n_alpha];
         for (ai, row) in block.iter().enumerate() {
@@ -397,7 +397,7 @@ fn build_airfoil_data(rows: &[&RawRow]) -> Result<AirfoilData, ParseError> {
         }
     }
 
-    // physical sanity: CD >= 0 everywhere
+    // Physical check: CD must be >= 0 everywhere.
     for r in rows {
         if r.cd < 0.0 {
             return Err(ParseError::NegativeCd {
@@ -408,7 +408,7 @@ fn build_airfoil_data(rows: &[&RawRow]) -> Result<AirfoilData, ParseError> {
         }
     }
 
-    // transpose Re-major -> alpha-major (Table2D row = alpha)
+    // Transposes the data from Re-major to alpha-major (a Table2D row is one alpha value).
     let mut cl_data: Vec<S> = vec![0.0 as S; n_alpha * n_re];
     let mut cd_data: Vec<S> = vec![0.0 as S; n_alpha * n_re];
     let mut cm_data: Vec<S> = vec![0.0 as S; n_alpha * n_re];
@@ -422,7 +422,7 @@ fn build_airfoil_data(rows: &[&RawRow]) -> Result<AirfoilData, ParseError> {
         }
     }
 
-    // Convert breakpoints to Scalar (alpha to radians).
+    // Changes the breakpoints into Scalar (alpha into radians).
     let alpha_rad: Vec<S> = alpha_bps.iter().map(|&a| (a as S).to_radians()).collect();
     let re_s: Vec<S> = re_bps.iter().map(|&r| r as S).collect();
 
@@ -476,7 +476,7 @@ mod tests {
     #[test]
     fn parse_minimal_synthetic_csv_shape() {
         let polars = parse_foil_tools_csv(minimal_csv()).unwrap();
-        // 2 Re × 3 alpha table
+        // 2 Re values x 3 alpha values
         for foil in [&polars.ncrit1, &polars.ncrit4, &polars.ncrit9] {
             if let AeroCoeff::Table2D { rows, cols, data } = &foil.cl {
                 assert_eq!(rows.len(), 3, "expected 3 alpha rows");
@@ -491,7 +491,7 @@ mod tests {
     #[test]
     fn parse_ncrit_slices_are_distinct() {
         let polars = parse_foil_tools_csv(minimal_csv()).unwrap();
-        // At Re=1e6, alpha=0, the three Ncrit CL values are 0.0, 0.02, 0.05 respectively.
+        // At Re=1e6 and alpha=0, the three Ncrit values of CL are 0.0, 0.02, and 0.05.
         let re = 1_000_000.0 as S;
         let alpha = 0.0 as S;
         let cl1 = polars.ncrit1.cl.evaluate(alpha, re);
@@ -534,7 +534,7 @@ mod tests {
 
     #[test]
     fn parse_rejects_truncated_triplet() {
-        // Only 2 rows: not divisible by 3.
+        // Only 2 rows. This is not a multiple of 3.
         let csv = "Re,alpha,CL,CD,CM\n\
                    1000000,0,0.0,0.01,0.0\n\
                    1000000,0,0.0,0.01,0.0\n";
@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     fn parse_rejects_negative_cd() {
-        // One Re block, 1 alpha × 3 Ncrit = 3 rows. First Ncrit=1 row has negative CD.
+        // One Re block, 1 alpha x 3 Ncrit = 3 rows. The first Ncrit=1 row has a negative CD.
         let csv = "Re,alpha,CL,CD,CM\n\
                    1000000,0,0.0,-0.001,0.0\n\
                    1000000,0,0.0,0.008,0.0\n\
@@ -563,7 +563,7 @@ mod tests {
                    1000000,0,NaN,0.01,0.0\n\
                    1000000,0,0.0,0.01,0.0\n\
                    1000000,0,0.0,0.01,0.0\n";
-        // "NaN" parses as f64::NAN but is caught by the is_finite check.
+        // "NaN" parses as f64::NAN, but the is_finite check catches it.
         let result = parse_foil_tools_csv(csv);
         assert!(
             matches!(result, Err(ParseError::NonFinite { .. }))
@@ -574,8 +574,8 @@ mod tests {
 
     #[test]
     fn parse_rejects_non_monotonic_re() {
-        // Re=2e6 block comes before Re=1e6 block (descending).
-        // Each Re block: 3 alpha × 3 Ncrit = 9 rows. Total: 18 rows.
+        // The Re=2e6 block comes before the Re=1e6 block (descending order).
+        // Each Re block: 3 alpha x 3 Ncrit = 9 rows. Total: 18 rows.
         let csv = "Re,alpha,CL,CD,CM\n\
                    2000000,0,0.0,0.01,0.0\n\
                    2000000,5,0.5,0.01,0.0\n\
@@ -603,9 +603,9 @@ mod tests {
 
     #[test]
     fn parse_rejects_inconsistent_alpha_grid() {
-        // Two Re blocks, but the second has a different alpha grid than the first.
-        // Re=1e6: 3 alpha (-5, 0, 5) × 3 Ncrit = 9 rows, correct
-        // Re=2e6: 3 alpha (-5, 0, 10) — alpha grid differs at index 2, error
+        // Two Re blocks. The second has a different alpha grid than the first.
+        // Re=1e6: 3 alpha values (-5, 0, 5) x 3 Ncrit = 9 rows. Correct.
+        // Re=2e6: 3 alpha values (-5, 0, 10). The alpha grid differs at index 2. An error.
         let csv = "Re,alpha,CL,CD,CM\n\
                    1000000,-5,-0.5,0.01,0.0\n\
                    1000000,0,0.0,0.01,0.0\n\
@@ -637,7 +637,7 @@ mod tests {
         let ar = 6.94 as S;
         let extended = polars.ncrit9.with_post_stall(ar);
         let pi_half = std::f64::consts::FRAC_PI_2 as S;
-        // CL at ±90° should be near zero (flat-plate Viterna).
+        // At +/-90 deg, CL must be near zero (flat-plate Viterna).
         let cl_p90 = extended.cl.evaluate(pi_half, 1_000_000.0 as S);
         let cl_n90 = extended.cl.evaluate(-pi_half, 1_000_000.0 as S);
         assert!(
@@ -648,7 +648,7 @@ mod tests {
             cl_n90.abs() < 0.15 as S,
             "CL at -90° should be near 0, got {cl_n90}"
         );
-        // CD at 90° should be near CD_max = 1.11 + 0.018 * AR.
+        // At 90 deg, CD must be near CD_max = 1.11 + 0.018 * AR.
         let cd_max = 1.11 as S + 0.018 as S * ar;
         let cd_90 = extended.cd.evaluate(pi_half, 1_000_000.0 as S);
         assert!(
@@ -669,10 +669,10 @@ mod tests {
 
     #[test]
     fn validate_flags_placeholder_cl() {
-        // AeroCoeff::validate does not flag Placeholder as an error: it is a
-        // valid "not yet modelled" sentinel that warns at runtime, not at
-        // parse time. AirfoilData::validate therefore returns empty for a
-        // default (Placeholder cl/cd, Absent cm) airfoil.
+        // AeroCoeff::validate does not report Placeholder as an error. It is a
+        // valid sentinel for "no model yet", and it gives a warning at
+        // runtime, not at parse time. Thus, AirfoilData::validate returns an
+        // empty list for a default airfoil (Placeholder cl and cd, Absent cm).
         let foil = AirfoilData::default();
         let issues = foil.validate("placeholder_foil");
         assert!(

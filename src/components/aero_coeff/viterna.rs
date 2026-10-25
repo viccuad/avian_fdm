@@ -26,11 +26,11 @@ fn viterna_cd_max(ar: S) -> S {
 /// They cover 25 deg to 180 deg: 5-deg steps from 25 to 50, then 10-deg steps.
 fn extension_angles() -> Vec<S> {
     let mut angles = Vec::new();
-    // Fine steps near stall transition (25-50 deg)
+    // Fine steps near the stall transition (25-50 deg).
     for deg in (25..=50).step_by(5) {
         angles.push((deg as S).to_radians());
     }
-    // Coarser steps for the rest (60-180 deg)
+    // Coarser steps for the rest of the range (60-180 deg).
     for deg in (60..=180).step_by(10) {
         angles.push((deg as S).to_radians());
     }
@@ -112,7 +112,7 @@ fn extend_1d_lift(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     let mut new_bp = Vec::with_capacity(bp.len() + 40);
     let mut new_vals = Vec::with_capacity(bp.len() + 40);
 
-    // Negative side extension (from -pi up to alpha_min).
+    // Extension on the negative side, from -pi up to alpha_min.
     if alpha_min > -(PI - 0.01) {
         let a2_neg = viterna_a2(alpha_min.abs(), -cl_at_min, a1);
         for &a in ext_angles.iter().rev() {
@@ -127,7 +127,7 @@ fn extend_1d_lift(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
     new_bp.extend_from_slice(bp);
     new_vals.extend_from_slice(vals);
 
-    // Positive side extension (from alpha_max up to +pi).
+    // Extension on the positive side, from alpha_max up to +pi.
     if alpha_max < PI - 0.01 {
         let a2_pos = viterna_a2(alpha_max, cl_at_max, a1);
         for &a in &ext_angles {

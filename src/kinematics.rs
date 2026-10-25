@@ -40,7 +40,7 @@ pub fn update_flight_state(
     for (transform, lin_vel, ang_vel, atm, mut fs) in &mut query {
         let altitude_m = transform.translation().y as Scalar;
 
-        // Body angular rates, rotate world AngularVelocity to body frame.
+        // Body angular rates: turns the world AngularVelocity into the body frame.
         let q = quat_to_quaternion(transform.rotation());
         let av_world = ang_vel.0;
         let omega_body = q.inverse() * av_world;
@@ -48,12 +48,12 @@ pub fn update_flight_state(
         let q_rads = omega_body.y;
         let r_rads = omega_body.z;
 
-        // World-frame velocity relative to air mass.
+        // Velocity in world space, relative to the air mass.
         let vel_world = lin_vel.0 - wind_world;
 
         let airspeed_ms = vel_world.length();
 
-        // Zero-airspeed guard: skip derived quantities, leave stale FlightState values.
+        // Guard for zero airspeed: skip the derived values, and keep the old FlightState values.
         if airspeed_ms < 1e-4 {
             fs.airspeed_ms = airspeed_ms;
             fs.altitude_m = altitude_m;
@@ -64,16 +64,16 @@ pub fn update_flight_state(
             continue;
         }
 
-        // Rotate velocity to body frame.
+        // Turns the velocity into the body frame.
         let vel_body = world_to_body(q, vel_world);
 
-        // Angle of attack α: atan2(w, u)
+        // Angle of attack, alpha: atan2(w, u)
         let u = vel_body.x; // forward
         let v = vel_body.y; // right
         let w = vel_body.z; // down
         let alpha_rad = w.atan2(u);
 
-        // Sideslip β: atan2(v, sqrt(u²+w²))
+        // Sideslip angle, beta: atan2(v, sqrt(u^2 + w^2))
         let beta_rad = v.atan2((u * u + w * w).sqrt());
 
         let dynamic_pressure_pa = 0.5 * atm.density_kgm3 * airspeed_ms * airspeed_ms;

@@ -25,7 +25,7 @@ pub(super) fn clamp_with_warn(v: S, lo: S, hi: S, label: &'static str) -> S {
 pub(super) fn bilerp(angle_rad: S, re: S, rows: &[S], cols: &[S], data: &[S]) -> S {
     let nc = cols.len();
 
-    // saturating_sub(2) handles the single-row / single-col degenerate case.
+    // saturating_sub(2) handles the degenerate case of a single row or a single column.
     let ri = rows
         .partition_point(|&r| r <= angle_rad)
         .saturating_sub(1)
@@ -35,7 +35,7 @@ pub(super) fn bilerp(angle_rad: S, re: S, rows: &[S], cols: &[S], data: &[S]) ->
         .saturating_sub(1)
         .min(cols.len().saturating_sub(2));
 
-    // If only one row or one column, the "next" index is the same, t = 0.
+    // If there is only one row or one column, the "next" index is the same, and t = 0.
     let ri1 = (ri + 1).min(rows.len() - 1);
     let ci1 = (ci + 1).min(cols.len() - 1);
 

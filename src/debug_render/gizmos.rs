@@ -16,7 +16,7 @@ use crate::components::{
 };
 
 //
-// Centre of gravity
+// Center of gravity
 //
 
 /// Draws a sphere at the center of gravity (CG) of the aircraft.
@@ -44,7 +44,7 @@ pub(super) fn debug_render_cg(
 }
 
 //
-// Aerodynamic centres
+// Aerodynamic centers
 //
 
 /// Draws a marker at the aerodynamic center (AC) of each zone.
@@ -162,7 +162,7 @@ pub(super) fn debug_render_resultant(
 }
 
 //
-// Moment arcs
+// Moment arrows
 //
 
 /// Draws the pitch, roll, and yaw moment arrows from the CG.
@@ -182,8 +182,9 @@ pub(super) fn debug_render_moments(
         let cg = tf.translation + tf.rotation * vector_to_vec3(com.0);
         let scale = config.force_scale;
 
-        // Decompose torque into body-frame components and draw each axis.
-        // Torque is already in world frame; project onto body axes for display.
+        // Splits the torque into body-frame components, and draws each axis.
+        // The torque is already in world space. The function projects it onto
+        // the body axes to draw it.
         let t = vector_to_vec3(torque.0);
         if t.length_squared() < 1.0 {
             continue;
@@ -367,7 +368,7 @@ fn draw_zone_shape(
 }
 
 //
-// Angle-of-attack / wind indicator
+// Indicator for the angle of attack and the wind
 //
 
 /// Draws the relative-wind arrow and the nose arrow, to show the angle of
@@ -399,25 +400,26 @@ pub(super) fn debug_render_wind(
 
         let cg = tf.translation + tf.rotation * vector_to_vec3(com.0);
 
-        // Body-frame forward (nose direction) in world space.
+        // Forward direction of the body frame (the nose) in world space.
         let nose_dir = tf.rotation * Vec3::X;
 
-        // Freestream direction: the wind comes from opposite the velocity vector.
-        // Reconstruct velocity direction from alpha and beta in body frame, then
-        // rotate to world. Body-frame velocity components from AoA / sideslip:
-        // u = cos(alpha)*cos(beta), v = sin(beta), w = sin(alpha)*cos(beta)
+        // Freestream direction: the wind comes from the direction opposite to
+        // the velocity vector. The function rebuilds the velocity direction
+        // from alpha and beta in the body frame, and then turns it into world
+        // space. Body-frame velocity components from alpha and beta:
+        // u = cos(alpha) * cos(beta), v = sin(beta), w = sin(alpha) * cos(beta)
         let (sa, ca) = (fs.alpha_rad.sin() as f32, fs.alpha_rad.cos() as f32);
         let (sb, cb) = (fs.beta_rad.sin() as f32, fs.beta_rad.cos() as f32);
         let vel_body_dir = Vec3::new(ca * cb, sb, sa * cb); // unit vector
         let vel_world_dir = tf.rotation * vel_body_dir;
 
-        // Arrow scale: use a fixed 2 m length so it doesn't dwarf force arrows.
+        // Arrow length: a fixed 2 m, so that it does not dwarf the force arrows.
         let arm = 2.0_f32;
 
-        // Wind arrow: from CG in the freestream direction (into-wind = -vel).
+        // Wind arrow: from the CG, in the freestream direction (into the wind = -velocity).
         gizmos.arrow(cg, cg - vel_world_dir * arm, color);
 
-        // Nose arrow: shows aircraft heading for quick AoA reading.
+        // Nose arrow: shows the heading of the aircraft, to read the angle of attack.
         gizmos.arrow(cg, cg + nose_dir * arm, color.with_alpha(0.5));
     }
 }

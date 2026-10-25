@@ -26,7 +26,7 @@ pub(super) fn accumulate_engine_force(
     if zf.force != Vec3::ZERO {
         let force = vec3_to_vector(zf.force);
         *total_force += force;
-        // ZoneForce.world_point is Vec3 (always f32 for visualization).
+        // ZoneForce.world_point is Vec3 (always f32, for visualization).
         *total_torque += (vec3_to_vector(zf.world_point) - com_world).cross(force);
     }
 }
@@ -57,7 +57,7 @@ mod tests {
         };
         let (mut f, mut t) = (Vector::ZERO, Vector::ZERO);
         accumulate_engine_force(&zf, Vector::ZERO, &mut f, &mut t);
-        // arm=(0,2,0) × thrust=(500,0,0) → torque=(0,0,-1000)
+        // arm = (0, 2, 0), thrust = (500, 0, 0), torque = (0, 0, -1000)
         assert!(
             (t.z - (-1000.0)).abs() < 1e-4,
             "starboard engine → nose-left yaw, got z={}",

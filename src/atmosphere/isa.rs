@@ -87,7 +87,7 @@ const MU_REF_SUTH: Scalar = 1.716e-5;
 const S_SUTH: Scalar = 110.4;
 
 //
-// Pure ISA functions (public for testing and external use)
+// Pure ISA functions (public for tests and for external use)
 //
 
 /// Calculates the ISA temperature (K) at the geometric altitude `h` (m).
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn isa_sea_level() {
-        // ICAO: T=288.15 K, p=101325 Pa, ρ=1.2250 kg/m³
+        // ICAO: T = 288.15 K, p = 101325 Pa, rho = 1.2250 kg/m3
         let atm = atmosphere_at(0.0);
         assert!(
             pct_err(atm.temperature_k, 288.15) < TEMP_TOL,
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn isa_1000m() {
-        // ICAO: T=281.65 K, p=89874 Pa, ρ=1.1117 kg/m³
+        // ICAO: T = 281.65 K, p = 89874 Pa, rho = 1.1117 kg/m3
         let atm = atmosphere_at(1_000.0);
         assert!(pct_err(atm.temperature_k, 281.65) < TEMP_TOL);
         assert!(pct_err(atm.pressure_pa, 89_874.0) < PRES_TOL);
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn isa_5000m() {
-        // ICAO: T=255.65 K, p=54048 Pa, ρ=0.7364 kg/m³
+        // ICAO: T = 255.65 K, p = 54048 Pa, rho = 0.7364 kg/m3
         let atm = atmosphere_at(5_000.0);
         assert!(pct_err(atm.temperature_k, 255.65) < TEMP_TOL);
         assert!(pct_err(atm.pressure_pa, 54_048.0) < PRES_TOL);
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn isa_11000m_tropopause() {
-        // ICAO: T=216.65 K, p=22632 Pa, ρ=0.3639 kg/m³
+        // ICAO: T = 216.65 K, p = 22632 Pa, rho = 0.3639 kg/m3
         let atm = atmosphere_at(11_000.0);
         assert!(pct_err(atm.temperature_k, 216.65) < TEMP_TOL);
         assert!(pct_err(atm.pressure_pa, 22_632.0) < PRES_TOL);
@@ -211,21 +211,21 @@ mod tests {
 
     #[test]
     fn isa_stratosphere_is_isothermal() {
-        // Above 11 km temperature must stay at 216.65 K.
+        // Above 11 km, the temperature must stay at 216.65 K.
         assert!((isa_temperature(15_000.0) - 216.65).abs() < 0.01);
         assert!((isa_temperature(20_000.0) - 216.65).abs() < 0.01);
     }
 
     #[test]
     fn speed_of_sound_sea_level() {
-        // ICAO: a₀ = 340.294 m/s at sea level
+        // ICAO: a_0 = 340.294 m/s at sea level
         let a = speed_of_sound(288.15);
         assert!((a - 340.294).abs() < 0.01, "a₀ = {a}");
     }
 
     #[test]
     fn sutherland_sea_level() {
-        // Standard value: μ ≈ 1.789×10⁻⁵ kg/(m·s) at 288.15 K
+        // Standard value: mu = approximately 1.789e-5 kg/(m*s) at 288.15 K
         let mu = sutherland_viscosity(288.15);
         assert!((mu - 1.789e-5).abs() / 1.789e-5 < 0.005, "μ = {mu:.4e}");
     }

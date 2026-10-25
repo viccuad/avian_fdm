@@ -65,7 +65,7 @@ mod tests {
     #[test]
     fn induced_drag_opposes_velocity() {
         let id = InducedDrag { oswald_factor: 0.8 };
-        // Velocity in +X; induced drag should be in -X.
+        // The velocity is in +X. The induced drag must be in -X.
         let drag = apply_induced_drag(&id, 10.0, 10.0, 10.0, 100.0, Vector::X, identity_rot());
         assert!(
             drag.x < 0.0,
@@ -80,7 +80,7 @@ mod tests {
         let id = InducedDrag { oswald_factor: 0.8 };
         let drag1 = apply_induced_drag(&id, 10.0, 10.0, 10.0, 100.0, Vector::X, identity_rot());
         let drag2 = apply_induced_drag(&id, 20.0, 10.0, 10.0, 100.0, Vector::X, identity_rot());
-        // Doubling CL → 4x induced drag.
+        // Doubling CL gives 4 times the induced drag.
         let ratio = drag2.x / drag1.x;
         assert!((ratio - 4.0).abs() < 1e-5, "CD_i ∝ CL², ratio={ratio}");
     }
