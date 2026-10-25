@@ -1,9 +1,9 @@
 //! System that calculates the engine thrust (Gagg-Ferrar altitude model).
 
 use crate::_bevy::*;
-use crate::math::{quat_to_quaternion, vector_to_vec3};
+use crate::math::{vec3_to_vector, vector_to_vec3};
 use avian3d::math::Scalar;
-use avian3d::prelude::ColliderOf;
+use avian3d::prelude::{ColliderOf, Position, Rotation};
 
 use super::engine_zone::EngineZone;
 use super::throttle::interp_curve;
@@ -17,11 +17,13 @@ pub(super) const RHO_0: Scalar = 1.225;
 /// Calculates the thrust of each engine zone and writes it to its `ZoneForce`.
 ///
 /// It runs before `compute_aero_forces`, which adds the thrust to the root entity.
+/// The attitude comes from the Avian [`Rotation`] of the root entity, because
+/// `GlobalTransform` would be one step old during `BroadPhase`.
 #[allow(clippy::type_complexity)]
 pub fn compute_engine_zone_forces(
     mut engine_query: Query<(
         &EngineZone,
-        &GlobalTransform,
+        &Transform,
         &ColliderOf,
         &mut ZoneForce,
         Option<&Failure>,
@@ -30,10 +32,11 @@ pub fn compute_engine_zone_forces(
         &ControlInputs,
         &AtmosphereState,
         &FlightState,
-        &GlobalTransform,
+        &Position,
+        &Rotation,
     )>,
 ) {
-    for (engine, engine_gt, col_of, mut zone_force, opt_failure) in engine_query.iter_mut() {
+    for (engine, engine_transform, col_of, mut zone_force, opt_failure) in engine_query.iter_mut() {
         *zone_force = ZoneForce::default();
 
         let remaining = get_remaining(opt_failure);
@@ -41,7 +44,7 @@ pub fn compute_engine_zone_forces(
             continue;
         }
 
-        let Ok((ctrl, atmos, flight, root_gt)) = root_query.get_mut(col_of.body) else {
+        let Ok((ctrl, atmos, flight, pos, rot)) = root_query.get_mut(col_of.body) else {
             continue;
         };
 
@@ -68,7 +71,7 @@ pub fn compute_engine_zone_forces(
             * speed_factor;
 
         // 4. Turns the thrust axis from the body frame to world space, and writes ZoneForce.
-        let q = quat_to_quaternion(root_gt.rotation());
+        let q = rot.0;
         let thrust_world = q * (engine.thrust_axis_body.normalize_or_zero() * thrust_n);
 
         if !thrust_world.is_finite() {
@@ -77,7 +80,8 @@ pub fn compute_engine_zone_forces(
         }
 
         zone_force.force = vector_to_vec3(thrust_world);
-        zone_force.world_point = engine_gt.translation();
+        zone_force.world_point =
+            vector_to_vec3(pos.0 + q * vec3_to_vector(engine_transform.translation));
     }
 }
 

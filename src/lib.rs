@@ -729,17 +729,19 @@
 //!
 //! ```text
 //! +-- PhysicsStepSystems::BroadPhase (once per physics step) ---------------+
-//! |  1. update_atmosphere          reads:  GlobalTransform(root)            |
+//! |  1. update_atmosphere          reads:  Position(root)                   |
 //! |                                writes: AtmosphereState                  |
 //! |                                                                         |
-//! |  2. update_flight_state        reads:  GlobalTransform(root),           |
+//! |  2. update_flight_state        reads:  Position(root), Rotation(root),  |
 //! |                                        LinearVelocity, AngularVelocity, |
 //! |                                        AtmosphereState, WindResource    |
 //! |                                writes: FlightState                      |
 //! |                                                                         |
 //! |  3. compute_engine_zone_forces reads:  ControlInputs, AtmosphereState,  |
 //! |                                        FlightState, EngineZone,         |
-//! |                                        Failure, GlobalTransform         |
+//! |                                        Failure, Position(root),         |
+//! |                                        Rotation(root),                  |
+//! |                                        Transform(engine)                |
 //! |                                writes: ZoneForce(engine)                |
 //! |                                                                         |
 //! |  4. compute_aero_forces        reads:  Position(root), Rotation(root),  |
@@ -761,25 +763,24 @@
 //!         v  PostUpdate: Bevy propagates GlobalTransform from Position and Rotation
 //! ```
 //!
-//! ### Why zone positions use Transform, not GlobalTransform
+//! ### Why the FDM reads Position, Rotation, and Transform, not GlobalTransform
 //!
 //! Avian writes the physics state of the root entity into `Position` and
 //! `Rotation`. Bevy copies these values into `GlobalTransform` only in
 //! `PostUpdate`, after the physics schedule. Thus, during `BroadPhase`, the
-//! `GlobalTransform` of a zone child has the value from the *previous* frame.
+//! `GlobalTransform` of the root and of each zone child has the value from
+//! the *previous* frame. With a floating origin, `GlobalTransform` is also not
+//! the physics position.
 //!
-//! For this reason, `compute_aero_forces` reads `Position` and `Rotation` on
-//! the root entity. It also reads the local `Transform` of each aero zone and
-//! each engine zone. The zone `Transform` is set at spawn time and does not
-//! change at runtime. The system calculates the moment arm of each zone in
-//! body frame and rotates it to world orientation:
+//! For this reason, all FDM systems read `Position` and `Rotation` on the root
+//! entity. `compute_aero_forces` and `compute_engine_zone_forces` also read
+//! the local `Transform` of each aero zone and each engine zone. The zone
+//! `Transform` is set at spawn time and does not change at runtime.
+//! `compute_aero_forces` calculates the moment arm of each zone in body frame
+//! and rotates it to world orientation:
 //! `arm = root_rotation * (zone_transform.translation - center_of_mass)`.
 //! This value is current in the physics step. It does not lose precision far
 //! from the origin, because it does not subtract two world positions.
-//!
-//! `update_atmosphere`, `update_flight_state`, and
-//! `compute_engine_zone_forces` read `GlobalTransform`. Their input values
-//! come from the last `PostUpdate`, not from the current physics step.
 //!
 //! ### Add a custom system (for example, an autopilot)
 //!
