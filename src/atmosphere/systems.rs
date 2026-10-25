@@ -8,6 +8,7 @@
 use super::isa::atmosphere_at;
 use crate::_bevy::*;
 use crate::components::AtmosphereState;
+use crate::math::scalar_to_f32;
 use avian3d::prelude::Position;
 
 /// Updates [`AtmosphereState`] on each aircraft from its altitude in world space.
@@ -18,6 +19,6 @@ use avian3d::prelude::Position;
 /// the physics position when the app uses a floating origin.
 pub fn update_atmosphere(mut query: Query<(&Position, &mut AtmosphereState)>) {
     for (pos, mut atm) in &mut query {
-        *atm = atmosphere_at(pos.0.y);
+        *atm = atmosphere_at(scalar_to_f32(pos.0.y));
     }
 }

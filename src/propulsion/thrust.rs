@@ -1,7 +1,7 @@
 //! System that calculates the engine thrust (Gagg-Ferrar altitude model).
 
 use crate::_bevy::*;
-use crate::math::{vec3_to_vector, vector_to_vec3};
+use crate::math::{f32_to_scalar, vec3_to_vector, vector_to_vec3};
 use avian3d::math::Scalar;
 use avian3d::prelude::{ColliderOf, Position, Rotation};
 
@@ -53,7 +53,7 @@ pub fn compute_engine_zone_forces(
         let thrust_fraction = interp_curve(&engine.throttle_curve, throttle);
 
         // 2. Gagg-Ferrar altitude correction.
-        let rho = atmos.density_kgm3;
+        let rho = f32_to_scalar(atmos.density_kgm3);
         let density_ratio = (rho / RHO_0).max(0.0);
 
         // 3. Thrust decay with speed, for fixed-pitch propellers.

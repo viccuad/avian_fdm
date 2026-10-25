@@ -35,9 +35,11 @@ pub fn update_flight_state(
     )>,
     wind: Option<Res<WindResource>>,
 ) {
-    use crate::math::world_to_body;
+    use crate::math::{f32_to_scalar, vec3_to_vector, world_to_body};
 
-    let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vector::ZERO);
+    let wind_world = wind
+        .map(|w| vec3_to_vector(w.velocity_world_ms))
+        .unwrap_or(Vector::ZERO);
 
     for (pos, rot, lin_vel, ang_vel, atm, mut fs) in &mut query {
         let altitude_m = pos.0.y;
@@ -78,8 +80,8 @@ pub fn update_flight_state(
         // Sideslip angle, beta: atan2(v, sqrt(u^2 + w^2))
         let beta_rad = v.atan2((u * u + w * w).sqrt());
 
-        let dynamic_pressure_pa = 0.5 * atm.density_kgm3 * airspeed_ms * airspeed_ms;
-        let mach = airspeed_ms / atm.speed_of_sound_ms;
+        let dynamic_pressure_pa = 0.5 * f32_to_scalar(atm.density_kgm3) * airspeed_ms * airspeed_ms;
+        let mach = airspeed_ms / f32_to_scalar(atm.speed_of_sound_ms);
 
         *fs = FlightState {
             alpha_rad,

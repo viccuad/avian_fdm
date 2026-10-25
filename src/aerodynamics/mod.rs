@@ -39,7 +39,7 @@ pub use local_angles::zone_local_angles;
 pub(crate) use world_forces::zone_force_world;
 
 use crate::_bevy::*;
-use crate::math::{quat_to_quaternion, vec3_to_vector, vector_to_vec3};
+use crate::math::{f32_to_scalar, quat_to_quaternion, vec3_to_vector, vector_to_vec3};
 use avian3d::math::{Scalar, Vector};
 use avian3d::prelude::{ComputedCenterOfMass, ConstantForce, ConstantTorque, Position, Rotation};
 
@@ -104,8 +104,8 @@ pub fn compute_aero_forces(
         let s = geo.wing_area_m2;
         let b = geo.wing_span_m;
 
-        let mu = crate::atmosphere::sutherland_viscosity(atm.temperature_k);
-        let rho = atm.density_kgm3;
+        let mu = f32_to_scalar(crate::atmosphere::sutherland_viscosity(atm.temperature_k));
+        let rho = f32_to_scalar(atm.density_kgm3);
 
         let body_to_world = rot.0;
         let (sa, ca) = (alpha.sin(), alpha.cos());

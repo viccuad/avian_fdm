@@ -40,11 +40,11 @@ pub struct FlightState {
 #[reflect(Component, Serialize, Deserialize)]
 pub struct AtmosphereState {
     /// Air density ρ (kg/m³).
-    pub density_kgm3: Scalar,
+    pub density_kgm3: f32,
     /// Static pressure p (Pa).
-    pub pressure_pa: Scalar,
+    pub pressure_pa: f32,
     /// Temperature T (K).
-    pub temperature_k: Scalar,
+    pub temperature_k: f32,
     /// Speed of sound a (m/s).
-    pub speed_of_sound_ms: Scalar,
+    pub speed_of_sound_ms: f32,
 }
