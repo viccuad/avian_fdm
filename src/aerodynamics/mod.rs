@@ -39,7 +39,7 @@ pub use local_angles::zone_local_angles;
 pub(crate) use world_forces::zone_force_world;
 
 use crate::_bevy::*;
-use crate::math::{vec3_to_vector, vector_to_vec3};
+use avian3d::math::{ToF32Precision, ToRealPrecision};
 use avian3d::prelude::{ComputedCenterOfMass, ConstantForce, ConstantTorque, Position, Rotation};
 
 use crate::components::EngineZone;
@@ -204,8 +204,7 @@ pub fn compute_aero_forces(
                 let ac_from_cg_world = body_to_world * (ac_body - com_body);
 
                 zone_force.force = force;
-                zone_force.world_point =
-                    vector_to_vec3(pos.0 + vec3_to_vector(body_to_world * ac_body));
+                zone_force.world_point = (pos.0 + (body_to_world * ac_body).real()).f32();
 
                 total_force += force;
                 total_torque += ac_from_cg_world.cross(force) + torque;

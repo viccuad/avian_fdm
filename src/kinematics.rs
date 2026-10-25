@@ -34,12 +34,13 @@ pub fn update_flight_state(
     )>,
     wind: Option<Res<WindResource>>,
 ) {
-    use crate::math::{scalar_to_f32, world_to_body};
+    use crate::math::world_to_body;
+    use avian3d::math::ToF32Precision;
 
     let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vec3::ZERO);
 
     for (pos, rot, lin_vel, ang_vel, atm, mut fs) in &mut query {
-        let altitude_m = scalar_to_f32(pos.0.y);
+        let altitude_m = pos.0.y.f32();
 
         // Body angular rates: turns the world AngularVelocity into the body frame.
         let q = rot.0;

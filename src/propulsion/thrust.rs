@@ -1,7 +1,7 @@
 //! System that calculates the engine thrust (Gagg-Ferrar altitude model).
 
 use crate::_bevy::*;
-use crate::math::{vec3_to_vector, vector_to_vec3};
+use avian3d::math::{ToF32Precision, ToRealPrecision};
 use avian3d::prelude::{ColliderOf, Position, Rotation};
 
 use super::engine_zone::EngineZone;
@@ -79,8 +79,7 @@ pub fn compute_engine_zone_forces(
         }
 
         zone_force.force = thrust_world;
-        zone_force.world_point =
-            vector_to_vec3(pos.0 + vec3_to_vector(q * engine_transform.translation));
+        zone_force.world_point = (pos.0 + (q * engine_transform.translation).real()).f32();
     }
 }
 
