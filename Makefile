@@ -33,7 +33,7 @@ jsbsim:
 	cargo test -p avian_fdm_j3cub_jsbsim -- jsbsim --nocapture
 	
 .PHONY: j3cub-jsbsim
-j3cub-sbsim:
+j3cub-jsbsim:
 	cargo run -p avian_fdm_j3cub_jsbsim --example j3cub_visual --release
 
 .PHONY: bench
