@@ -70,7 +70,7 @@ pub fn compute_aero_forces(
         Option<&InducedDrag>,
     )>,
     mut zone_query: Query<(&AeroZone, &Transform, &mut ZoneForce, Option<&Failure>)>,
-    engine_zone_query: Query<&ZoneForce, (With<EngineZone>, Without<AeroZone>)>,
+    engine_zone_query: Query<(&ZoneForce, &Transform), (With<EngineZone>, Without<AeroZone>)>,
 ) {
     for (
         mut cf,
@@ -111,7 +111,6 @@ pub fn compute_aero_forces(
         let (sa, ca) = (alpha.sin(), alpha.cos());
         let (sb, cb) = (beta.sin(), beta.cos());
         let vel_body_unit_global = Vector::new(ca * cb, sb, sa * cb);
-        let com_world: Vector = pos.0 + body_to_world * com.0;
         let use_lod = lod_damping.is_some();
 
         let mut total_cl_x_area: Scalar = 0.0;
@@ -210,10 +209,12 @@ pub fn compute_aero_forces(
             }
 
             // Step 3: adds the thrust of the engine zone.
-            if let Ok(zf) = engine_zone_query.get(child) {
+            if let Ok((zf, engine_transform)) = engine_zone_query.get(child) {
+                let arm_world =
+                    body_to_world * (vec3_to_vector(engine_transform.translation) - com.0);
                 let mut ef = Vector::ZERO;
                 let mut et = Vector::ZERO;
-                accumulate_engine_force(zf, com_world, &mut ef, &mut et);
+                accumulate_engine_force(zf, arm_world, &mut ef, &mut et);
                 cf.0 += ef;
                 ct.0 += et;
                 continue;

@@ -747,7 +747,8 @@
 //! |                                        FlightState, AtmosphereState,    |
 //! |                                        AircraftGeometry, ControlInputs, |
 //! |                                        AeroZone, Failure,               |
-//! |                                        Transform(zone), Children,       |
+//! |                                        Transform(zone, engine),         |
+//! |                                        Children,                        |
 //! |                                        ZoneForce(engine), LodDamping,   |
 //! |                                        InducedDrag                      |
 //! |                                writes: ZoneForce(aero),                 |
@@ -768,11 +769,13 @@
 //! `GlobalTransform` of a zone child has the value from the *previous* frame.
 //!
 //! For this reason, `compute_aero_forces` reads `Position` and `Rotation` on
-//! the root entity. It also reads the local `Transform` of each zone. The zone
-//! `Transform` is set at spawn time and does not change at runtime. The system
-//! calculates the world position of each zone from these values:
-//! `world_pos = root_position + root_rotation * zone_transform.translation`.
-//! This value is always one physics step ahead of `GlobalTransform`.
+//! the root entity. It also reads the local `Transform` of each aero zone and
+//! each engine zone. The zone `Transform` is set at spawn time and does not
+//! change at runtime. The system calculates the moment arm of each zone in
+//! body frame and rotates it to world orientation:
+//! `arm = root_rotation * (zone_transform.translation - center_of_mass)`.
+//! This value is current in the physics step. It does not lose precision far
+//! from the origin, because it does not subtract two world positions.
 //!
 //! `update_atmosphere`, `update_flight_state`, and
 //! `compute_engine_zone_forces` read `GlobalTransform`. Their input values
