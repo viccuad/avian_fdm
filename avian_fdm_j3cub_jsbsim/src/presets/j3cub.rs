@@ -109,7 +109,7 @@
 //!
 //! All zones are tiled without collider overlap. No double-counted mass.
 
-use avian3d::prelude::{Collider, ColliderDensity, RigidBody};
+use avian3d::prelude::{CcdFilter, Collider, ColliderDensity, RigidBody, SweptCcd};
 use bevy_ecs::prelude::*;
 use bevy_math::prelude::*;
 use bevy_transform::prelude::*;
@@ -782,17 +782,24 @@ pub fn spawn(commands: &mut Commands, transform: Transform) -> Entity {
 /// Pair with [`InducedDrag`] (already included by [`spawn`]) for lift-induced
 /// drag.  No [`LodDamping`](avian_fdm::components::LodDamping). Roll/pitch/yaw
 /// damping emerges from per-zone local α/β physics.
+///
+/// The bundle includes [`SweptCcd`] with [`CcdFilter::DYNAMIC`]. By default,
+/// Avian sweeps fast bodies only against static and kinematic bodies, so two
+/// aircraft that fly into each other would pass through each other.
 pub fn j3cub_core_bundle(transform: Transform) -> impl Bundle {
-    (AircraftCoreBundle {
-        geometry: AircraftGeometry {
-            wing_area_m2: WING_AREA_M2,
-            wing_span_m: WING_SPAN_M,
-            chord_m: CHORD_M,
+    (
+        AircraftCoreBundle {
+            geometry: AircraftGeometry {
+                wing_area_m2: WING_AREA_M2,
+                wing_span_m: WING_SPAN_M,
+                chord_m: CHORD_M,
+            },
+            rigid_body: RigidBody::Dynamic,
+            transform,
+            ..Default::default()
         },
-        rigid_body: RigidBody::Dynamic,
-        transform,
-        ..Default::default()
-    },)
+        SweptCcd::default().with_filter(CcdFilter::DEFAULT | CcdFilter::DYNAMIC),
+    )
 }
 
 // ── Zone builder functions (pub for testing / custom assemblies) ──────────────

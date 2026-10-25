@@ -64,6 +64,10 @@ use serde::{Deserialize, Serialize};
 ///   tables, for missiles, or for low-detail AI aircraft.
 /// - [`LodDamping`]: add it only for sparse-zone aircraft. In these aircraft,
 ///   the zone geometry cannot make realistic roll, pitch, and yaw damping.
+/// - [`avian3d::prelude::SweptCcd`] with [`avian3d::prelude::CcdFilter::DYNAMIC`]:
+///   add it if aircraft can collide with each other. By default, Avian sweeps
+///   fast bodies only against static and kinematic bodies. Refer to
+///   [Numeric Precision](crate#precision-is-not-tunneling).
 ///
 /// # Example
 /// ```rust,no_run
