@@ -2,6 +2,7 @@
 
 use crate::_bevy::*;
 use crate::components::aero_coeff::AeroCoeff;
+use crate::math::scalar_to_f32;
 use avian3d::math::Scalar;
 use avian3d::prelude::Collider;
 use serde::{Deserialize, Serialize};
@@ -173,7 +174,7 @@ impl AeroZone {
         if self.chord_m <= 0.0 || self.area_m2 <= 0.0 {
             return self;
         }
-        let ar = self.area_m2 / (self.chord_m * self.chord_m);
+        let ar = scalar_to_f32(self.area_m2 / (self.chord_m * self.chord_m));
         self.cl = self.cl.with_post_stall_lift(ar);
         self.cd = self.cd.with_post_stall_drag(ar);
         self.cy = self.cy.with_post_stall_lift(ar);

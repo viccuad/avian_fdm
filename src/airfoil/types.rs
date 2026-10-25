@@ -2,7 +2,6 @@
 
 use crate::_bevy::*;
 use crate::components::aero_coeff::AeroCoeff;
-use avian3d::math::Scalar;
 use serde::{Deserialize, Serialize};
 
 /// Aerodynamic coefficient data for a 2-D airfoil section.
@@ -48,7 +47,7 @@ impl AirfoilData {
     /// give the data to the zone constructors. Refer to
     /// [`AeroCoeff::with_post_stall_lift`] and
     /// [`AeroCoeff::with_post_stall_drag`] for the algorithms.
-    pub fn with_post_stall(self, aspect_ratio: Scalar) -> Self {
+    pub fn with_post_stall(self, aspect_ratio: f32) -> Self {
         Self {
             cl: self.cl.with_post_stall_lift(aspect_ratio),
             cd: self.cd.with_post_stall_drag(aspect_ratio),

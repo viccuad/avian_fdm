@@ -1,7 +1,6 @@
 //! [`AeroCoeff`] enum and its simple accessors.
 
 use crate::_bevy::*;
-use avian3d::math::Scalar as S;
 use serde::{Deserialize, Serialize};
 
 /// The value of one aerodynamic coefficient: a constant, a 1-D table, or a
@@ -11,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// dimensionless coefficient that can change with the angle of attack, the
 /// Reynolds number, or both.
 ///
-/// Call [`AeroCoeff::evaluate`] in each physics step to get a `Scalar` value
+/// Call [`AeroCoeff::evaluate`] in each physics step to get an `f32` value
 /// at the current flight conditions.
 ///
 /// ## Completeness system: `Absent`, `Placeholder`, and the data variants
@@ -60,7 +59,7 @@ pub enum AeroCoeff {
     Placeholder,
 
     /// Constant value. Good for simple models.
-    Scalar(S),
+    Scalar(f32),
 
     /// 1-D table: the coefficient as a function of the angle of attack (rad).
     ///
@@ -68,9 +67,9 @@ pub enum AeroCoeff {
     /// `breakpoints` must be strictly increasing.
     Table1D {
         /// Angle-of-attack breakpoints in radians, strictly increasing.
-        breakpoints: Vec<S>,
+        breakpoints: Vec<f32>,
         /// Coefficient values at each breakpoint.
-        values: Vec<S>,
+        values: Vec<f32>,
     },
 
     /// 2-D table: the coefficient as a function of the angle of attack and the Reynolds number.
@@ -79,11 +78,11 @@ pub enum AeroCoeff {
     /// `rows[i]` (alpha) and `cols[j]` (Re).
     Table2D {
         /// Angle-of-attack breakpoints (rows), in radians, strictly increasing.
-        rows: Vec<S>,
+        rows: Vec<f32>,
         /// Reynolds-number breakpoints (columns), strictly increasing.
-        cols: Vec<S>,
+        cols: Vec<f32>,
         /// Flat row-major coefficient data. Length must equal `rows.len() × cols.len()`.
-        data: Vec<S>,
+        data: Vec<f32>,
     },
 }
 

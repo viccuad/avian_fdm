@@ -1,6 +1,7 @@
 //! Step 1: coefficient evaluation. Table evaluation, control-surface scaling, and damage.
 
 use crate::components::{AeroZone, ControlInputs, ControlSurfaceRole};
+use crate::math::{f32_to_scalar, scalar_to_f32};
 use avian3d::math::Scalar;
 
 /// Six non-dimensional aerodynamic coefficients with all scaling applied. To
@@ -66,12 +67,15 @@ pub(crate) fn evaluate_zone_coefficients(
     qbar: Scalar,
     remaining: Scalar,
 ) -> ZoneCoefficients {
-    let cl_base = zone.cl.evaluate(alpha_local, re);
-    let cd_base = zone.cd.evaluate(alpha_local, re);
-    let cy_base = zone.cy.evaluate(beta_local, re);
-    let cm_base = zone.cm.evaluate(alpha_local, re);
-    let croll_base = zone.croll.evaluate(alpha_local, re);
-    let cn_base = zone.cn.evaluate(alpha_local, re);
+    let alpha = scalar_to_f32(alpha_local);
+    let beta = scalar_to_f32(beta_local);
+    let re = scalar_to_f32(re);
+    let cl_base = f32_to_scalar(zone.cl.evaluate(alpha, re));
+    let cd_base = f32_to_scalar(zone.cd.evaluate(alpha, re));
+    let cy_base = f32_to_scalar(zone.cy.evaluate(beta, re));
+    let cm_base = f32_to_scalar(zone.cm.evaluate(alpha, re));
+    let croll_base = f32_to_scalar(zone.croll.evaluate(alpha, re));
+    let cn_base = f32_to_scalar(zone.cn.evaluate(alpha, re));
 
     let (scale, cd_scale) = match &zone.control_role {
         Some(ControlSurfaceRole::Elevator) => (ctrl.elevator, ctrl.elevator.abs()),
@@ -111,7 +115,7 @@ mod tests {
         }
     }
 
-    fn simple_zone(cl: Scalar, cd: Scalar) -> AeroZone {
+    fn simple_zone(cl: f32, cd: f32) -> AeroZone {
         AeroZone {
             cl: AeroCoeff::Scalar(cl),
             cd: AeroCoeff::Scalar(cd),

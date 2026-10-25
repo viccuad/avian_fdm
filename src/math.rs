@@ -1,9 +1,10 @@
 //! Shared math utilities: rotations between the body frame and the world
 //! frame, and other helper functions for the subsystems.
 //!
-//! All functions use the active avian3d precision (`Scalar`, `Vector`,
-//! `Quaternion`). With the `f32` feature, these types are `f32`, `Vec3`, and
-//! `Quat`. With the `f64` feature, they are `f64`, `DVec3`, and `DQuat`.
+//! `lerp_1d` uses `f32`, like all coefficient tables. The other functions use
+//! the active avian3d precision (`Scalar`, `Vector`, `Quaternion`). With the
+//! `f32` feature, these types are `f32`, `Vec3`, and `Quat`. With the `f64`
+//! feature, they are `f64`, `DVec3`, and `DQuat`.
 
 use avian3d::math::{Quaternion, Scalar, Vector};
 use bevy_math::{Quat, Vec3};
@@ -15,10 +16,10 @@ use bevy_math::{Quat, Vec3};
 /// It returns `0.0` for an empty table, and `vals[0]` for a table with one
 /// entry.
 #[inline]
-pub(crate) fn lerp_1d(x: Scalar, bp: &[Scalar], vals: &[Scalar]) -> Scalar {
+pub(crate) fn lerp_1d(x: f32, bp: &[f32], vals: &[f32]) -> f32 {
     debug_assert_eq!(bp.len(), vals.len());
     if bp.is_empty() {
-        return 0.0 as Scalar;
+        return 0.0;
     }
     if bp.len() == 1 {
         return vals[0];
@@ -48,6 +49,20 @@ pub(crate) fn quat_to_quaternion(q: Quat) -> Quaternion {
 #[allow(clippy::unnecessary_cast)]
 pub(crate) fn vector_to_vec3(v: Vector) -> Vec3 {
     Vec3::new(v.x as f32, v.y as f32, v.z as f32)
+}
+
+/// Changes an `f32` into a `Scalar` of the active precision.
+#[inline]
+#[allow(clippy::unnecessary_cast)]
+pub(crate) fn f32_to_scalar(x: f32) -> Scalar {
+    x as Scalar
+}
+
+/// Changes a `Scalar` of the active precision into an `f32`.
+#[inline]
+#[allow(clippy::unnecessary_cast)]
+pub(crate) fn scalar_to_f32(x: Scalar) -> f32 {
+    x as f32
 }
 
 /// Turns a vector from the aircraft body frame into the Bevy world frame.

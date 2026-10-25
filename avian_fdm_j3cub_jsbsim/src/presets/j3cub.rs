@@ -376,7 +376,7 @@ const WING_DIHEDRAL_RAD: Scalar = sourced!(
 /// Kept for use in unit tests; not used in production code (wing zones now receive
 /// airfoil data from the `avian_fdm` built-in library).
 #[allow(dead_code)]
-const ALPHA_BP: [Scalar; 14] = sourced!(
+const ALPHA_BP: [f32; 14] = sourced!(
     [
         -1.5700, -0.3491, -0.2443, -0.1745, -0.0873, 0.0000, 0.0873, 0.1309, 0.1745, 0.2182,
         0.2618, 0.3054, 0.3491, 1.5700
@@ -387,7 +387,7 @@ const ALPHA_BP: [Scalar; 14] = sourced!(
 /// Reynolds number breakpoints for the USA-35B airfoil tables.
 /// Kept for use in unit tests.
 #[allow(dead_code)]
-const RE_BP: [Scalar; 2] = sourced!(
+const RE_BP: [f32; 2] = sourced!(
     [1_668_183.0, 3_707_224.0],
     "JSBSim:J3Cub.xml: Re at cruise (V=27 m/s) and fast cruise (V=40 m/s), chord=1.6 m, ν=1.46e-5"
 );
@@ -397,7 +397,7 @@ const RE_BP: [Scalar; 2] = sourced!(
 // From J3Cub.xml `Lift_alpha` table. Rows correspond to ALPHA_BP, columns to RE_BP.
 // Kept for use in unit tests.
 #[allow(dead_code)]
-const CL_DATA: [Scalar; 28] = sourced!(
+const CL_DATA: [f32; 28] = sourced!(
     [
         0.0000, 0.0000, // alpha = −1.5700
         -0.0085, -0.5085, // alpha = −0.3491
@@ -423,7 +423,7 @@ const CL_DATA: [Scalar; 28] = sourced!(
 // in lift distribution). Columns correspond to RE_BP.
 // Kept for use in unit tests.
 #[allow(dead_code)]
-const CD_DATA: [Scalar; 28] = sourced!(
+const CD_DATA: [f32; 28] = sourced!(
     [
         1.4091, 1.4091, // alpha = −1.5700
         0.1898, 0.1736, // alpha = −0.3491

@@ -1,6 +1,5 @@
 //! [`AeroCoeff::evaluate`], bilinear interpolation, and clamp helper functions.
 
-use avian3d::math::Scalar as S;
 use bevy_log::{warn, warn_once};
 
 use crate::math::lerp_1d;
@@ -8,7 +7,7 @@ use crate::math::lerp_1d;
 use super::types::AeroCoeff;
 
 /// Clamps `v` to `[lo, hi]`. If the clamp changes the value, emits a `warn_once!`.
-pub(super) fn clamp_with_warn(v: S, lo: S, hi: S, label: &'static str) -> S {
+pub(super) fn clamp_with_warn(v: f32, lo: f32, hi: f32, label: &'static str) -> f32 {
     if v < lo {
         warn_once!("{label} = {v:.4} is below table minimum {lo:.4}; clamping");
         lo
@@ -22,7 +21,7 @@ pub(super) fn clamp_with_warn(v: S, lo: S, hi: S, label: &'static str) -> S {
 
 /// Bilinear interpolation in a flat, row-major 2-D table.
 /// The caller must clamp `angle_rad` and `re` to their ranges first.
-pub(super) fn bilerp(angle_rad: S, re: S, rows: &[S], cols: &[S], data: &[S]) -> S {
+pub(super) fn bilerp(angle_rad: f32, re: f32, rows: &[f32], cols: &[f32], data: &[f32]) -> f32 {
     let nc = cols.len();
 
     // saturating_sub(2) handles the degenerate case of a single row or a single column.
@@ -80,7 +79,7 @@ impl AeroCoeff {
     ///
     /// It never panics in release builds. For a degenerate table (no
     /// breakpoints), it emits a `warn!` and returns `0.0`.
-    pub fn evaluate(&self, angle_rad: S, re: S) -> S {
+    pub fn evaluate(&self, angle_rad: f32, re: f32) -> f32 {
         match self {
             AeroCoeff::Absent => 0.0,
             AeroCoeff::Placeholder => {
