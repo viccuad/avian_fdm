@@ -1,19 +1,22 @@
 .PHONY: check
 check:
-	# f32 (default) workspace-wide, then f64 core-only (mutually exclusive backends).
+	# Default features (parry-f32, debug-plugin) workspace-wide. Then parry-f64
+	# with and without debug-plugin. parry-f32 and parry-f64 are mutually exclusive.
 	cargo check --workspace
-	cargo check -p avian_fdm --no-default-features --features "f64"
+	cargo check --workspace --no-default-features --features "parry-f64,debug-plugin"
+	cargo check -p avian_fdm --no-default-features --features "parry-f64"
 
 .PHONY: clippy
 clippy:
 	cargo clippy --workspace
-	cargo clippy -p avian_fdm --no-default-features --features "f64"
+	cargo clippy --workspace --no-default-features --features "parry-f64,debug-plugin"
+	cargo clippy -p avian_fdm --no-default-features --features "parry-f64"
 
 .PHONY: test
 test:
-	# f32 (default) workspace-wide, then f64 core-only.
+	# Default features workspace-wide, then parry-f64 core-only.
 	cargo test --workspace
-	cargo test -p avian_fdm --no-default-features --features "f64"
+	cargo test -p avian_fdm --no-default-features --features "parry-f64"
 	
 .PHONY: fmt
 fmt:
@@ -33,7 +36,7 @@ jsbsim:
 	cargo test -p avian_fdm_j3cub_jsbsim -- jsbsim --nocapture
 	
 .PHONY: j3cub-jsbsim
-j3cub-sbsim:
+j3cub-jsbsim:
 	cargo run -p avian_fdm_j3cub_jsbsim --example j3cub_visual --release
 
 .PHONY: bench

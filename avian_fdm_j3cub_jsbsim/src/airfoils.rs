@@ -69,7 +69,7 @@ mod tests {
     fn usa35b_with_post_stall_extends_to_pi() {
         // Use a per-panel-ish AR; exact value doesn't matter for this smoke test.
         let ar = 1.1_f32;
-        let foil = usa35b().with_post_stall(ar as avian3d::math::Scalar);
+        let foil = usa35b().with_post_stall(ar);
         let cl_90 = foil.cl.evaluate(PI / 2.0, 1_000_000.0);
         assert!(
             cl_90.abs() < 0.2,

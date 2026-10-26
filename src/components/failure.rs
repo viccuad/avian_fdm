@@ -2,7 +2,6 @@
 //! The hit or damage system of the game writes it. The FDM systems read it.
 
 use crate::_bevy::*;
-use avian3d::math::Scalar;
 use serde::{Deserialize, Serialize};
 
 /// Fraction of the nominal capability of a zone that remains after damage or
@@ -53,7 +52,7 @@ pub struct Failure {
     /// The FDM systems multiply their outputs (force, torque, thrust) by this
     /// value before they apply them. Write it from your projectile or
     /// collision system.
-    pub remaining: Scalar,
+    pub remaining: f32,
 }
 
 impl Default for Failure {
@@ -75,7 +74,7 @@ impl Default for Failure {
 /// assert_eq!(get_remaining(Some(&f)), 0.4);
 /// ```
 #[inline]
-pub fn get_remaining(failure: Option<&Failure>) -> Scalar {
+pub fn get_remaining(failure: Option<&Failure>) -> f32 {
     failure.map(|f| f.remaining).unwrap_or(1.0)
 }
 

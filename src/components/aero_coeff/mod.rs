@@ -31,7 +31,7 @@
 //!
 //! ## Table storage layout
 //!
-//! `Table2D::data` is a **flat, row-major `Vec<S>`**. Its length is
+//! `Table2D::data` is a **flat, row-major `Vec<f32>`**. Its length is
 //! `rows.len() * cols.len()`. The element at row index `i` and column index
 //! `j` is `data[i * cols.len() + j]`. This layout uses one heap allocation.
 //! It also gives good cache locality during bilinear interpolation.

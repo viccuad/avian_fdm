@@ -9,30 +9,27 @@
 //! post-stall flight or in a tumble. It also does not clamp in other
 //! orientations where the local angle of attack is outside the data range.
 
-use avian3d::math::Scalar as S;
-
 use super::types::AeroCoeff;
 
-#[allow(clippy::unnecessary_cast)]
-const PI: S = std::f64::consts::PI as S;
-const HALF_PI: S = PI / 2.0;
+const PI: f32 = std::f32::consts::PI;
+const HALF_PI: f32 = PI / 2.0;
 
 /// Viterna CD_max for a surface with a finite aspect ratio.
-fn viterna_cd_max(ar: S) -> S {
+fn viterna_cd_max(ar: f32) -> f32 {
     1.11 + 0.018 * ar
 }
 
 /// Angles (in radians) of the extension points.
 /// They cover 25 deg to 180 deg: 5-deg steps from 25 to 50, then 10-deg steps.
-fn extension_angles() -> Vec<S> {
+fn extension_angles() -> Vec<f32> {
     let mut angles = Vec::new();
     // Fine steps near the stall transition (25-50 deg).
     for deg in (25..=50).step_by(5) {
-        angles.push((deg as S).to_radians());
+        angles.push((deg as f32).to_radians());
     }
     // Coarser steps for the rest of the range (60-180 deg).
     for deg in (60..=180).step_by(10) {
-        angles.push((deg as S).to_radians());
+        angles.push((deg as f32).to_radians());
     }
     angles
 }
@@ -45,7 +42,7 @@ fn extension_angles() -> Vec<S> {
 /// The A2 * cos^2/sin term gives a smooth transition from the value at the
 /// stall angle to the flat-plate behavior. After 90 deg, only the sin(2a)
 /// term remains. Near 180 deg, sin(a) goes to zero, and the A2 term diverges.
-fn viterna_cl(a: S, a1: S, a2: S) -> S {
+fn viterna_cl(a: f32, a1: f32, a2: f32) -> f32 {
     let sa = a.sin();
     let flat = a1 * (2.0 * a).sin();
     if a.abs() <= HALF_PI && sa.abs() > 1e-10 {
@@ -60,7 +57,7 @@ fn viterna_cl(a: S, a1: S, a2: S) -> S {
 ///   CD = CD_0_eff + (CD_max - CD_0_eff) * sin^2(a)
 ///
 /// The result is CD_0_eff at 0 and 180 deg, and CD_max at 90 deg.
-fn viterna_cd(a: S, cd0_eff: S, cd_max: S) -> S {
+fn viterna_cd(a: f32, cd0_eff: f32, cd_max: f32) -> f32 {
     cd0_eff + (cd_max - cd0_eff) * a.sin().powi(2)
 }
 
@@ -69,7 +66,7 @@ fn viterna_cd(a: S, cd0_eff: S, cd_max: S) -> S {
 ///   A2 = (CL_s - A1 * sin(2*alpha_s)) * sin(alpha_s) / cos^2(alpha_s)
 ///
 /// If alpha_s is near 90 deg (cos^2 near zero), returns 0 (pure flat plate).
-fn viterna_a2(alpha_s: S, cl_s: S, a1: S) -> S {
+fn viterna_a2(alpha_s: f32, cl_s: f32, a1: f32) -> f32 {
     let cos2 = alpha_s.cos().powi(2);
     if cos2 < 1e-6 {
         return 0.0;
@@ -82,7 +79,7 @@ fn viterna_a2(alpha_s: S, cl_s: S, a1: S) -> S {
 ///   CD_0_eff = (CD_s - CD_max * sin^2(alpha_s)) / cos^2(alpha_s)
 ///
 /// If alpha_s is near 90 deg, returns CD_s. A small discontinuity is then possible.
-fn effective_cd0(alpha_s: S, cd_s: S, cd_max: S) -> S {
+fn effective_cd0(alpha_s: f32, cd_s: f32, cd_max: f32) -> f32 {
     let cos2 = alpha_s.cos().powi(2);
     if cos2 < 1e-6 {
         return cd_s;
@@ -91,7 +88,7 @@ fn effective_cd0(alpha_s: S, cd_s: S, cd_max: S) -> S {
 }
 
 /// Extends a 1-D lift table to +/-pi.
-fn extend_1d_lift(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
+fn extend_1d_lift(bp: &[f32], vals: &[f32], ar: f32) -> (Vec<f32>, Vec<f32>) {
     if bp.is_empty() {
         return (bp.to_vec(), vals.to_vec());
     }
@@ -142,7 +139,7 @@ fn extend_1d_lift(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
 }
 
 /// Extends a 1-D drag table to +/-pi.
-fn extend_1d_drag(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
+fn extend_1d_drag(bp: &[f32], vals: &[f32], ar: f32) -> (Vec<f32>, Vec<f32>) {
     if bp.is_empty() {
         return (bp.to_vec(), vals.to_vec());
     }
@@ -192,7 +189,7 @@ fn extend_1d_drag(bp: &[S], vals: &[S], ar: S) -> (Vec<S>, Vec<S>) {
 }
 
 /// Changes a scalar CD into a Table1D with flat-plate drag at high angles.
-fn scalar_to_drag_table(cd0: S, ar: S) -> (Vec<S>, Vec<S>) {
+fn scalar_to_drag_table(cd0: f32, ar: f32) -> (Vec<f32>, Vec<f32>) {
     let cd_max = viterna_cd_max(ar);
     let all_angles = extension_angles();
 
@@ -214,14 +211,14 @@ fn scalar_to_drag_table(cd0: S, ar: S) -> (Vec<S>, Vec<S>) {
 }
 
 /// Extends a 2-D lift table to +/-pi. Each Reynolds-number column gets its own extension.
-fn extend_2d_lift(rows: &[S], cols: &[S], data: &[S], ar: S) -> (Vec<S>, Vec<S>) {
+fn extend_2d_lift(rows: &[f32], cols: &[f32], data: &[f32], ar: f32) -> (Vec<f32>, Vec<f32>) {
     let nc = cols.len();
     if rows.is_empty() || nc == 0 {
         return (rows.to_vec(), data.to_vec());
     }
-    let mut col_results: Vec<(Vec<S>, Vec<S>)> = Vec::with_capacity(nc);
+    let mut col_results: Vec<(Vec<f32>, Vec<f32>)> = Vec::with_capacity(nc);
     for j in 0..nc {
-        let col_vals: Vec<S> = (0..rows.len()).map(|i| data[i * nc + j]).collect();
+        let col_vals: Vec<f32> = (0..rows.len()).map(|i| data[i * nc + j]).collect();
         col_results.push(extend_1d_lift(rows, &col_vals, ar));
     }
     let new_rows = col_results[0].0.clone();
@@ -236,14 +233,14 @@ fn extend_2d_lift(rows: &[S], cols: &[S], data: &[S], ar: S) -> (Vec<S>, Vec<S>)
 }
 
 /// Extends a 2-D drag table to +/-pi.
-fn extend_2d_drag(rows: &[S], cols: &[S], data: &[S], ar: S) -> (Vec<S>, Vec<S>) {
+fn extend_2d_drag(rows: &[f32], cols: &[f32], data: &[f32], ar: f32) -> (Vec<f32>, Vec<f32>) {
     let nc = cols.len();
     if rows.is_empty() || nc == 0 {
         return (rows.to_vec(), data.to_vec());
     }
-    let mut col_results: Vec<(Vec<S>, Vec<S>)> = Vec::with_capacity(nc);
+    let mut col_results: Vec<(Vec<f32>, Vec<f32>)> = Vec::with_capacity(nc);
     for j in 0..nc {
-        let col_vals: Vec<S> = (0..rows.len()).map(|i| data[i * nc + j]).collect();
+        let col_vals: Vec<f32> = (0..rows.len()).map(|i| data[i * nc + j]).collect();
         col_results.push(extend_1d_drag(rows, &col_vals, ar));
     }
     let new_rows = col_results[0].0.clone();
@@ -302,7 +299,7 @@ impl AeroCoeff {
     /// let cl_90 = cl_full.evaluate(std::f32::consts::FRAC_PI_2 as _, 0.0);
     /// assert!(cl_90.abs() < 0.01);
     /// ```
-    pub fn with_post_stall_lift(self, aspect_ratio: S) -> Self {
+    pub fn with_post_stall_lift(self, aspect_ratio: f32) -> Self {
         match self {
             AeroCoeff::Table1D {
                 breakpoints,
@@ -360,7 +357,7 @@ impl AeroCoeff {
     /// let cd_90 = cd_full.evaluate(std::f32::consts::FRAC_PI_2 as _, 0.0);
     /// assert!((cd_90 - 1.164).abs() < 0.01);
     /// ```
-    pub fn with_post_stall_drag(self, aspect_ratio: S) -> Self {
+    pub fn with_post_stall_drag(self, aspect_ratio: f32) -> Self {
         match self {
             AeroCoeff::Scalar(cd0) => {
                 let (bp, vals) = scalar_to_drag_table(cd0, aspect_ratio);
@@ -469,7 +466,7 @@ mod tests {
             values: vec![-2.5, 0.0, 2.5],
         };
         let extended = cl.with_post_stall_lift(3.0);
-        for deg in [45.0 as S, 60.0, 90.0, 120.0, 150.0] {
+        for deg in [45.0_f32, 60.0, 90.0, 120.0, 150.0] {
             let a = deg.to_radians();
             let pos = extended.evaluate(a, 0.0);
             let neg = extended.evaluate(-a, 0.0);
@@ -535,7 +532,7 @@ mod tests {
     #[test]
     fn post_stall_drag_symmetric() {
         let cd = AeroCoeff::Scalar(0.01).with_post_stall_drag(3.0);
-        for deg in [30.0 as S, 60.0, 90.0, 120.0, 150.0] {
+        for deg in [30.0_f32, 60.0, 90.0, 120.0, 150.0] {
             let a = deg.to_radians();
             let pos = cd.evaluate(a, 0.0);
             let neg = cd.evaluate(-a, 0.0);

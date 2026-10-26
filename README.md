@@ -7,7 +7,7 @@
 
 # avian_fdm
 
-**Avian FDM** is 6-DoF Flight Dynamics Model plugin for
+**AvianFDM** is 6-DoF Flight Dynamics Model plugin for
 [Bevy](https://bevyengine.org/) + [Avian](https://crates.io/crates/avian3d).
 
 ---
@@ -47,7 +47,7 @@ emergent behaviors appear when computing the AeroZones together.
 - Zone-based damage/failure model with graceful degradation
 - Automatic mass, CG, and inertia tensor from collider geometry
 - Debug gizmo overlays for forces, moments, zones, and colliders
-- Supports both avian3d f32 and f64 backends
+- Supports the avian3d `f64` feature for large worlds (world positions in f64)
 
 ### Emergent behavior
 
@@ -68,8 +68,8 @@ Add dependencies to `Cargo.toml`:
 [dependencies]
 avian_fdm              = "0.2"
 avian_fdm_j3cub_jsbsim = "0.2"
-avian3d                = "0.7"
-bevy                   = "0.19"
+avian3d                = "0.8"
+bevy                   = "0.20"
 ```
 
 Spawn the reference J-3 Cub aircraft:
@@ -108,12 +108,27 @@ fn spawn(mut commands: Commands) {
 
 | Feature | Default | Description |
 |---|---|---|
-| `f32` | yes | Avian3d f32 physics backend (standard Bevy precision) |
-| `f64` | -- | Avian3d f64 physics backend (mutually exclusive with f32) |
+| `parry-f32` | yes | Avian3d collider backend for f32 world positions |
+| `parry-f64` | -- | Avian3d collider backend for f64 world positions. Enables `f64` |
+| `f64` | -- | Avian3d f64 world positions. The FDM still calculates in f32 |
 | `debug-plugin` | yes | Bevy Gizmo overlays for forces, moments, and zones |
 
-Exactly one of `f32` or `f64` must be enabled. They are mutually exclusive.
-For f64, use `default-features = false, features = ["f64"]`.
+The features mirror the precision features of avian3d. Enable exactly one of
+`parry-f32` and `parry-f64`. For f64, use
+`default-features = false, features = ["parry-f64", "debug-plugin"]`.
+
+## Numeric precision
+
+The FDM calculates in `f32`, like Avian 0.8. Only world positions use `f64`
+when the `f64` feature is on. The FDM never subtracts two world positions:
+it calculates moment arms in the body frame, relative to the center of mass.
+Thus, it keeps its precision far from the origin. Use `parry-f64` when bodies
+move far from the origin. At 10,000 km, an `f32` position has a resolution of
+about 1 m.
+
+Fast bodies that pass through each other are a time-step problem, not a
+precision problem. Refer to the "Numeric Precision" section of the crate
+documentation for the CCD setup between aircraft, and for projectiles.
 
 The JSBSim-derived J-3 Cub reference aircraft is in the separate
 `avian_fdm_j3cub_jsbsim` crate (GPL-3.0-only, due to JSBSim data provenance).
@@ -122,6 +137,7 @@ The JSBSim-derived J-3 Cub reference aircraft is in the separate
 
 | avian_fdm | Bevy | avian3d |
 |---|---|---|
+| main | 0.20 | 0.8 |
 | 0.2 | 0.19 | 0.7 |
 | 0.1 | 0.18 | 0.6 |
 

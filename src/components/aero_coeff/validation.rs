@@ -1,11 +1,9 @@
 //! [`AeroCoeff::validate`] and the `is_strictly_increasing` helper function.
 
-use avian3d::math::Scalar as S;
-
 use super::types::AeroCoeff;
 
 /// Returns `true` if the slice is strictly increasing (each element > the previous element).
-pub(super) fn is_strictly_increasing(s: &[S]) -> bool {
+pub(super) fn is_strictly_increasing(s: &[f32]) -> bool {
     s.windows(2).all(|w| w[0] < w[1])
 }
 
@@ -119,7 +117,7 @@ mod tests {
 
     #[test]
     fn validate_scalar_nan() {
-        let v = AeroCoeff::Scalar(S::NAN).validate("test");
+        let v = AeroCoeff::Scalar(f32::NAN).validate("test");
         assert_eq!(v.len(), 1);
         assert!(v[0].contains("not finite"));
     }
@@ -159,7 +157,7 @@ mod tests {
     fn validate_table1d_nan_value() {
         let c = AeroCoeff::Table1D {
             breakpoints: vec![0.0, 0.3],
-            values: vec![0.0, S::NAN],
+            values: vec![0.0, f32::NAN],
         };
         let v = c.validate("cl");
         assert!(!v.is_empty());

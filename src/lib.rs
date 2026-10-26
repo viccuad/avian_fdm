@@ -34,8 +34,9 @@
 //!     - [Collider strategy](#collider-strategy)
 //! 11. [Reading Simulation Output](#reading-simulation-output)
 //! 12. [Data Flow](#data-flow)
-//! 13. [Feature Flags](#feature-flags)
-//! 14. [Further Reading](#further-reading)
+//! 13. [Numeric Precision](#numeric-precision)
+//! 14. [Feature Flags](#feature-flags)
+//! 15. [Further Reading](#further-reading)
 //!
 //! ---
 //!
@@ -46,8 +47,8 @@
 //! ```toml
 //! avian_fdm              = "0.2"
 //! avian_fdm_j3cub_jsbsim = { version = "0.2" }
-//! avian3d                = { version = "0.7" }
-//! bevy                   = { version = "0.19" }
+//! avian3d                = { version = "0.8" }
+//! bevy                   = { version = "0.20" }
 //! ```
 //!
 //! Spawn the reference J-3 Cub aircraft from `avian_fdm_j3cub_jsbsim`:
@@ -233,8 +234,8 @@
 //! zone_to_world    = body_to_world * zone_rotation
 //! ```
 //!
-//! All internal calculations use the native precision of avian3d (`Scalar`).
-//! `Scalar` is `f32` or `f64`. The active feature flag selects the type.
+//! All FDM calculations use `f32`, in both precision modes. Refer to
+//! [Numeric Precision](#numeric-precision).
 //!
 //! ---
 //!
@@ -729,17 +730,19 @@
 //!
 //! ```text
 //! +-- PhysicsStepSystems::BroadPhase (once per physics step) ---------------+
-//! |  1. update_atmosphere          reads:  GlobalTransform(root)            |
+//! |  1. update_atmosphere          reads:  Position(root)                   |
 //! |                                writes: AtmosphereState                  |
 //! |                                                                         |
-//! |  2. update_flight_state        reads:  GlobalTransform(root),           |
+//! |  2. update_flight_state        reads:  Position(root), Rotation(root),  |
 //! |                                        LinearVelocity, AngularVelocity, |
 //! |                                        AtmosphereState, WindResource    |
 //! |                                writes: FlightState                      |
 //! |                                                                         |
 //! |  3. compute_engine_zone_forces reads:  ControlInputs, AtmosphereState,  |
 //! |                                        FlightState, EngineZone,         |
-//! |                                        Failure, GlobalTransform         |
+//! |                                        Failure, Position(root),         |
+//! |                                        Rotation(root),                  |
+//! |                                        Transform(engine)                |
 //! |                                writes: ZoneForce(engine)                |
 //! |                                                                         |
 //! |  4. compute_aero_forces        reads:  Position(root), Rotation(root),  |
@@ -747,7 +750,8 @@
 //! |                                        FlightState, AtmosphereState,    |
 //! |                                        AircraftGeometry, ControlInputs, |
 //! |                                        AeroZone, Failure,               |
-//! |                                        Transform(zone), Children,       |
+//! |                                        Transform(zone, engine),         |
+//! |                                        Children,                        |
 //! |                                        ZoneForce(engine), LodDamping,   |
 //! |                                        InducedDrag                      |
 //! |                                writes: ZoneForce(aero),                 |
@@ -760,23 +764,24 @@
 //!         v  PostUpdate: Bevy propagates GlobalTransform from Position and Rotation
 //! ```
 //!
-//! ### Why zone positions use Transform, not GlobalTransform
+//! ### Why the FDM reads Position, Rotation, and Transform, not GlobalTransform
 //!
 //! Avian writes the physics state of the root entity into `Position` and
 //! `Rotation`. Bevy copies these values into `GlobalTransform` only in
 //! `PostUpdate`, after the physics schedule. Thus, during `BroadPhase`, the
-//! `GlobalTransform` of a zone child has the value from the *previous* frame.
+//! `GlobalTransform` of the root and of each zone child has the value from
+//! the *previous* frame. With a floating origin, `GlobalTransform` is also not
+//! the physics position.
 //!
-//! For this reason, `compute_aero_forces` reads `Position` and `Rotation` on
-//! the root entity. It also reads the local `Transform` of each zone. The zone
-//! `Transform` is set at spawn time and does not change at runtime. The system
-//! calculates the world position of each zone from these values:
-//! `world_pos = root_position + root_rotation * zone_transform.translation`.
-//! This value is always one physics step ahead of `GlobalTransform`.
-//!
-//! `update_atmosphere`, `update_flight_state`, and
-//! `compute_engine_zone_forces` read `GlobalTransform`. Their input values
-//! come from the last `PostUpdate`, not from the current physics step.
+//! For this reason, all FDM systems read `Position` and `Rotation` on the root
+//! entity. `compute_aero_forces` and `compute_engine_zone_forces` also read
+//! the local `Transform` of each aero zone and each engine zone. The zone
+//! `Transform` is set at spawn time and does not change at runtime.
+//! `compute_aero_forces` calculates the moment arm of each zone in body frame
+//! and rotates it to world orientation:
+//! `arm = root_rotation * (zone_transform.translation - center_of_mass)`.
+//! This value is current in the physics step. It does not lose precision far
+//! from the origin, because it does not subtract two world positions.
 //!
 //! ### Add a custom system (for example, an autopilot)
 //!
@@ -800,13 +805,65 @@
 //!
 //! ---
 //!
+//! ## Numeric Precision
+//!
+//! `avian_fdm` uses the precision model of Avian 0.8:
+//!
+//! - The FDM calculates in `f32`. This includes all public components, the
+//!   coefficient tables, and the aerodynamic, atmosphere, and propulsion
+//!   math. Avian also stores the rotation, the velocities, the forces, the
+//!   torques, and the mass properties in `f32`.
+//! - Only the world position ([`avian3d::prelude::Position`]) uses
+//!   `avian3d::math::Real`. `Real` is `f32` by default, and `f64` with the
+//!   `f64` feature.
+//!
+//! An `f32` value has about 7 significant digits. This is much more than the
+//! accuracy of the aerodynamic data. The FDM does not lose precision far from
+//! the origin, because it never subtracts two world positions:
+//!
+//! - It calculates the moment arm of each zone in the body frame, relative to
+//!   the center of mass. Then it rotates the arm to world orientation.
+//! - It reads the altitude from `Position`, and converts it to `f32` once. At
+//!   10 km, the rounding is about 1 mm.
+//!
+//! Use the `parry-f64` feature when bodies move far from the origin. At
+//! 10,000 km, an `f32` position has a resolution of about 1 m. With `f64`,
+//! Avian keeps positions and contact points in `f64`, and it calculates
+//! contacts with `f64` poses. The broad phase stores its bounding boxes in
+//! `f32`, but it rounds them outward. Far from the origin, this costs
+//! performance, but it does not miss contacts. Bevy `Transform` is `f32`, so
+//! the rendering of a large world needs a floating origin.
+//!
+//! ### Precision is not tunneling
+//!
+//! A fast body can pass through a thin body if it moves farther in one
+//! physics step than the thickness of the thin body. This depends on the
+//! speed and the time step, not on the precision. For example, two aircraft
+//! with a closing speed of 500 m/s move 8.3 m in one step at 60 Hz.
+//!
+//! - By default, Avian 0.8 sweeps fast bodies only against static and
+//!   kinematic bodies. For contact between aircraft, add
+//!   [`avian3d::prelude::SweptCcd`] with [`avian3d::prelude::CcdFilter::DYNAMIC`].
+//! - Two fast bodies on crossing paths can still miss each other. For this
+//!   case, also add [`avian3d::prelude::SpeculativeCcd`].
+//! - For bullets and missiles, do not use rigid-body contacts. Use a hit-scan
+//!   with the relative motion of the two bodies, for example
+//!   [`time_of_impact`](avian3d::collision::collider::contact_query::time_of_impact).
+//!
+//! ---
+//!
 //! ## Feature Flags
 //!
 //! | Feature        | Default | Description |
 //! |----------------|---------|-------------|
-//! | `f32`          | yes     | Enables the avian3d f32 backend and collider shapes. |
-//! | `f64`          | --      | Enables the avian3d f64 backend. You cannot use it together with `f32`. |
+//! | `parry-f32`    | yes     | Enables the avian3d collider backend for f32 world positions. |
+//! | `parry-f64`    | --      | Enables the avian3d collider backend for f64 world positions. Also enables `f64`. |
+//! | `f64`          | --      | Enables f64 world positions in avian3d. The FDM still calculates in f32. |
 //! | `debug-plugin` | yes     | Bevy gizmo overlays for forces, moments, and zones ([`debug_render`]) |
+//!
+//! These features mirror the precision features of avian3d. Enable exactly one
+//! of `parry-f32` and `parry-f64`. For f64, use
+//! `default-features = false, features = ["parry-f64", "debug-plugin"]`.
 //!
 //! The JSBSim-derived reference aircraft (J-3 Cub) is in the separate
 //! `avian_fdm_j3cub_jsbsim` crate (GPL-3.0-only).
@@ -860,6 +917,14 @@
 //! [JSBSim]: https://jsbsim.sourceforge.net/
 
 #![deny(missing_docs)]
+
+// avian3d reports a missing backend only for its `default-collider` feature.
+// Without a backend, `Collider` does not exist, and the errors come from inside
+// this crate.
+#[cfg(not(any(feature = "parry-f32", feature = "parry-f64")))]
+compile_error!(
+    "avian_fdm requires the feature \"parry-f32\" or \"parry-f64\"; please disable default features, and choose only one of them"
+);
 
 /// Records the data source of a value.
 ///

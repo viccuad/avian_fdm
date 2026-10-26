@@ -41,7 +41,6 @@
 
 use crate::airfoil::AirfoilData;
 use crate::components::aero_coeff::AeroCoeff;
-use avian3d::math::Scalar as S;
 use thiserror::Error;
 
 /// The three Ncrit slices from one foil.tools polar CSV.
@@ -409,22 +408,22 @@ fn build_airfoil_data(rows: &[&RawRow]) -> Result<AirfoilData, ParseError> {
     }
 
     // Transposes the data from Re-major to alpha-major (a Table2D row is one alpha value).
-    let mut cl_data: Vec<S> = vec![0.0 as S; n_alpha * n_re];
-    let mut cd_data: Vec<S> = vec![0.0 as S; n_alpha * n_re];
-    let mut cm_data: Vec<S> = vec![0.0 as S; n_alpha * n_re];
+    let mut cl_data: Vec<f32> = vec![0.0; n_alpha * n_re];
+    let mut cd_data: Vec<f32> = vec![0.0; n_alpha * n_re];
+    let mut cm_data: Vec<f32> = vec![0.0; n_alpha * n_re];
 
     for (re_idx, re_block) in rows.chunks(n_alpha).enumerate() {
         for (alpha_idx, r) in re_block.iter().enumerate() {
             let flat = alpha_idx * n_re + re_idx;
-            cl_data[flat] = r.cl as S;
-            cd_data[flat] = r.cd as S;
-            cm_data[flat] = r.cm as S;
+            cl_data[flat] = r.cl as f32;
+            cd_data[flat] = r.cd as f32;
+            cm_data[flat] = r.cm as f32;
         }
     }
 
-    // Changes the breakpoints into Scalar (alpha into radians).
-    let alpha_rad: Vec<S> = alpha_bps.iter().map(|&a| (a as S).to_radians()).collect();
-    let re_s: Vec<S> = re_bps.iter().map(|&r| r as S).collect();
+    // Changes the breakpoints into f32 (alpha into radians).
+    let alpha_rad: Vec<f32> = alpha_bps.iter().map(|&a| (a as f32).to_radians()).collect();
+    let re_s: Vec<f32> = re_bps.iter().map(|&r| r as f32).collect();
 
     Ok(AirfoilData {
         cl: AeroCoeff::Table2D {
@@ -492,23 +491,14 @@ mod tests {
     fn parse_ncrit_slices_are_distinct() {
         let polars = parse_foil_tools_csv(minimal_csv()).unwrap();
         // At Re=1e6 and alpha=0, the three Ncrit values of CL are 0.0, 0.02, and 0.05.
-        let re = 1_000_000.0 as S;
-        let alpha = 0.0 as S;
+        let re = 1_000_000.0;
+        let alpha = 0.0;
         let cl1 = polars.ncrit1.cl.evaluate(alpha, re);
         let cl4 = polars.ncrit4.cl.evaluate(alpha, re);
         let cl9 = polars.ncrit9.cl.evaluate(alpha, re);
-        assert!(
-            (cl1 - 0.0 as S).abs() < 1e-4 as S,
-            "ncrit1 CL at 0° = {cl1}"
-        );
-        assert!(
-            (cl4 - 0.02 as S).abs() < 1e-4 as S,
-            "ncrit4 CL at 0° = {cl4}"
-        );
-        assert!(
-            (cl9 - 0.05 as S).abs() < 1e-4 as S,
-            "ncrit9 CL at 0° = {cl9}"
-        );
+        assert!((cl1 - 0.0).abs() < 1e-4, "ncrit1 CL at 0° = {cl1}");
+        assert!((cl4 - 0.02).abs() < 1e-4, "ncrit4 CL at 0° = {cl4}");
+        assert!((cl9 - 0.05).abs() < 1e-4, "ncrit9 CL at 0° = {cl9}");
     }
 
     #[test]
@@ -634,25 +624,25 @@ mod tests {
     #[test]
     fn with_post_stall_extends_to_pi() {
         let polars = parse_foil_tools_csv(minimal_csv()).unwrap();
-        let ar = 6.94 as S;
+        let ar = 6.94;
         let extended = polars.ncrit9.with_post_stall(ar);
-        let pi_half = std::f64::consts::FRAC_PI_2 as S;
+        let pi_half = std::f32::consts::FRAC_PI_2;
         // At +/-90 deg, CL must be near zero (flat-plate Viterna).
-        let cl_p90 = extended.cl.evaluate(pi_half, 1_000_000.0 as S);
-        let cl_n90 = extended.cl.evaluate(-pi_half, 1_000_000.0 as S);
+        let cl_p90 = extended.cl.evaluate(pi_half, 1_000_000.0);
+        let cl_n90 = extended.cl.evaluate(-pi_half, 1_000_000.0);
         assert!(
-            cl_p90.abs() < 0.15 as S,
+            cl_p90.abs() < 0.15,
             "CL at +90° should be near 0, got {cl_p90}"
         );
         assert!(
-            cl_n90.abs() < 0.15 as S,
+            cl_n90.abs() < 0.15,
             "CL at -90° should be near 0, got {cl_n90}"
         );
         // At 90 deg, CD must be near CD_max = 1.11 + 0.018 * AR.
-        let cd_max = 1.11 as S + 0.018 as S * ar;
-        let cd_90 = extended.cd.evaluate(pi_half, 1_000_000.0 as S);
+        let cd_max = 1.11 + 0.018 * ar;
+        let cd_90 = extended.cd.evaluate(pi_half, 1_000_000.0);
         assert!(
-            (cd_90 - cd_max).abs() < 0.05 as S,
+            (cd_90 - cd_max).abs() < 0.05,
             "CD at 90° should be near {cd_max:.3}, got {cd_90}"
         );
     }

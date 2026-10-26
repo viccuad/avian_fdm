@@ -14,18 +14,19 @@
 use crate::_bevy::*;
 use crate::atmosphere::WindResource;
 use crate::components::{AtmosphereState, FlightState};
-use avian3d::math::{Scalar, Vector};
+use avian3d::prelude::{Position, Rotation};
 
 /// Updates [`FlightState`] on each aircraft from the velocity and the atmosphere.
 ///
 /// It reads [`avian3d::prelude::LinearVelocity`] and
 /// [`avian3d::prelude::AngularVelocity`], and subtracts the wind from
-/// [`WindResource`] (if present). It turns the result into the body frame.
-/// Then it calculates alpha, beta, V, qbar, Mach, and the body rates.
-#[allow(clippy::unnecessary_cast)]
+/// [`WindResource`] (if present). It turns the result into the body frame
+/// with the Avian [`Rotation`]. Then it calculates alpha, beta, V, qbar,
+/// Mach, and the body rates. The altitude comes from the Avian [`Position`].
 pub fn update_flight_state(
     mut query: Query<(
-        &GlobalTransform,
+        &Position,
+        &Rotation,
         &avian3d::prelude::LinearVelocity,
         &avian3d::prelude::AngularVelocity,
         &AtmosphereState,
@@ -33,15 +34,16 @@ pub fn update_flight_state(
     )>,
     wind: Option<Res<WindResource>>,
 ) {
-    use crate::math::{quat_to_quaternion, world_to_body};
+    use crate::math::world_to_body;
+    use avian3d::math::ToF32Precision;
 
-    let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vector::ZERO);
+    let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vec3::ZERO);
 
-    for (transform, lin_vel, ang_vel, atm, mut fs) in &mut query {
-        let altitude_m = transform.translation().y as Scalar;
+    for (pos, rot, lin_vel, ang_vel, atm, mut fs) in &mut query {
+        let altitude_m = pos.0.y.f32();
 
         // Body angular rates: turns the world AngularVelocity into the body frame.
-        let q = quat_to_quaternion(transform.rotation());
+        let q = rot.0;
         let av_world = ang_vel.0;
         let omega_body = q.inverse() * av_world;
         let p_rads = omega_body.x;

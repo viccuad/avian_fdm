@@ -38,7 +38,6 @@
 
 use std::time::Duration;
 
-use avian3d::math::Scalar;
 use avian3d::prelude::*;
 use avian_fdm::prelude::*;
 use avian_fdm_j3cub_jsbsim::presets::j3cub;
@@ -134,10 +133,9 @@ fn spawn_aircraft(mut commands: Commands) {
         .insert(LinearVelocity(Vec3::new(27.0, 0.0, 0.0)));
 }
 
-#[allow(clippy::unnecessary_cast)]
 fn ramp_throttle(mut query: Query<&mut ControlInputs, With<AircraftGeometry>>, time: Res<Time>) {
     let t = time.elapsed_secs_f64();
-    let throttle = (0.5 + t / 50.0).min(0.75) as Scalar;
+    let throttle = (0.5 + t / 50.0).min(0.75) as f32;
     for mut ctrl in &mut query {
         ctrl.throttle = throttle;
     }
@@ -157,11 +155,8 @@ fn collect_samples(
     for state in &query {
         collector.samples.push(Sample {
             time: t,
-            #[allow(clippy::unnecessary_cast)]
             altitude_m: state.altitude_m as f64,
-            #[allow(clippy::unnecessary_cast)]
             airspeed_ms: state.airspeed_ms as f64,
-            #[allow(clippy::unnecessary_cast)]
             alpha_deg: state.alpha_rad.to_degrees() as f64,
         });
     }
