@@ -5,4 +5,4 @@
 2. Bump version, merge PR.
 3. Edit GH release draft as needed (version, content).
 4. Tag.
-5. `cargo publish --dry-run`.
+5. Approve release workflow run for trusted publishing.
