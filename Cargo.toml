@@ -1,6 +1,6 @@
 [package]
 name = "avian_fdm"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "6-DoF Flight Dynamics Model for Bevy + Avian"
 license = "LGPL-3.0-or-later"
