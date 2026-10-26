@@ -138,6 +138,7 @@ The JSBSim-derived J-3 Cub reference aircraft is in the separate
 | avian_fdm | Bevy | avian3d |
 |---|---|---|
 | main | 0.20 | 0.8 |
+| 0.3 | 0.20 | 0.8 |
 | 0.2 | 0.19 | 0.7 |
 | 0.1 | 0.18 | 0.6 |
 
