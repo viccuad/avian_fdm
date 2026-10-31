@@ -3,7 +3,12 @@
 //!
 //! All FDM math uses `f32`, `Vec3`, and `Quat`.
 
+#[cfg(feature = "round-earth")]
+use avian3d::math::Real;
 use bevy_math::{Quat, Vec3};
+
+#[cfg(feature = "round-earth")]
+pub(crate) const EARTH_RADIUS: Real = 6_360_000.0;
 
 /// Linear interpolation in a 1-D breakpoint table.
 ///

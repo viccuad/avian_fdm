@@ -17,8 +17,19 @@ use avian3d::prelude::Position;
 /// altitude above sea level. `Position` is the physics state of the current
 /// step. `GlobalTransform` would be one step old during `BroadPhase`, and it is not
 /// the physics position when the app uses a floating origin.
+#[cfg(not(feature = "round-earth"))]
 pub fn update_atmosphere(mut query: Query<(&Position, &mut AtmosphereState)>) {
     for (pos, mut atm) in &mut query {
         *atm = atmosphere_at(pos.0.y.f32());
+    }
+}
+
+#[cfg(feature = "round-earth")]
+pub fn update_atmosphere(mut query: Query<(&Position, &mut AtmosphereState)>) {
+    for (pos, mut atm) in &mut query {
+        use crate::math::EARTH_RADIUS;
+
+        let altitude_m = pos.length() - EARTH_RADIUS;
+        *atm = atmosphere_at(altitude_m);
     }
 }
