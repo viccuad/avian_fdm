@@ -29,7 +29,7 @@ pub fn update_atmosphere(mut query: Query<(&Position, &mut AtmosphereState)>) {
     for (pos, mut atm) in &mut query {
         use crate::math::EARTH_RADIUS;
 
-        let altitude_m = pos.length() - EARTH_RADIUS;
+        let altitude_m = pos.0.length() - EARTH_RADIUS;
         *atm = atmosphere_at(altitude_m as f32);
     }
 }
