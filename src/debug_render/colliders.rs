@@ -42,6 +42,7 @@ pub struct ShowColliders(pub bool);
 /// Orange color for the collider wireframe overlay.
 const COLLIDER_COLOR: bevy_color::Color = bevy_color::Color::srgba(0.8, 0.5, 0.2, 0.8);
 
+/// Adds the collider overlay resource and system.
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<ShowColliders>();
     app.add_systems(

@@ -41,6 +41,7 @@
 use crate::_bevy::*;
 use serde::{Deserialize, Serialize};
 
+/// Serde default for the cylinder axis: the local X axis.
 fn default_cylinder_axis() -> Vec3 {
     Vec3::X
 }

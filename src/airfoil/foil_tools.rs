@@ -259,15 +259,22 @@ pub fn parse_foil_tools_csv(csv: &str) -> Result<FoilToolsPolars, ParseError> {
     })
 }
 
+/// One data row of the CSV file, before the rows are grouped by Reynolds number.
 #[derive(Debug)]
 struct RawRow {
+    /// Reynolds number.
     re: f64,
+    /// Angle of attack in degrees.
     alpha_deg: f64,
+    /// Lift coefficient.
     cl: f64,
+    /// Drag coefficient.
     cd: f64,
+    /// Pitching moment coefficient.
     cm: f64,
 }
 
+/// Checks the header and splits each CSV line into a [`RawRow`].
 fn lex(csv: &str) -> Result<Vec<RawRow>, ParseError> {
     let mut rows = Vec::new();
     let mut header_seen = false;

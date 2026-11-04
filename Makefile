@@ -24,7 +24,7 @@ fmt:
 
 .PHONY: doc
 doc:
-	RUSTDOCFLAGS="-D warnings" cargo doc -p avian_fdm --no-deps
+	RUSTDOCFLAGS="-D warnings" cargo doc -p avian_fdm --no-deps --document-private-items
 	RUSTDOCFLAGS="-D warnings" cargo doc -p avian_fdm_j3cub_jsbsim --no-deps
 
 .PHONY: build

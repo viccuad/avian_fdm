@@ -144,6 +144,7 @@ impl Plugin for AircraftFdmPlugin {
     }
 }
 
+/// Adds the FDM system sets and systems to the `PhysicsSchedule`.
 fn register_fdm_systems(app: &mut App) {
     app.configure_sets(
         PhysicsSchedule,
