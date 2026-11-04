@@ -287,6 +287,7 @@ pub(super) fn debug_render_zones(
     }
 }
 
+/// Picks the gizmo color from the zone role: engine, control surface, lifting surface, or other.
 fn zone_type_color(aero: Option<&AeroZone>) -> Color {
     if aero.is_none() {
         Color::srgba(0.95, 0.65, 0.15, 0.9) // orange - engine / non-aero
@@ -308,6 +309,7 @@ fn damage_tint(color: Color, remaining: f32) -> Color {
     color.mix(&grey, 1.0 - remaining)
 }
 
+/// Draws the gizmo for one zone shape in world space.
 fn draw_zone_shape(
     gizmos: &mut Gizmos<FdmGizmos>,
     shape: &GizmoShape,

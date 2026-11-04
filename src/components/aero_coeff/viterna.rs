@@ -11,7 +11,9 @@
 
 use super::types::AeroCoeff;
 
+/// Pi as `f32`.
 const PI: f32 = std::f32::consts::PI;
+/// Half of pi, the angle of attack of a flat plate normal to the flow.
 const HALF_PI: f32 = PI / 2.0;
 
 /// Viterna CD_max for a surface with a finite aspect ratio.

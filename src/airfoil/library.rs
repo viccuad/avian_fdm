@@ -17,6 +17,7 @@ use super::types::AirfoilData;
 /// fields of each [`crate::components::AeroZone`].
 #[derive(Resource, Default)]
 pub struct AirfoilLibrary {
+    /// Airfoil data by name.
     pub(super) map: HashMap<String, AirfoilData>,
 }
 
