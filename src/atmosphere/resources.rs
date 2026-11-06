@@ -36,7 +36,7 @@ pub struct WindResource {
 ///
 /// # Example
 /// ```rust,no_run
-/// # use avian_fdm::resources::PlanetResource;
+/// # use avian_fdm::components::PlanetResource;
 /// # use bevy::prelude::*;
 /// // app.insert_resource(PlanetResource { center: Vec3::new(0.0, 0.0, 0.0), radius_m: 6_360_000 });
 /// ```
