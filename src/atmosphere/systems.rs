@@ -23,6 +23,6 @@ pub fn update_atmosphere(
 ) {
     for (pos, mut atm) in &mut query {
         let altitude_m = altitude_m(pos, planet_resource.as_deref());
-        *atm = atmosphere_at(altitude_m as f32);
+        *atm = atmosphere_at(altitude_m);
     }
 }
