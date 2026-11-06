@@ -12,7 +12,8 @@
 //! rotations and `atan2` calls. They do not depend on an atmosphere model.
 
 use crate::_bevy::*;
-use crate::atmosphere::WindResource;
+use crate::atmosphere::resources::altitude_m;
+use crate::atmosphere::{PlanetResource, WindResource};
 use crate::components::{AtmosphereState, FlightState};
 use avian3d::prelude::{Position, Rotation};
 
@@ -33,14 +34,14 @@ pub fn update_flight_state(
         &mut FlightState,
     )>,
     wind: Option<Res<WindResource>>,
+    planet: Option<Res<PlanetResource>>,
 ) {
     use crate::math::world_to_body;
-    use avian3d::math::ToF32Precision;
 
     let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vec3::ZERO);
 
     for (pos, rot, lin_vel, ang_vel, atm, mut fs) in &mut query {
-        let altitude_m = pos.0.y.f32();
+        let altitude_m = altitude_m(pos, planet.as_deref());
 
         // Body angular rates: turns the world AngularVelocity into the body frame.
         let q = rot.0;
