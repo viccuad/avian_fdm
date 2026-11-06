@@ -1,6 +1,11 @@
 //! [`WindResource`]: optional global wind for all aircraft.
 
 use crate::_bevy::*;
+use avian3d::{
+    math::{Real, ToF32Precision},
+    parry::math::Vector,
+    physics_transform::Position,
+};
 use serde::{Deserialize, Serialize};
 
 /// Optional resource for a uniform ambient wind. Insert it into the Bevy
@@ -22,4 +27,45 @@ pub struct WindResource {
     /// Ambient wind velocity in the world frame (m/s).
     /// Positive X = the wind blows in the world +X direction.
     pub velocity_world_ms: Vec3,
+}
+
+/// Optional resource for a round earth. Insert it into the Bevy
+/// [`World`] make the atmosphere spherical.
+///
+/// If this resource is absent, the atmosphere will default to calculating flat-earth altitude.
+///
+/// # Example
+/// ```rust,no_run
+/// # use avian_fdm::components::PlanetResource;
+/// # use bevy::prelude::*;
+/// // app.insert_resource(PlanetResource { center: Vec3::new(0.0, 0.0, 0.0), radius_m: 6_360_000 });
+/// ```
+#[derive(Resource, Reflect, Serialize, Deserialize, Clone, Debug)]
+#[reflect(Resource, Serialize, Deserialize)]
+pub struct PlanetResource {
+    /// The center of the earth in world space (m).
+    pub center: Vector,
+    /// The distance from the center to sea level (m).
+    pub radius_m: Real,
+}
+
+impl Default for PlanetResource {
+    fn default() -> Self {
+        const EARTH_RADIUS: Real = sourced!(
+            6_360_000.0,
+            "Match bevy atmosphere radius: https://github.com/bevyengine/bevy/blob/main/crates/bevy_light/src/atmosphere.rs#L80"
+        );
+        Self {
+            center: Vector::default(),
+            radius_m: EARTH_RADIUS,
+        }
+    }
+}
+
+/// Calculates the altitude from `PlanetResource`, or, if it's absent, the y-position in world space.
+pub fn altitude_m(pos: &Position, planet: Option<&PlanetResource>) -> f32 {
+    match planet {
+        Some(p) => ((pos.0 - p.center).length() - p.radius_m).f32(),
+        None => pos.0.y.f32(),
+    }
 }
