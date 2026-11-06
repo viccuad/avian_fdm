@@ -30,7 +30,6 @@ f64 = ["avian3d/f64"]
 parry-f32 = ["avian3d/parry-f32"]
 parry-f64 = ["f64", "avian3d/parry-f64"]
 debug-plugin = ["dep:bevy_color", "dep:bevy_gizmos", "dep:bevy_shape"]
-round-earth = []
 
 [dependencies]
 # collider-from-mesh is excluded: avian_fdm uses only analytic shapes (boxes, spheres,
