@@ -53,7 +53,7 @@ impl Default for PlanetResource {
     fn default() -> Self {
         const EARTH_RADIUS: Real = sourced!(
             6_360_000.0,
-            "Match bevy atmosphere radius: https://github.com/bevyengine/bevy/blob/main/crates/bevy_light/src/atmosphere.rs#L80"
+            "Bevy 0.20 Atmosphere::earth EARTH_INNER_RADIUS"
         );
         Self {
             center: Vector::default(),
