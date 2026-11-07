@@ -11,12 +11,14 @@ use crate::atmosphere::resources::{altitude_m, PlanetResource};
 use crate::components::AtmosphereState;
 use avian3d::prelude::Position;
 
-/// Updates [`AtmosphereState`] on each aircraft from its altitude in world space.
+/// Updates [`AtmosphereState`] on each aircraft from its altitude.
 ///
-/// It uses the length of the Avian [`Position`] minus the earth radius `R0` as the geometric
-/// altitude above sea level. `Position` is the physics state of the current
-/// step. `GlobalTransform` would be one step old during `BroadPhase`, and it is not
-/// the physics position when the app uses a floating origin.
+/// It calls [`altitude_m`] for the geometric altitude above sea level. If a
+/// [`PlanetResource`] exists, the altitude is the distance from the planet
+/// center minus `radius_m`. If not, the altitude is the `y` component of the
+/// Avian [`Position`]. `Position` is the physics state of the current
+/// step. `GlobalTransform` would be one step old during `BroadPhase`, and it
+/// is not the physics position when the app uses a floating origin.
 pub fn update_atmosphere(
     mut query: Query<(&Position, &mut AtmosphereState)>,
     planet_resource: Option<Res<PlanetResource>>,
