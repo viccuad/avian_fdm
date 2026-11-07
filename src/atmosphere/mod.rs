@@ -2,7 +2,8 @@
 //!
 //! - [`isa`]: pure ISA and Sutherland functions and constants (no Bevy types).
 //! - [`systems`]: Bevy systems that write the ISA values into ECS components.
-//! - [`resources`]: [`WindResource`], the global wind vector and [`PlanetResource`], defining the planet center and radius.
+//! - [`resources`]: [`WindResource`], the global wind vector and
+//!   [`PlanetResource`], defining the planet center and radius.
 
 pub mod isa;
 pub mod resources;
