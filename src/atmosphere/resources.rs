@@ -1,11 +1,7 @@
 //! [`WindResource`]: optional global wind for all aircraft.
 
 use crate::_bevy::*;
-use avian3d::{
-    math::{Real, ToF32Precision},
-    parry::math::Vector,
-    physics_transform::Position,
-};
+use avian3d::math::{RVector, Real};
 use serde::{Deserialize, Serialize};
 
 /// Optional resource for a uniform ambient wind. Insert it into the Bevy
@@ -38,13 +34,14 @@ pub struct WindResource {
 /// ```rust,no_run
 /// # use avian_fdm::components::PlanetResource;
 /// # use bevy::prelude::*;
-/// // app.insert_resource(PlanetResource { center: Vec3::new(0.0, 0.0, 0.0), radius_m: 6_360_000 });
+/// # use avian3d::math::RVector;
+/// // app.insert_resource(PlanetResource { center: RVector::new(0.0, -6_360_000.0, 0.0), radius_m: 6_360_000.0 });
 /// ```
 #[derive(Resource, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Resource, Serialize, Deserialize)]
 pub struct PlanetResource {
     /// The center of the earth in world space (m).
-    pub center: Vector,
+    pub center: RVector,
     /// The distance from the center to sea level (m).
     pub radius_m: Real,
 }
@@ -56,16 +53,8 @@ impl Default for PlanetResource {
             "Bevy 0.20 Atmosphere::earth EARTH_INNER_RADIUS"
         );
         Self {
-            center: Vector::default(),
+            center: RVector::new(0.0, -EARTH_RADIUS, 0.0),
             radius_m: EARTH_RADIUS,
         }
-    }
-}
-
-/// Calculates the altitude from `PlanetResource`, or, if it's absent, the y-position in world space.
-pub fn altitude_m(pos: &Position, planet: Option<&PlanetResource>) -> f32 {
-    match planet {
-        Some(p) => ((pos.0 - p.center).length() - p.radius_m).f32(),
-        None => pos.0.y.f32(),
     }
 }

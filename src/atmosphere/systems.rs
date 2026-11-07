@@ -7,8 +7,9 @@
 
 use super::isa::atmosphere_at;
 use crate::_bevy::*;
-use crate::atmosphere::resources::{altitude_m, PlanetResource};
+use crate::atmosphere::resources::PlanetResource;
 use crate::components::AtmosphereState;
+use avian3d::math::ToF32Precision;
 use avian3d::prelude::Position;
 
 /// Updates [`AtmosphereState`] on each aircraft from its altitude.
@@ -26,5 +27,13 @@ pub fn update_atmosphere(
     for (pos, mut atm) in &mut query {
         let altitude_m = altitude_m(pos, planet_resource.as_deref());
         *atm = atmosphere_at(altitude_m);
+    }
+}
+
+/// Calculates the altitude from `PlanetResource`, or, if it's absent, the y-position in world space.
+pub(crate) fn altitude_m(pos: &Position, planet: Option<&PlanetResource>) -> f32 {
+    match planet {
+        Some(p) => ((pos.0 - p.center).length() - p.radius_m).f32(),
+        None => pos.0.y.f32(),
     }
 }

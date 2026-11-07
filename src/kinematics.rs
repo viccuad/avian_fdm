@@ -12,7 +12,7 @@
 //! rotations and `atan2` calls. They do not depend on an atmosphere model.
 
 use crate::_bevy::*;
-use crate::atmosphere::resources::altitude_m;
+use crate::atmosphere::systems::altitude_m;
 use crate::atmosphere::{PlanetResource, WindResource};
 use crate::components::{AtmosphereState, FlightState};
 use avian3d::prelude::{Position, Rotation};
