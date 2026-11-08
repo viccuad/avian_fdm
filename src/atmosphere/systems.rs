@@ -37,3 +37,132 @@ pub(crate) fn altitude_m(pos: &Position, planet: Option<&PlanetResource>) -> f32
         None => pos.0.y.f32(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::{
+        atmosphere::{systems::altitude_m, PlanetResource},
+        components::FlightState,
+        plugin::AircraftFdmPlugin,
+    };
+    use avian3d::{
+        dynamics::integrator::Gravity,
+        math::{RVector, Real},
+        parry::glamx::approx::assert_abs_diff_eq,
+        physics_transform::Position,
+        PhysicsPlugins,
+    };
+    use bevy::{prelude::App, time::TimeUpdateStrategy, MinimalPlugins};
+
+    const EPS: Real = if cfg!(feature = "f64") { 1e-3 } else { 0.01 };
+    const EARTH_RADIUS_M: Real = sourced!(
+        6_360_000.0,
+        "Bevy 0.20 Atmosphere::earth EARTH_INNER_RADIUS"
+    );
+
+    #[test]
+    fn altitude_flat_world() {
+        assert_eq!(
+            altitude_m(&Position::from_xyz(0.0, 1000.0, 0.0), None),
+            1000.0
+        )
+    }
+
+    #[test]
+    fn altitude_round_y_axis() {
+        let planet = PlanetResource::new(RVector::default(), EARTH_RADIUS_M);
+        let pos = Position::from_xyz(0.0, EARTH_RADIUS_M + 1000.0, 0.0);
+
+        assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), 1000.0, epsilon = EPS)
+    }
+
+    #[test]
+    fn altitude_round_x_axis() {
+        let planet = PlanetResource::new(RVector::default(), EARTH_RADIUS_M);
+        let pos = Position::from_xyz(EARTH_RADIUS_M + 1000.0, 0.0, 0.0);
+
+        assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), 1000.0, epsilon = EPS)
+    }
+
+    #[test]
+    fn altitude_round_offset_center() {
+        let center = RVector::new(0.0, -EARTH_RADIUS_M, 0.0);
+        let planet = PlanetResource::new(center, EARTH_RADIUS_M);
+
+        let pos = Position::from_xyz(0.0, -EARTH_RADIUS_M, 0.0);
+
+        assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), 1000.0, epsilon = EPS)
+    }
+
+    #[test]
+    fn altitude_round_below_sea_level() {
+        let planet = PlanetResource::default();
+        let pos = Position::from_xyz(0.0, EARTH_RADIUS_M - 10.0, 0.0);
+
+        assert_eq!(altitude_m(&pos, Some(&planet)), -100.0)
+    }
+
+    #[test]
+    fn atmosphere_matches_flight_state() {
+        // Create app
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(bevy::transform::TransformPlugin)
+            .add_plugins(bevy::asset::AssetPlugin::default())
+            .add_plugins(PhysicsPlugins::default())
+            .add_plugins(AircraftFdmPlugin::default());
+        app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(
+            1.0 / 60.0,
+        )));
+        app.insert_resource(Gravity::ZERO);
+        app.finish();
+
+        let planet = PlanetResource::default();
+        app.insert_resource(planet.clone());
+
+        let pos = Position::from_xyz(0.0, 1000.0, 0.0);
+
+        app.world_mut().spawn((
+            FlightState {
+                altitude_m: 0.0,
+                ..Default::default()
+            },
+            pos,
+        ));
+
+        // Two updates: command flush + PreUpdate resolution
+        app.update();
+        app.update();
+
+        let flight_state = app
+            .world_mut()
+            .query::<&FlightState>()
+            .iter(app.world())
+            .next()
+            .expect("FlightState to exist");
+
+        assert_eq!(altitude_m(&pos, Some(&planet)), flight_state.altitude_m);
+    }
+
+    #[test]
+    #[cfg(feature = "parry-f64")]
+    fn altitude_round_f64_precision() {
+        use avian3d::parry::glamx::approx::assert_abs_diff_ne;
+
+        const ALTITUDE_M: f64 = 500;
+
+        let distance_from_center = EARTH_RADIUS_M + ALTITUDE_M;
+        let pos = Position::from_xyz(distance_from_center.cos(), distance_from_center.sin(), 0.0);
+
+        assert_abs_diff_eq!(
+            altitude_m(
+                &pos,
+                PlanetResource::new(RVector::default(), EARTH_RADIUS_M)
+            ),
+            ALTITUDE_M,
+            epsilon = 1e-3
+        )
+    }
+}
