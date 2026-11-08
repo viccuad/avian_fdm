@@ -98,10 +98,11 @@ mod tests {
 
     #[test]
     fn altitude_round_below_sea_level() {
+        const ALTITIUDE_M: Real = -100.0;
         let planet = PlanetResource::default();
-        let pos = Position::from_xyz(0.0, EARTH_RADIUS_M - 10.0, 0.0);
+        let pos = Position::from_xyz(0.0, ALTITIUDE_M, 0.0);
 
-        assert_eq!(altitude_m(&pos, Some(&planet)), -100.0)
+        assert_eq!(altitude_m(&pos, Some(&planet)), ALTITIUDE_M)
     }
 
     #[test]
