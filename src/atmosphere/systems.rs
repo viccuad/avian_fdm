@@ -11,6 +11,7 @@ use crate::atmosphere::resources::PlanetResource;
 use crate::components::AtmosphereState;
 use avian3d::math::ToF32Precision;
 use avian3d::prelude::Position;
+use bevy_math::DVec3;
 
 /// Updates [`AtmosphereState`] on each aircraft from its altitude.
 ///
@@ -30,10 +31,26 @@ pub fn update_atmosphere(
     }
 }
 
-/// Calculates the altitude from `PlanetResource`, or, if it's absent, the y-position in world space.
+/// Calculates the altitude from `PlanetResource`, or, if it's absent, the y-position in world
+/// space.
+///
+/// With a planet, the distance to the center is about 6.36e6 m. At this size, `f32` has a
+/// resolution of 0.5 m. The function calculates in `f64` in all builds, so the altitude keeps the
+/// precision of the position. In the `f64` build, the conversions do nothing.
 pub(crate) fn altitude_m(pos: &Position, planet: Option<&PlanetResource>) -> f32 {
     match planet {
-        Some(p) => ((pos.0 - p.center).length() - p.radius_m).f32(),
+        Some(p) => {
+            #[allow(
+                clippy::useless_conversion,
+                reason = "The conversions to f64 are identities only in the f64 build"
+            )]
+            let (pos, center, radius) = (
+                DVec3::from(pos.0),
+                DVec3::from(p.center),
+                f64::from(p.radius_m),
+            );
+            ((pos - center).length() - radius) as f32
+        }
         None => pos.0.y.f32(),
     }
 }
@@ -63,6 +80,17 @@ mod tests {
             altitude_m(&Position::from_xyz(0.0, 1000.0, 0.0), None),
             1000.0
         )
+    }
+
+    /// With the default planet, the aircraft is near the world origin, so its
+    /// `f32` position is precise. The altitude must keep that precision, even
+    /// though the distance to the planet center is about 6.36e6 m.
+    #[test]
+    fn altitude_round_default_planet_keeps_precision() {
+        let planet = PlanetResource::default();
+        let pos = Position::from_xyz(0.0, 1000.3, 0.0);
+
+        assert_near(altitude_m(&pos, Some(&planet)), 1000.3, 0.01)
     }
 
     #[test]
