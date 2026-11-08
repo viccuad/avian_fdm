@@ -1,4 +1,6 @@
 //! [`WindResource`]: optional global wind for all aircraft.
+//! [`PlanetResource`]: optional, will treat your world like a round planet
+//! instead of like a flat one.
 
 use crate::_bevy::*;
 use avian3d::math::{RVector, Real};
