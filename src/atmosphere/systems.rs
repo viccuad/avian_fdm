@@ -43,13 +43,19 @@ mod tests {
     use crate::atmosphere::{systems::altitude_m, PlanetResource};
     use avian3d::{
         math::{RVector, Real},
-        parry::glamx::approx::assert_abs_diff_eq,
         physics_transform::Position,
     };
 
     /// `altitude_m` returns `f32`, so the tolerance is `f32` in both builds.
     const EPS: f32 = if cfg!(feature = "f64") { 1e-3 } else { 0.01 };
     const EARTH_RADIUS_M: Real = PlanetResource::EARTH_RADIUS_M;
+
+    fn assert_near(actual: f32, expected: f32, eps: f32) {
+        assert!(
+            (actual - expected).abs() <= eps,
+            "actual {actual}, expected {expected}, tolerance {eps}"
+        );
+    }
 
     #[test]
     fn altitude_flat_world() {
@@ -64,7 +70,7 @@ mod tests {
         let planet = PlanetResource::new(RVector::default(), EARTH_RADIUS_M);
         let pos = Position::from_xyz(0.0, EARTH_RADIUS_M + 1000.0, 0.0);
 
-        assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), 1000.0, epsilon = EPS)
+        assert_near(altitude_m(&pos, Some(&planet)), 1000.0, EPS)
     }
 
     #[test]
@@ -72,7 +78,7 @@ mod tests {
         let planet = PlanetResource::new(RVector::default(), EARTH_RADIUS_M);
         let pos = Position::from_xyz(EARTH_RADIUS_M + 1000.0, 0.0, 0.0);
 
-        assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), 1000.0, epsilon = EPS)
+        assert_near(altitude_m(&pos, Some(&planet)), 1000.0, EPS)
     }
 
     #[test]
@@ -82,7 +88,7 @@ mod tests {
 
         let pos = Position::from_xyz(0.0, 1000.0, 0.0);
 
-        assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), 1000.0, epsilon = EPS)
+        assert_near(altitude_m(&pos, Some(&planet)), 1000.0, EPS)
     }
 
     #[test]
@@ -90,7 +96,7 @@ mod tests {
         let planet = PlanetResource::default();
         let pos = Position::from_xyz(0.0, -100.0, 0.0);
 
-        assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), -100.0, epsilon = EPS)
+        assert_near(altitude_m(&pos, Some(&planet)), -100.0, EPS)
     }
 
     /// The subtraction must happen in `Real`. A cast to `f32` before the
@@ -107,6 +113,6 @@ mod tests {
             0.0,
         );
 
-        assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), 500.0, epsilon = 1e-3)
+        assert_near(altitude_m(&pos, Some(&planet)), 500.0, 1e-3)
     }
 }
