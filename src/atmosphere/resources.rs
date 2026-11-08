@@ -48,13 +48,13 @@ pub struct PlanetResource {
 
 impl Default for PlanetResource {
     fn default() -> Self {
-        const EARTH_RADIUS: Real = sourced!(
+        const EARTH_RADIUS_M: Real = sourced!(
             6_360_000.0,
             "Bevy 0.20 Atmosphere::earth EARTH_INNER_RADIUS"
         );
         Self {
-            center: RVector::new(0.0, -EARTH_RADIUS, 0.0),
-            radius_m: EARTH_RADIUS,
+            center: RVector::new(0.0, -EARTH_RADIUS_M, 0.0),
+            radius_m: EARTH_RADIUS_M,
         }
     }
 }
