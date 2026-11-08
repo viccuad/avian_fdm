@@ -91,7 +91,7 @@ mod tests {
         let center = RVector::new(0.0, -EARTH_RADIUS_M, 0.0);
         let planet = PlanetResource::new(center, EARTH_RADIUS_M);
 
-        let pos = Position::from_xyz(0.0, -EARTH_RADIUS_M, 0.0);
+        let pos = Position::from_xyz(0.0, 1000.0, 0.0);
 
         assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), 1000.0, epsilon = EPS)
     }
