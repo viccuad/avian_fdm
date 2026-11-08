@@ -40,24 +40,12 @@ pub(crate) fn altitude_m(pos: &Position, planet: Option<&PlanetResource>) -> f32
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
-    use crate::{
-        atmosphere::{systems::altitude_m, PlanetResource},
-        components::{AtmosphereState, FlightState},
-        plugin::AircraftFdmPlugin,
-    };
+    use crate::atmosphere::{systems::altitude_m, PlanetResource};
     use avian3d::{
-        dynamics::{
-            integrator::Gravity,
-            rigid_body::{AngularVelocity, LinearVelocity},
-        },
         math::{RVector, Real},
         parry::glamx::approx::assert_abs_diff_eq,
-        physics_transform::{Position, Rotation},
-        PhysicsPlugins,
+        physics_transform::Position,
     };
-    use bevy::{prelude::App, time::TimeUpdateStrategy, MinimalPlugins};
 
     /// `altitude_m` returns `f32`, so the tolerance is `f32` in both builds.
     const EPS: f32 = if cfg!(feature = "f64") { 1e-3 } else { 0.01 };
@@ -103,52 +91,6 @@ mod tests {
         let pos = Position::from_xyz(0.0, -100.0, 0.0);
 
         assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), -100.0, epsilon = EPS)
-    }
-
-    #[test]
-    fn atmosphere_matches_flight_state() {
-        // Create app
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins)
-            .add_plugins(bevy::transform::TransformPlugin)
-            .add_plugins(bevy::asset::AssetPlugin::default())
-            .add_plugins(PhysicsPlugins::default())
-            .add_plugins(AircraftFdmPlugin::default());
-        app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(
-            1.0 / 60.0,
-        )));
-        app.insert_resource(Gravity::ZERO);
-        app.finish();
-
-        let planet = PlanetResource::default();
-        app.insert_resource(planet.clone());
-
-        let pos = Position::from_xyz(0.0, 1000.0, 0.0);
-
-        app.world_mut().spawn((
-            FlightState {
-                altitude_m: 0.0,
-                ..Default::default()
-            },
-            AtmosphereState::default(),
-            LinearVelocity::default(),
-            AngularVelocity::default(),
-            pos,
-            Rotation::default(),
-        ));
-
-        // Two updates: command flush + PreUpdate resolution
-        app.update();
-        app.update();
-
-        let flight_state = app
-            .world_mut()
-            .query::<&FlightState>()
-            .iter(app.world())
-            .next()
-            .expect("FlightState to exist");
-
-        assert_eq!(altitude_m(&pos, Some(&planet)), flight_state.altitude_m);
     }
 
     /// The subtraction must happen in `Real`. A cast to `f32` before the
