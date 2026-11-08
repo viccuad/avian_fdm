@@ -59,7 +59,8 @@ mod tests {
     };
     use bevy::{prelude::App, time::TimeUpdateStrategy, MinimalPlugins};
 
-    const EPS: Real = if cfg!(feature = "f64") { 1e-3 } else { 0.01 };
+    /// `altitude_m` returns `f32`, so the tolerance is `f32` in both builds.
+    const EPS: f32 = if cfg!(feature = "f64") { 1e-3 } else { 0.01 };
     const EARTH_RADIUS_M: Real = sourced!(
         6_360_000.0,
         "Bevy 0.20 Atmosphere::earth EARTH_INNER_RADIUS"
@@ -101,11 +102,10 @@ mod tests {
 
     #[test]
     fn altitude_round_below_sea_level() {
-        const ALTITIUDE_M: Real = -100.0;
         let planet = PlanetResource::default();
-        let pos = Position::from_xyz(0.0, ALTITIUDE_M, 0.0);
+        let pos = Position::from_xyz(0.0, -100.0, 0.0);
 
-        assert_eq!(altitude_m(&pos, Some(&planet)), ALTITIUDE_M)
+        assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), -100.0, epsilon = EPS)
     }
 
     #[test]
@@ -154,23 +154,20 @@ mod tests {
         assert_eq!(altitude_m(&pos, Some(&planet)), flight_state.altitude_m);
     }
 
+    /// The subtraction must happen in `Real`. A cast to `f32` before the
+    /// subtraction gives an error of about 0.5 m at this radius.
     #[test]
-    #[cfg(feature = "parry-f64")]
+    #[cfg(feature = "f64")]
     fn altitude_round_f64_precision() {
-        use avian3d::parry::glamx::approx::assert_abs_diff_ne;
+        let planet = PlanetResource::new(RVector::default(), EARTH_RADIUS_M);
+        let distance_from_center = EARTH_RADIUS_M + 500.0;
+        let angle: Real = 0.7;
+        let pos = Position::from_xyz(
+            distance_from_center * angle.cos(),
+            distance_from_center * angle.sin(),
+            0.0,
+        );
 
-        const ALTITUDE_M: f64 = 500;
-
-        let distance_from_center = EARTH_RADIUS_M + ALTITUDE_M;
-        let pos = Position::from_xyz(distance_from_center.cos(), distance_from_center.sin(), 0.0);
-
-        assert_abs_diff_eq!(
-            altitude_m(
-                &pos,
-                PlanetResource::new(RVector::default(), EARTH_RADIUS_M)
-            ),
-            ALTITUDE_M,
-            epsilon = 1e-3
-        )
+        assert_abs_diff_eq!(altitude_m(&pos, Some(&planet)), 500.0, epsilon = 1e-3)
     }
 }
