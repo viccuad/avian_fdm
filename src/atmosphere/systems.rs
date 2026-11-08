@@ -44,14 +44,17 @@ mod tests {
 
     use crate::{
         atmosphere::{systems::altitude_m, PlanetResource},
-        components::FlightState,
+        components::{AtmosphereState, FlightState},
         plugin::AircraftFdmPlugin,
     };
     use avian3d::{
-        dynamics::integrator::Gravity,
+        dynamics::{
+            integrator::Gravity,
+            rigid_body::{AngularVelocity, LinearVelocity},
+        },
         math::{RVector, Real},
         parry::glamx::approx::assert_abs_diff_eq,
-        physics_transform::Position,
+        physics_transform::{Position, Rotation},
         PhysicsPlugins,
     };
     use bevy::{prelude::App, time::TimeUpdateStrategy, MinimalPlugins};
@@ -130,7 +133,11 @@ mod tests {
                 altitude_m: 0.0,
                 ..Default::default()
             },
+            AtmosphereState::default(),
+            LinearVelocity::default(),
+            AngularVelocity::default(),
             pos,
+            Rotation::default(),
         ));
 
         // Two updates: command flush + PreUpdate resolution
