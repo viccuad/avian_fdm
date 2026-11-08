@@ -61,10 +61,7 @@ mod tests {
 
     /// `altitude_m` returns `f32`, so the tolerance is `f32` in both builds.
     const EPS: f32 = if cfg!(feature = "f64") { 1e-3 } else { 0.01 };
-    const EARTH_RADIUS_M: Real = sourced!(
-        6_360_000.0,
-        "Bevy 0.20 Atmosphere::earth EARTH_INNER_RADIUS"
-    );
+    const EARTH_RADIUS_M: Real = PlanetResource::EARTH_RADIUS_M;
 
     #[test]
     fn altitude_flat_world() {

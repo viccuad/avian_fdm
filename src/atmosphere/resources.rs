@@ -50,18 +50,22 @@ pub struct PlanetResource {
 
 impl Default for PlanetResource {
     fn default() -> Self {
-        const EARTH_RADIUS_M: Real = sourced!(
-            6_360_000.0,
-            "Bevy 0.20 Atmosphere::earth EARTH_INNER_RADIUS"
-        );
         Self {
-            center: RVector::new(0.0, -EARTH_RADIUS_M, 0.0),
-            radius_m: EARTH_RADIUS_M,
+            center: RVector::new(0.0, -Self::EARTH_RADIUS_M, 0.0),
+            radius_m: Self::EARTH_RADIUS_M,
         }
     }
 }
 
 impl PlanetResource {
+    /// Earth radius of the Bevy sky renderer (m). Use it as `radius_m` when you
+    /// choose your own `center`. The default planet puts the center at
+    /// `(0, -EARTH_RADIUS_M, 0)`, so that sea level is at `y = 0`.
+    pub const EARTH_RADIUS_M: Real = sourced!(
+        6_360_000.0,
+        "Bevy 0.20 Atmosphere::earth EARTH_INNER_RADIUS"
+    );
+
     /// Creates a new `PlanetResource` from the planet center in world space
     /// and the planet radius in meters.
     ///
