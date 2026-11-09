@@ -13,10 +13,12 @@ use std::time::Duration;
 
 const R: Real = PlanetResource::EARTH_RADIUS_M;
 
-/// The f32 distance calculation at this radius has a resolution of about 0.5 m.
-const ALT_TOL_M: f32 = if cfg!(feature = "f64") { 1e-3 } else { 1.0 };
+/// The crate calculates the altitude in `f64` in both builds, and the test
+/// positions are exact in `f32`. Thus both builds use the same tolerance.
+const ALT_TOL_M: f32 = 1e-3;
 
-/// A 1 m altitude error changes the density by about 0.01%. Allow a margin.
+/// The atmospheres come from altitudes that agree within `ALT_TOL_M`. This
+/// tolerance only allows for the `f32` rounding in the ISA functions.
 const DENSITY_REL_TOL: f32 = 1e-3;
 
 /// Flies one aircraft for two frames and returns the values the crate wrote.

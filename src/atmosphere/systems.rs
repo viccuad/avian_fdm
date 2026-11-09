@@ -63,8 +63,9 @@ mod tests {
         physics_transform::Position,
     };
 
-    /// `altitude_m` returns `f32`, so the tolerance is `f32` in both builds.
-    const EPS: f32 = if cfg!(feature = "f64") { 1e-3 } else { 0.01 };
+    /// `altitude_m` calculates in `f64` in both builds, and the test positions
+    /// are exact in `f32`. Thus both builds use the same tolerance.
+    const EPS: f32 = 1e-3;
     const EARTH_RADIUS_M: Real = PlanetResource::EARTH_RADIUS_M;
 
     fn assert_near(actual: f32, expected: f32, eps: f32) {
@@ -77,7 +78,7 @@ mod tests {
     #[test]
     fn altitude_flat_world() {
         assert_eq!(
-            altitude_m(&Position::from_xyz(0.0, 1000.0, 0.0), None),
+            altitude_m(&Position::from_xyz(123.0, 1000.0, -45.0), None),
             1000.0
         )
     }
@@ -90,7 +91,7 @@ mod tests {
         let planet = PlanetResource::default();
         let pos = Position::from_xyz(0.0, 1000.3, 0.0);
 
-        assert_near(altitude_m(&pos, Some(&planet)), 1000.3, 0.01)
+        assert_near(altitude_m(&pos, Some(&planet)), 1000.3, EPS)
     }
 
     #[test]
