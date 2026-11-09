@@ -39,7 +39,7 @@ jobs:
         with:
           cache-key: test
       - run: make test
-      
+
   fmt:
     name: fmt
     runs-on: ubuntu-latest
@@ -86,3 +86,29 @@ jobs:
         run: make jsbsim
         env:
           JSBSIM_DATA_PATH: ${{ github.workspace }}/jsbsim
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-key: coverage
+          components: llvm-tools-preview
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: cargo-llvm-cov
+      - run: cargo llvm-cov --workspace --ignore-run-fail --lcov --output-path coverage/lcov.info
+      - name: Upload Rust coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          name: rust
+          files: coverage/lcov.info
+          flags: rust-tests
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}

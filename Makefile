@@ -44,6 +44,10 @@ j3cub-jsbsim:
 .PHONY: bench
 bench:
 	cargo test $(CARGO_FLAGS) -p avian_fdm --test perf_limits -- --nocapture
+	
+.PHONY: coverage
+coverage:
+	cargo $(CARGO_FLAGS) llvm-cov --workspace --ignore-run-fail --html --output-dir coverage/
 
 .PHONY: ci
 ci: check clippy test doc build
