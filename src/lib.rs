@@ -332,6 +332,21 @@
 //! `update_atmosphere` writes a new [`components::AtmosphereState`] to the
 //! root entity.
 //!
+//! By default, the world is flat. Sea level is at `y = 0`, and the altitude is
+//! the `y` component of the Avian `Position`. To use a spherical planet,
+//! insert a [`components::PlanetResource`]. The altitude is then the distance
+//! from the planet center minus the planet radius. Both systems that need an
+//! altitude (`update_atmosphere` and `update_flight_state`) use the same
+//! helper, so `AtmosphereState` and `FlightState::altitude_m` always agree.
+//!
+//! Gravity is not part of this resource. With a planet, you must set gravity
+//! yourself, because the Avian `Gravity` resource points in one fixed
+//! direction.
+//!
+//! Note: currently only the geometric altitude above sea level is implemented.
+//! This introduces an an air density error, see the module documentation for
+//! more information.
+//!
 //! ---
 //!
 //! ## Aerodynamic Forces and Moments
@@ -706,7 +721,7 @@
 //!
 //! | Field | Units | Notes |
 //! |-------|-------|-------|
-//! | `altitude_m` | m | World Y position (positive up) |
+//! | `altitude_m` | m | Geometric altitude above sea level. With no [`components::PlanetResource`]: the world Y position (positive up). With one: the distance from the planet center minus `radius_m`. |
 //! | `airspeed_ms` | m/s | True airspeed (TAS): the magnitude of the velocity relative to the air |
 //! | `alpha_rad` | rad | Angle of attack. Positive when the nose is above the velocity vector. |
 //! | `beta_rad` | rad | Sideslip angle. Positive when the wind comes from starboard. |
@@ -730,12 +745,14 @@
 //!
 //! ```text
 //! +-- PhysicsStepSystems::BroadPhase (once per physics step) ---------------+
-//! |  1. update_atmosphere          reads:  Position(root)                   |
+//! |  1. update_atmosphere          reads:  Position(root),                  |
+//! |                                        PlanetResource                   |
 //! |                                writes: AtmosphereState                  |
 //! |                                                                         |
 //! |  2. update_flight_state        reads:  Position(root), Rotation(root),  |
 //! |                                        LinearVelocity, AngularVelocity, |
-//! |                                        AtmosphereState, WindResource    |
+//! |                                        AtmosphereState, WindResource,   |
+//! |                                        PlanetResource                   |
 //! |                                writes: FlightState                      |
 //! |                                                                         |
 //! |  3. compute_engine_zone_forces reads:  ControlInputs, AtmosphereState,  |
@@ -824,7 +841,9 @@
 //! - It calculates the moment arm of each zone in the body frame, relative to
 //!   the center of mass. Then it rotates the arm to world orientation.
 //! - It reads the altitude from `Position`, and converts it to `f32` once. At
-//!   10 km, the rounding is about 1 mm.
+//!   10 km, the rounding is about 1 mm. With a [`components::PlanetResource`],
+//!   it subtracts the planet center and the radius in `f64` in all builds,
+//!   and then converts the small result to `f32`.
 //!
 //! Use the `parry-f64` feature when bodies move far from the origin. At
 //! 10,000 km, an `f32` position has a resolution of about 1 m. With `f64`,
@@ -833,6 +852,9 @@
 //! `f32`, but it rounds them outward. Far from the origin, this costs
 //! performance, but it does not miss contacts. Bevy `Transform` is `f32`, so
 //! the rendering of a large world needs a floating origin.
+//! A [`components::PlanetResource`] of real size has the same limit. If
+//! the world origin is at the planet center, all positions are about 6,360 km
+//! from the origin, with a resolution of 0.5 m in `f32`.
 //!
 //! ### Precision is not tunneling
 //!

@@ -12,7 +12,8 @@
 //! rotations and `atan2` calls. They do not depend on an atmosphere model.
 
 use crate::_bevy::*;
-use crate::atmosphere::WindResource;
+use crate::atmosphere::systems::altitude_m;
+use crate::atmosphere::{PlanetResource, WindResource};
 use crate::components::{AtmosphereState, FlightState};
 use avian3d::prelude::{Position, Rotation};
 
@@ -22,7 +23,13 @@ use avian3d::prelude::{Position, Rotation};
 /// [`avian3d::prelude::AngularVelocity`], and subtracts the wind from
 /// [`WindResource`] (if present). It turns the result into the body frame
 /// with the Avian [`Rotation`]. Then it calculates alpha, beta, V, qbar,
-/// Mach, and the body rates. The altitude comes from the Avian [`Position`].
+/// Mach, and the body rates.
+///
+/// The altitude comes from the Avian [`Position`], through
+/// [`crate::atmosphere::systems::altitude_m`]. This is the same value that
+/// [`crate::atmosphere::update_atmosphere`] uses. If a [`PlanetResource`]
+/// exists, the altitude is the distance from the planet center minus
+/// `radius_m`. If not, the altitude is the `y` component of `Position`.
 pub fn update_flight_state(
     mut query: Query<(
         &Position,
@@ -33,14 +40,14 @@ pub fn update_flight_state(
         &mut FlightState,
     )>,
     wind: Option<Res<WindResource>>,
+    planet: Option<Res<PlanetResource>>,
 ) {
     use crate::math::world_to_body;
-    use avian3d::math::ToF32Precision;
 
     let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vec3::ZERO);
 
     for (pos, rot, lin_vel, ang_vel, atm, mut fs) in &mut query {
-        let altitude_m = pos.0.y.f32();
+        let altitude_m = altitude_m(pos, planet.as_deref());
 
         // Body angular rates: turns the world AngularVelocity into the body frame.
         let q = rot.0;

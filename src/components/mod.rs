@@ -8,7 +8,7 @@ pub mod failure;
 pub mod flight_state;
 pub mod zone_force;
 
-pub use crate::atmosphere::WindResource;
+pub use crate::atmosphere::{PlanetResource, WindResource};
 pub use crate::gizmo_shape::{GizmoContours, GizmoShape};
 pub use aero_coeff::AeroCoeff;
 pub use aero_zone::{AeroZone, AeroZoneBundle, ControlSurfaceRole};
