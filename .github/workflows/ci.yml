@@ -50,16 +50,6 @@ jobs:
           cache-key: doc
       - run: make doc
 
-  build:
-    name: Build (release)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/rust-setup
-        with:
-          cache-key: build
-      - run: make build
-
   jsbsim:
     name: JSBSim Validation (+-1%)
     runs-on: ubuntu-latest
