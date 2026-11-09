@@ -5,6 +5,10 @@ inputs:
   cache-key:
     description: Per-job suffix for the Cargo cache key (avoids cross-job cache thrashing).
     required: true
+  components:
+    description: Comma-separated rustup components to install.
+    required: false
+    default: clippy
 
 runs:
   using: composite
@@ -12,7 +16,7 @@ runs:
     - name: Install Rust stable
       uses: dtolnay/rust-toolchain@stable
       with:
-        components: clippy
+        components: ${{ inputs.components }}
 
     - name: Restore Cargo cache
       uses: actions/cache@v4

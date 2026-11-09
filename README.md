@@ -4,6 +4,7 @@
 [![ci](https://github.com/viccuad/avian_fdm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/viccuad/avian_fdm/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/avian_fdm)](https://crates.io/crates/avian_fdm)
 [![docs.rs](https://img.shields.io/docsrs/avian_fdm)](https://docs.rs/avian_fdm)
+[![codecov](https://codecov.io/github/viccuad/avian_fdm/graph/badge.svg?token=8TNCGJCJY8)](https://codecov.io/github/viccuad/avian_fdm)
 
 # avian_fdm
 

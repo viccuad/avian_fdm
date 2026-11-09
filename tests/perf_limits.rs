@@ -1,3 +1,7 @@
+#![cfg(not(coverage))]
+// Exempt of coverage cover, as coverage instruments the code, which runs
+// slower and fails the perf limits.
+
 /// Performance regression guards for the `avian_fdm` hot path.
 ///
 /// These tests catch catastrophic regressions (e.g. an O(n^2) lookup) in
