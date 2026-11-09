@@ -65,18 +65,4 @@ impl PlanetResource {
         6_360_000.0,
         "Bevy 0.20 Atmosphere::earth EARTH_INNER_RADIUS"
     );
-
-    /// Creates a new `PlanetResource` from the planet center in world space
-    /// and the planet radius in meters.
-    ///
-    /// # Example
-    /// ```rust,no_run
-    /// # use avian_fdm::components::PlanetResource;
-    /// # use bevy::prelude::*;
-    /// # use avian3d::math::RVector;
-    /// // app.insert_resource(PlanetResource::new(RVector::new(0.0, -6_360_000.0, 0.0), 6_360_000.0));
-    /// ```
-    pub fn new(center: RVector, radius_m: Real) -> Self {
-        Self { center, radius_m }
-    }
 }

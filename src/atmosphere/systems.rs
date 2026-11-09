@@ -96,7 +96,10 @@ mod tests {
 
     #[test]
     fn altitude_round_y_axis() {
-        let planet = PlanetResource::new(RVector::default(), EARTH_RADIUS_M);
+        let planet = PlanetResource {
+            center: RVector::default(),
+            radius_m: EARTH_RADIUS_M,
+        };
         let pos = Position::from_xyz(0.0, EARTH_RADIUS_M + 1000.0, 0.0);
 
         assert_near(altitude_m(&pos, Some(&planet)), 1000.0, EPS)
@@ -104,7 +107,10 @@ mod tests {
 
     #[test]
     fn altitude_round_x_axis() {
-        let planet = PlanetResource::new(RVector::default(), EARTH_RADIUS_M);
+        let planet = PlanetResource {
+            center: RVector::default(),
+            radius_m: EARTH_RADIUS_M,
+        };
         let pos = Position::from_xyz(EARTH_RADIUS_M + 1000.0, 0.0, 0.0);
 
         assert_near(altitude_m(&pos, Some(&planet)), 1000.0, EPS)
@@ -113,7 +119,10 @@ mod tests {
     #[test]
     fn altitude_round_offset_center() {
         let center = RVector::new(0.0, -EARTH_RADIUS_M, 0.0);
-        let planet = PlanetResource::new(center, EARTH_RADIUS_M);
+        let planet = PlanetResource {
+            center,
+            radius_m: EARTH_RADIUS_M,
+        };
 
         let pos = Position::from_xyz(0.0, 1000.0, 0.0);
 
@@ -133,7 +142,10 @@ mod tests {
     #[test]
     #[cfg(feature = "f64")]
     fn altitude_round_f64_precision() {
-        let planet = PlanetResource::new(RVector::default(), EARTH_RADIUS_M);
+        let planet = PlanetResource {
+            center: RVector::default(),
+            radius_m: EARTH_RADIUS_M,
+        };
         let distance_from_center = EARTH_RADIUS_M + 500.0;
         let angle: Real = 0.7;
         let pos = Position::from_xyz(
