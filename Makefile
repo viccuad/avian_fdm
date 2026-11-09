@@ -1,5 +1,9 @@
 CARGO_FLAGS ?= --locked
 
+.PHONY: fmt
+fmt:
+	cargo fmt --all --check 
+
 .PHONY: check
 check:
 	# Default features (parry-f32, debug-plugin) workspace-wide. Then parry-f64
@@ -19,10 +23,6 @@ test:
 	# Default features workspace-wide, then parry-f64 core-only.
 	cargo test $(CARGO_FLAGS) --workspace
 	cargo test $(CARGO_FLAGS) -p avian_fdm --no-default-features --features "parry-f64"
-	
-.PHONY: fmt
-fmt:
-	cargo fmt
 
 .PHONY: doc
 doc:
@@ -50,4 +50,4 @@ coverage:
 	cargo $(CARGO_FLAGS) llvm-cov --workspace --ignore-run-fail --html --output-dir coverage/
 
 .PHONY: ci
-ci: check clippy test doc build
+ci: fmt clippy test doc build
