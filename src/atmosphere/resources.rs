@@ -17,7 +17,10 @@ use serde::{Deserialize, Serialize};
 /// ```rust,no_run
 /// # use avian_fdm::components::WindResource;
 /// # use bevy::prelude::*;
-/// // app.insert_resource(WindResource { velocity_world_ms: Vec3::new(-5.0, 0.0, 0.0) });
+/// # let mut app = App::new();
+/// app.insert_resource(WindResource {
+///     velocity_world_ms: Vec3::new(-5.0, 0.0, 0.0),
+/// });
 /// ```
 #[derive(Resource, Reflect, Serialize, Deserialize, Clone, Debug, Default)]
 #[reflect(Resource, Serialize, Deserialize)]
@@ -37,7 +40,12 @@ pub struct WindResource {
 /// # use avian_fdm::components::PlanetResource;
 /// # use bevy::prelude::*;
 /// # use avian3d::math::RVector;
-/// // app.insert_resource(PlanetResource { center: RVector::new(0.0, -6_360_000.0, 0.0), radius_m: 6_360_000.0 });
+/// # let mut app = App::new();
+/// // Sea level at y = 0, with the planet center below the origin.
+/// app.insert_resource(PlanetResource {
+///     center: RVector::new(0.0, -PlanetResource::EARTH_RADIUS_M, 0.0),
+///     radius_m: PlanetResource::EARTH_RADIUS_M,
+/// });
 /// ```
 #[derive(Resource, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Resource, Serialize, Deserialize)]
