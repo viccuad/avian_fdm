@@ -11,7 +11,7 @@ env:
 
 jobs:
   clippy:
-    name: Clippy
+    name: clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
       - run: make clippy
 
   test:
-    name: Test
+    name: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,7 @@ jobs:
       - run: make fmt
 
   doc:
-    name: Doc
+    name: doc
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
