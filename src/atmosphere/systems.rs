@@ -2,8 +2,9 @@
 //!
 //! They connect the pure ISA functions in [`super::isa`] to the ECS data on
 //! aircraft entities. At this time, there is one system,
-//! [`update_atmosphere`]. It calculates [`AtmosphereState`] from the altitude
-//! in world space.
+//! [`update_atmosphere`]. It calculates [`AtmosphereState`] from the geometric
+//! altitude above sea level. The helper [`altitude_m`] calculates this
+//! altitude. [`crate::kinematics::update_flight_state`] uses the same helper.
 
 use super::isa::atmosphere_at;
 use crate::_bevy::*;

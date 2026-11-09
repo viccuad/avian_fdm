@@ -23,7 +23,13 @@ use avian3d::prelude::{Position, Rotation};
 /// [`avian3d::prelude::AngularVelocity`], and subtracts the wind from
 /// [`WindResource`] (if present). It turns the result into the body frame
 /// with the Avian [`Rotation`]. Then it calculates alpha, beta, V, qbar,
-/// Mach, and the body rates. The altitude comes from the Avian [`Position`].
+/// Mach, and the body rates.
+///
+/// The altitude comes from the Avian [`Position`], through
+/// [`crate::atmosphere::systems::altitude_m`]. This is the same value that
+/// [`crate::atmosphere::update_atmosphere`] uses. If a [`PlanetResource`]
+/// exists, the altitude is the distance from the planet center minus
+/// `radius_m`. If not, the altitude is the `y` component of `Position`.
 pub fn update_flight_state(
     mut query: Query<(
         &Position,

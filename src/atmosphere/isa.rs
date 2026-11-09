@@ -6,6 +6,17 @@
 //! no Bevy types. Refer to [`super::systems`] for the ECS systems that use
 //! these functions.
 //!
+//! ## geometric altitude, not geopotential altitude
+//!
+//! Currently this module implements the geometric altitude `h` above sea level
+//! (the altitude in a fictional world constant gravity at all heights).
+//! ICAO defines the ISA tables in geopotential altitude `H` (the altitude taking
+//! into account the variation of gravity at different heights).
+//!
+//! This introduces an air density error of about 0.002% at 1 km, 0.015% at 3 km,
+//! 0.2% at 10 km, and 1% at 20 km. Note that real weather differs from the ISA
+//! by up to 10% of the density.
+//!
 //! ## Why density is important
 //!
 //! Each aerodynamic force is proportional to the dynamic pressure (qbar =
@@ -128,7 +139,11 @@ pub fn sutherland_viscosity(t: f32) -> f32 {
     MU_REF_SUTH * (t / T_REF_SUTH).powf(1.5) * (T_REF_SUTH + S_SUTH) / (t + S_SUTH)
 }
 
-/// Returns an [`AtmosphereState`] for the given altitude (m).
+/// Returns an [`AtmosphereState`] for the given geometric altitude (m).
+///
+/// The function uses `h` directly in the ISA formulas. It does not convert
+/// to geopotential altitude. See the module documentation for the introduced
+/// error.
 pub fn atmosphere_at(h: f32) -> AtmosphereState {
     let temperature_k = isa_temperature(h);
     let pressure_pa = isa_pressure(h);
