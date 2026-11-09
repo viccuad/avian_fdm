@@ -1,6 +1,5 @@
 //! [`WindResource`]: optional global wind for all aircraft.
-//! [`PlanetResource`]: optional, will treat your world like a round planet
-//! instead of like a flat one.
+//! [`PlanetResource`]: optional global resource, enables round planet altitude for all aircraft.
 
 use crate::_bevy::*;
 use avian3d::math::{RVector, Real};
@@ -30,10 +29,14 @@ pub struct WindResource {
     pub velocity_world_ms: Vec3,
 }
 
-/// Optional resource for a round earth. Insert it into the Bevy
-/// [`World`] make the atmosphere spherical.
+/// Optional resource for a spherical planet. Insert it into the Bevy
+/// [`World`] to calculate the altitude of all aircraft above a sphere.
 ///
-/// If this resource is absent, the atmosphere will default to calculating flat-earth altitude.
+/// The altitude is the distance from `center` minus `radius_m`.
+/// [`AtmosphereState`](crate::components::AtmosphereState) and
+/// [`FlightState::altitude_m`](crate::components::FlightState::altitude_m)
+/// both use this altitude. If this resource is absent, the world is flat, sea
+/// level is at `y = 0`, and the altitude is the world Y position.
 ///
 /// # Example
 /// ```rust,no_run
@@ -50,7 +53,7 @@ pub struct WindResource {
 #[derive(Resource, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Resource, Serialize, Deserialize)]
 pub struct PlanetResource {
-    /// The center of the earth in world space (m).
+    /// The center of the planet in world space (m).
     pub center: RVector,
     /// The distance from the center to sea level (m).
     pub radius_m: Real,
