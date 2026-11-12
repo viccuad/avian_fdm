@@ -125,12 +125,12 @@ const S_SUTH: f32 = 110.4;
 //
 
 /// Converts the geometric altitude `h` (m) to the geopotential altitude `H` (m).
-pub fn geopotential_altitude(h: f32) -> f32 {
+pub(crate) fn geopotential_altitude(h: f32) -> f32 {
     R0_ISA * h / (R0_ISA + h)
 }
 
 /// Calculates the ISA temperature (K) at the geopotential altitude `h_gp` (m).
-pub fn isa_temperature(h_gp: f32) -> f32 {
+pub(crate) fn isa_temperature(h_gp: f32) -> f32 {
     if h_gp <= H_TROP {
         T0 - L * h_gp
     } else {
@@ -139,7 +139,7 @@ pub fn isa_temperature(h_gp: f32) -> f32 {
 }
 
 /// Calculates the ISA static pressure (Pa) at the geopotential altitude `h_gp` (m).
-pub fn isa_pressure(h_gp: f32) -> f32 {
+pub(crate) fn isa_pressure(h_gp: f32) -> f32 {
     if h_gp <= H_TROP {
         let t = isa_temperature(h_gp);
         P0 * (t / T0).powf(TROP_EXPONENT)
@@ -159,12 +159,12 @@ pub(crate) fn isa_density(h_gp: f32) -> f32 {
 }
 
 /// Calculates the speed of sound (m/s) at the temperature `t` (K).
-pub fn speed_of_sound(t: f32) -> f32 {
+pub(crate) fn speed_of_sound(t: f32) -> f32 {
     (GAMMA * R_AIR * t).sqrt()
 }
 
 /// Calculates the dynamic viscosity (kg/(m·s)) with Sutherland's law at the temperature `t` (K).
-pub fn sutherland_viscosity(t: f32) -> f32 {
+pub(crate) fn sutherland_viscosity(t: f32) -> f32 {
     MU_REF_SUTH * (t / T_REF_SUTH).powf(1.5) * (T_REF_SUTH + S_SUTH) / (t + S_SUTH)
 }
 
@@ -172,7 +172,7 @@ pub fn sutherland_viscosity(t: f32) -> f32 {
 ///
 /// It converts `h` to the geopotential altitude with
 /// [`geopotential_altitude`], then applies the ISA formulas.
-pub fn atmosphere_at(h: f32) -> AtmosphereState {
+pub(crate) fn atmosphere_at(h: f32) -> AtmosphereState {
     let h_gp = geopotential_altitude(h);
     let temperature_k = isa_temperature(h_gp);
     let pressure_pa = isa_pressure(h_gp);

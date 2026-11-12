@@ -30,7 +30,7 @@ use avian3d::prelude::{Position, Rotation};
 /// [`crate::atmosphere::update_atmosphere`] uses. If a [`PlanetResource`]
 /// exists, the altitude is the distance from the planet center minus
 /// `radius_m`. If not, the altitude is the `y` component of `Position`.
-pub fn update_flight_state(
+pub(crate) fn update_flight_state(
     mut query: Query<(
         &Position,
         &Rotation,

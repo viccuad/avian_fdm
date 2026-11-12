@@ -73,7 +73,7 @@
 ///
 /// `(alpha_local, beta_local)`, both in radians.
 #[allow(clippy::too_many_arguments)]
-pub fn zone_local_angles(
+pub(crate) fn zone_local_angles(
     alpha: f32,
     beta: f32,
     p: f32,

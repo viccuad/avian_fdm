@@ -15,9 +15,9 @@
 //! propeller as the airspeed increases. It scales the thrust by
 //! max(0, 1 - (V / V_zero)^2). The thrust is zero at the windmilling speed.
 
-pub mod engine_zone;
+pub(crate) mod engine_zone;
 pub(crate) mod throttle;
 pub(crate) mod thrust;
 
 pub use engine_zone::EngineZone;
-pub use thrust::compute_engine_zone_forces;
+pub(crate) use thrust::compute_engine_zone_forces;
