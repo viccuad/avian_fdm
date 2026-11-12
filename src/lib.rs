@@ -347,8 +347,10 @@
 //! in geopotential altitude, which corrects for the decrease of gravity with
 //! height. `update_atmosphere` converts the geometric altitude to the
 //! geopotential altitude before it applies the ISA formulas.
-//! The conversion uses the ISA radius `r0` = 6 356 766 m, not the radius of
-//! the `PlanetResource`.
+//! The conversion uses the ISA radius `r0` = 6 356 766 m, never the radius of
+//! the [`components::PlanetResource`]. The planet is geometry only: it decides
+//! how high the aircraft is, and the fixed ISA decides what air is at that
+//! height.
 //!
 //! ---
 //!

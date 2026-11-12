@@ -124,7 +124,7 @@ const S_SUTH: f32 = 110.4;
 // altitude functions take the geopotential altitude.
 //
 
-/// Converts the geometric altitude `h` (m) to the geopotential altitude (m).
+/// Converts the geometric altitude `h` (m) to the geopotential altitude `H` (m).
 pub fn geopotential_altitude(h: f32) -> f32 {
     R0_ISA * h / (R0_ISA + h)
 }
