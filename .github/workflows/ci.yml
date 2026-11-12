@@ -83,7 +83,9 @@ jobs:
         uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
           tool: cargo-llvm-cov
-      - run: cargo llvm-cov --workspace --ignore-run-fail --lcov --output-path coverage/lcov.info
+      - run: |
+          mkdir -p coverage
+          cargo llvm-cov --workspace --ignore-run-fail --lcov --output-path coverage/lcov.info
       - name: Upload Rust coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
