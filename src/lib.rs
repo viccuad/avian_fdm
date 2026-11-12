@@ -343,9 +343,12 @@
 //! yourself, because the Avian `Gravity` resource points in one fixed
 //! direction.
 //!
-//! Note: currently only the geometric altitude above sea level is implemented.
-//! This introduces an an air density error, see the module documentation for
-//! more information.
+//! `FlightState::altitude_m` is the geometric altitude. ICAO defines the ISA
+//! in geopotential altitude, which corrects for the decrease of gravity with
+//! height. `update_atmosphere` converts the geometric altitude to the
+//! geopotential altitude before it applies the ISA formulas.
+//! The conversion uses the ISA radius `r0` = 6 356 766 m, not the radius of
+//! the `PlanetResource`.
 //!
 //! ---
 //!
