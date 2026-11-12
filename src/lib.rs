@@ -945,6 +945,7 @@
 
 #![deny(missing_docs)]
 #![warn(clippy::missing_docs_in_private_items)]
+#![warn(unreachable_pub)]
 
 // avian3d reports a missing backend only for its `default-collider` feature.
 // Without a backend, `Collider` does not exist, and the errors come from inside
