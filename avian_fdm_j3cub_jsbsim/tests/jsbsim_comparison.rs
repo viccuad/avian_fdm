@@ -7,11 +7,13 @@
 //! ## Tests
 //!
 //! * **`jsbsim_j3cub_comparison`** — powered flight (throttle ramp 50-75%).
-//!   Always runs with `--features presets`.
+//!   Always runs with `--features presets`. Fails if the AoA error exceeds
+//!   `TARGET_AOA_DEG` at any sample.
 //!
 //! * **`jsbsim_j3cub_glide_comparison`** — engine off, unpowered glide.
 //!   Always runs with `--features presets`. Uses `Failure { remaining: 0.0 }`
-//!   on the engine zone to exercise the damage model path.
+//!   on the engine zone to exercise the damage model path. Fails if the AoA
+//!   error exceeds `TARGET_AOA_DEG` at any sample.
 //!
 //! * **`jsbsim_regenerate_reference`** and **`jsbsim_regenerate_glide_reference`**
 //!   — run only when `JSBSIM_DATA_PATH` is set. Re-run the Python JSBSim
@@ -57,11 +59,11 @@ const REFERENCE_CSV: &str = include_str!("fixtures/jsbsim_j3cub_60s.csv");
 /// Reference CSV for unpowered glide (engine off).
 const REFERENCE_CSV_GLIDE: &str = include_str!("fixtures/jsbsim_j3cub_glide_60s.csv");
 
-/// Target tolerances (post-calibration).  Currently the models diverge
-/// significantly; see comparison output for details.
+/// Target tolerances (post-calibration). Only the AoA target is enforced.
+/// The altitude and TAS errors are still large; see comparison output for details.
 const _TARGET_ALT_PCT: f64 = 1.0;
 const _TARGET_TAS_PCT: f64 = 1.0;
-const _TARGET_AOA_DEG: f64 = 1.0;
+const TARGET_AOA_DEG: f64 = 1.0;
 
 // ── Sample type ──────────────────────────────────────────────────────────────
 
@@ -216,6 +218,7 @@ fn jsbsim_j3cub_comparison() {
     let mut max_alt_err = 0.0_f64;
     let mut max_tas_err = 0.0_f64;
     let mut max_aoa_err = 0.0_f64;
+    let mut max_aoa_err_t = 0.0_f64;
 
     for i in 0..n {
         let js = &jsbsim_data[i];
@@ -229,7 +232,10 @@ fn jsbsim_j3cub_comparison() {
 
         max_alt_err = max_alt_err.max(alt_err);
         max_tas_err = max_tas_err.max(tas_err);
-        max_aoa_err = max_aoa_err.max(aoa_err);
+        if aoa_err > max_aoa_err {
+            max_aoa_err = aoa_err;
+            max_aoa_err_t = js.time;
+        }
 
         println!(
             "{:6.1} │ {:9.2} {:9.2} {:+6.1}% │ {:9.2} {:9.2} {:+6.1}% │ {:+6.2} {:+6.2} {:+5.2}°",
@@ -250,7 +256,7 @@ fn jsbsim_j3cub_comparison() {
     println!("  Samples compared:   {n}");
     println!("  Max altitude error: {max_alt_err:.2}%  (target: ±{_TARGET_ALT_PCT}%)");
     println!("  Max TAS error:      {max_tas_err:.2}%  (target: ±{_TARGET_TAS_PCT}%)");
-    println!("  Max AoA error:      {max_aoa_err:.2}°  (target: ±{_TARGET_AOA_DEG}°)");
+    println!("  Max AoA error:      {max_aoa_err:.2}°  (target: ±{TARGET_AOA_DEG}°)");
 
     // ── Sanity assertions ────────────────────────────────────────────────
     for s in avian_data.iter() {
@@ -275,7 +281,13 @@ fn jsbsim_j3cub_comparison() {
     }
 
     println!("\n  ✓ avian_fdm produced physically sane flight data.");
-    println!("  ⚠ Precision tolerance matching deferred (model calibration needed).");
+
+    assert!(
+        max_aoa_err <= TARGET_AOA_DEG,
+        "Powered AoA error {max_aoa_err:.2}° at t={max_aoa_err_t:.1}s exceeds ±{TARGET_AOA_DEG}°",
+    );
+
+    println!("  ⚠ Altitude and TAS tolerance matching deferred (model calibration needed).");
 }
 
 // ── Glide runner (engine disabled via Failure) ───────────────────────────────
@@ -341,6 +353,7 @@ fn jsbsim_j3cub_glide_comparison() {
     let mut max_alt_err = 0.0_f64;
     let mut max_tas_err = 0.0_f64;
     let mut max_aoa_err = 0.0_f64;
+    let mut max_aoa_err_t = 0.0_f64;
 
     for i in 0..n {
         let js = &jsbsim_data[i];
@@ -354,7 +367,10 @@ fn jsbsim_j3cub_glide_comparison() {
 
         max_alt_err = max_alt_err.max(alt_err);
         max_tas_err = max_tas_err.max(tas_err);
-        max_aoa_err = max_aoa_err.max(aoa_err);
+        if aoa_err > max_aoa_err {
+            max_aoa_err = aoa_err;
+            max_aoa_err_t = js.time;
+        }
 
         println!(
             "{:6.1} | {:9.2} {:9.2} {:+6.1}% | {:9.2} {:9.2} {:+6.1}% | {:+6.2} {:+6.2} {:+5.2}",
@@ -375,7 +391,7 @@ fn jsbsim_j3cub_glide_comparison() {
     println!("  Samples compared:   {n}");
     println!("  Max altitude error: {max_alt_err:.2}%  (target: +-{_TARGET_ALT_PCT}%)");
     println!("  Max TAS error:      {max_tas_err:.2}%  (target: +-{_TARGET_TAS_PCT}%)");
-    println!("  Max AoA error:      {max_aoa_err:.2} deg  (target: +-{_TARGET_AOA_DEG} deg)");
+    println!("  Max AoA error:      {max_aoa_err:.2} deg  (target: +-{TARGET_AOA_DEG} deg)");
 
     let final_js = &jsbsim_data[n - 1];
     let final_av = &avian_data[n - 1];
@@ -389,6 +405,10 @@ fn jsbsim_j3cub_glide_comparison() {
         final_av.airspeed_ms > 10.0 && final_av.airspeed_ms < 80.0,
         "avian_fdm glide TAS out of range at t=60s: {:.1} m/s",
         final_av.airspeed_ms,
+    );
+    assert!(
+        max_aoa_err <= TARGET_AOA_DEG,
+        "Glide AoA error {max_aoa_err:.2} deg at t={max_aoa_err_t:.1}s exceeds +-{TARGET_AOA_DEG} deg",
     );
 
     println!("  Glide comparison complete.");
