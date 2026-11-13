@@ -840,8 +840,8 @@
 //!   `f64` feature.
 //!
 //! An `f32` value has about 7 significant digits. This is much more than the
-//! accuracy of the aerodynamic data. The FDM does not lose precision far from
-//! the origin, because it never subtracts two world positions:
+//! accuracy of the aerodynamic data. The FDM math does not lose precision far
+//! from the origin, because it never subtracts two world positions:
 //!
 //! - It calculates the moment arm of each zone in the body frame, relative to
 //!   the center of mass. Then it rotates the arm to world orientation.
@@ -850,16 +850,27 @@
 //!   it subtracts the planet center and the radius in `f64` in all builds,
 //!   and then converts the small result to `f32`.
 //!
-//! Use the `parry-f64` feature when bodies move far from the origin. At
-//! 10,000 km, an `f32` position has a resolution of about 1 m. With `f64`,
-//! Avian keeps positions and contact points in `f64`, and it calculates
-//! contacts with `f64` poses. The broad phase stores its bounding boxes in
-//! `f32`, but it rounds them outward. Far from the origin, this costs
+//! **Rule: if an aircraft flies more than 100 km from the world origin, use
+//! the `parry-f64` feature or a floating origin.** In an `f32` build, the
+//! crate warns once when an aircraft passes this limit.
+//!
+//! The reason is Avian, not the FDM math. Avian adds the movement of each
+//! physics step to `Position` in one addition. Far from the origin, `f32`
+//! rounds this movement: at 100 km to about 8 mm, at 6,360 km to 0.5 m. At
+//! 60 Hz, an aircraft at 50 m/s moves 0.83 m per step, so 0.5 m steps give an
+//! error of up to 40%. No later calculation can recover this precision.
+//!
+//! With `f64`, Avian keeps positions and contact points in `f64`, and it
+//! calculates contacts with `f64` poses. The broad phase stores its bounding
+//! boxes in `f32`, but it rounds them outward. Far from the origin, this costs
 //! performance, but it does not miss contacts. Bevy `Transform` is `f32`, so
-//! the rendering of a large world needs a floating origin.
-//! A [`components::PlanetResource`] of real size has the same limit. If
-//! the world origin is at the planet center, all positions are about 6,360 km
-//! from the origin, with a resolution of 0.5 m in `f32`.
+//! the rendering of a large world needs a floating origin in all builds.
+//!
+//! With a [`components::PlanetResource`], only the distance of the aircraft
+//! from the origin counts, not the distance of the planet center. The default
+//! planet puts sea level at the origin, so `parry-f32` is sufficient. If the
+//! world origin is at the planet center, every aircraft is 6,360 km from the
+//! origin. Then the rule applies, and the warning tells you.
 //!
 //! ### Precision is not tunneling
 //!

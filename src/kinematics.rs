@@ -30,6 +30,9 @@ use avian3d::prelude::{Position, Rotation};
 /// [`crate::atmosphere::update_atmosphere`] uses. If a [`PlanetResource`]
 /// exists, the altitude is the distance from the planet center minus
 /// `radius_m`. If not, the altitude is the `y` component of `Position`.
+///
+/// In an `f32` build, it also warns once if an aircraft is too far from the
+/// world origin for `f32` positions (see `F32_POSITION_LIMIT_M`).
 pub(crate) fn update_flight_state(
     mut query: Query<(
         &Position,
@@ -47,6 +50,9 @@ pub(crate) fn update_flight_state(
     let wind_world = wind.map(|w| w.velocity_world_ms).unwrap_or(Vec3::ZERO);
 
     for (pos, rot, lin_vel, ang_vel, atm, mut fs) in &mut query {
+        #[cfg(not(feature = "f64"))]
+        warn_if_far_from_origin(pos);
+
         let altitude_m = altitude_m(pos, planet.as_deref());
 
         // Body angular rates: turns the world AngularVelocity into the body frame.
@@ -99,5 +105,34 @@ pub(crate) fn update_flight_state(
             q_rads,
             r_rads,
         };
+    }
+}
+
+/// Distance from the world origin (m) where `f32` positions become too coarse
+/// for the physics. Here, an `f32` position has steps of about 8 mm. The step
+/// doubles with each doubling of the distance: 6 cm at 1,000 km, and 0.5 m at
+/// 6,360 km (an aircraft at sea level, with the origin at the planet center).
+#[cfg(not(feature = "f64"))]
+const F32_POSITION_LIMIT_M: f32 = 100_000.0;
+
+/// Warns once if an aircraft is farther than [`F32_POSITION_LIMIT_M`] from the
+/// world origin in an `f32` build.
+///
+/// Avian adds the movement of each physics step to [`Position`] in one
+/// addition. Far from the origin, `f32` rounds this movement, and the physics
+/// is wrong. The `f64` conversion in [`altitude_m`] cannot fix this, because
+/// `Position` already lost the precision.
+#[cfg(not(feature = "f64"))]
+fn warn_if_far_from_origin(pos: &Position) {
+    let distance_m = pos.0.length();
+    if distance_m > F32_POSITION_LIMIT_M {
+        let step_m = f32::from_bits(distance_m.to_bits() + 1) - distance_m;
+        warn_once!(
+            "An aircraft is {:.0} km from the world origin. In an f32 build, positions there \
+             have steps of {:.3} m, and the physics is wrong. Use the parry-f64 feature, \
+             or a floating origin that keeps the aircraft near the origin.",
+            distance_m / 1000.0,
+            step_m,
+        );
     }
 }
