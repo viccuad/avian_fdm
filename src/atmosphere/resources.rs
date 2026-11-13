@@ -38,6 +38,19 @@ pub struct WindResource {
 /// both use this altitude. If this resource is absent, the world is flat, sea
 /// level is at `y = 0`, and the altitude is the world Y position.
 ///
+/// # The planet is geometry only
+///
+/// This resource answers one question: how high is the aircraft above sea
+/// level? The atmosphere model itself does not change with the planet. The
+/// same altitude gives the same air, with or without this resource, for any
+/// `radius_m`. In particular, the ISA converts the altitude to geopotential
+/// altitude with the fixed ICAO radius (6,356,766 m), never with `radius_m`.
+///
+/// `radius_m` still matters: it decides where sea level is. If it does not
+/// match the distance from `center` to the ground of your world, every
+/// altitude is offset by that mismatch, and every aircraft flies in air of
+/// the wrong density.
+///
 /// # Example
 /// ```rust,no_run
 /// # use avian_fdm::components::PlanetResource;
@@ -55,7 +68,9 @@ pub struct WindResource {
 pub struct PlanetResource {
     /// The center of the planet in world space (m).
     pub center: RVector,
-    /// The distance from the center to sea level (m).
+    /// The distance from the center to sea level (m). It defines where the
+    /// altitude is zero. The ISA does not use it (see "The planet is
+    /// geometry only" above).
     pub radius_m: Real,
 }
 
