@@ -8,8 +8,8 @@
 
 use super::isa::atmosphere_at;
 use crate::_bevy::*;
-use crate::atmosphere::resources::PlanetResource;
 use crate::components::AtmosphereState;
+use crate::planet::PlanetResource;
 use avian3d::math::ToF32Precision;
 use avian3d::prelude::Position;
 use bevy_math::DVec3;
@@ -58,7 +58,7 @@ pub(crate) fn altitude_m(pos: &Position, planet: Option<&PlanetResource>) -> f32
 
 #[cfg(test)]
 mod tests {
-    use crate::atmosphere::{systems::altitude_m, PlanetResource};
+    use crate::{atmosphere::systems::altitude_m, planet::PlanetResource};
     use avian3d::{
         math::{RVector, Real},
         physics_transform::Position,

@@ -13,8 +13,9 @@
 
 use crate::_bevy::*;
 use crate::atmosphere::systems::altitude_m;
-use crate::atmosphere::{PlanetResource, WindResource};
+use crate::atmosphere::WindResource;
 use crate::components::{AtmosphereState, FlightState};
+use crate::planet::PlanetResource;
 use avian3d::prelude::{Position, Rotation};
 
 /// Updates [`FlightState`] on each aircraft from the velocity and the atmosphere.

@@ -1019,6 +1019,7 @@ pub mod components;
 pub(crate) mod gizmo_shape;
 pub(crate) mod kinematics;
 pub(crate) mod math;
+pub(crate) mod planet;
 pub mod plugin;
 pub(crate) mod propulsion;
 
