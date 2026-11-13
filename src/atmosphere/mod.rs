@@ -5,10 +5,10 @@
 //! - [`resources`]: [`WindResource`], the global wind vector and
 //!   [`PlanetResource`], defining the planet center and radius.
 
-pub mod isa;
-pub mod resources;
-pub mod systems;
+pub(crate) mod isa;
+pub(crate) mod resources;
+pub(crate) mod systems;
 
-pub use isa::sutherland_viscosity;
+pub(crate) use isa::sutherland_viscosity;
 pub use resources::{PlanetResource, WindResource};
-pub use systems::update_atmosphere;
+pub(crate) use systems::update_atmosphere;

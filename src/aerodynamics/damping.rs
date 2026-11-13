@@ -42,7 +42,7 @@ use bevy_math::{Quat, Vec3};
 ///
 /// Typical values (Nelson 1998, Table B1):
 /// `Cl_p ≈ −0.45`, `Cm_q ≈ −12.0`, `Cn_r ≈ −0.12`.
-pub fn damping_torque(
+pub(crate) fn damping_torque(
     flight: &FlightState,
     lod: &LodDamping,
     geo: &AircraftGeometry,

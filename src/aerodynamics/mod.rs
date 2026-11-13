@@ -34,8 +34,8 @@ pub(crate) mod local_angles;
 pub(crate) mod world_forces;
 
 pub(crate) use coefficients::evaluate_zone_coefficients;
-pub use damping::damping_torque;
-pub use local_angles::zone_local_angles;
+pub(crate) use damping::damping_torque;
+pub(crate) use local_angles::zone_local_angles;
 pub(crate) use world_forces::zone_force_world;
 
 use crate::_bevy::*;
@@ -53,7 +53,7 @@ use induced_drag::apply_induced_drag;
 
 /// Bevy system that runs the aerodynamic pipeline in each physics step.
 #[allow(clippy::type_complexity)]
-pub fn compute_aero_forces(
+pub(crate) fn compute_aero_forces(
     mut root_query: Query<(
         &mut ConstantForce,
         &mut ConstantTorque,

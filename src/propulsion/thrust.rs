@@ -19,7 +19,7 @@ pub(super) const RHO_0: f32 = 1.225;
 /// The attitude comes from the Avian [`Rotation`] of the root entity, because
 /// `GlobalTransform` would be one step old during `BroadPhase`.
 #[allow(clippy::type_complexity)]
-pub fn compute_engine_zone_forces(
+pub(crate) fn compute_engine_zone_forces(
     mut engine_query: Query<(
         &EngineZone,
         &Transform,

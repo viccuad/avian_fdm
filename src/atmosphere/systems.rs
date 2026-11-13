@@ -22,7 +22,7 @@ use bevy_math::DVec3;
 /// Avian [`Position`]. `Position` is the physics state of the current
 /// step. `GlobalTransform` would be one step old during `BroadPhase`, and it
 /// is not the physics position when the app uses a floating origin.
-pub fn update_atmosphere(
+pub(crate) fn update_atmosphere(
     mut query: Query<(&Position, &mut AtmosphereState)>,
     planet_resource: Option<Res<PlanetResource>>,
 ) {
