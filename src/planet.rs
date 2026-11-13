@@ -53,13 +53,9 @@ use serde::{Deserialize, Serialize};
 /// ```rust,no_run
 /// # use avian_fdm::components::PlanetResource;
 /// # use bevy::prelude::*;
-/// # use avian3d::math::RVector;
 /// # let mut app = App::new();
 /// // Sea level at y = 0, with the planet center below the origin.
-/// app.insert_resource(PlanetResource {
-///     center: RVector::new(0.0, -PlanetResource::EARTH_RADIUS_M, 0.0),
-///     radius_m: PlanetResource::EARTH_RADIUS_M,
-/// });
+/// app.insert_resource(PlanetResource::earth());
 /// ```
 #[derive(Resource, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Resource, Serialize, Deserialize)]
@@ -70,14 +66,14 @@ pub struct PlanetResource {
     /// altitude is zero. The ISA does not use it (see "The planet is
     /// geometry only" above).
     pub radius_m: Real,
+    /// The gravity at sea level (m/s²). The ISA does not use it: the ISA has
+    /// its own fixed gravity.
+    pub surface_gravity_ms2: f32,
 }
 
 impl Default for PlanetResource {
     fn default() -> Self {
-        Self {
-            center: RVector::new(0.0, -Self::EARTH_RADIUS_M, 0.0),
-            radius_m: Self::EARTH_RADIUS_M,
-        }
+        Self::earth()
     }
 }
 
@@ -89,6 +85,29 @@ impl PlanetResource {
         6_360_000.0,
         "Bevy 0.20 Atmosphere::earth EARTH_INNER_RADIUS"
     );
+
+    /// Standard gravity of the Earth at sea level (m/s²).
+    pub const EARTH_SURFACE_GRAVITY_MS2: f32 =
+        sourced!(9.806_65, "ICAO Doc 7488 standard gravity g0");
+
+    /// The Earth, with sea level at the world origin.
+    ///
+    /// - The center is at `(0, -EARTH_RADIUS_M, 0)`, so sea level is at
+    ///   `y = 0` and the aircraft stays near the origin.
+    /// - The radius is the radius of the Bevy sky renderer (6,360 km), not the
+    ///   mean Earth radius (6,371 km). If the ground of your world is at a
+    ///   different distance from the center, change `radius_m`. Otherwise,
+    ///   every altitude is wrong by the difference.
+    /// - The surface gravity is the standard gravity (9.806 65 m/s²).
+    ///
+    /// [`Default`] gives the same value.
+    pub fn earth() -> Self {
+        Self {
+            center: RVector::new(0.0, -Self::EARTH_RADIUS_M, 0.0),
+            radius_m: Self::EARTH_RADIUS_M,
+            surface_gravity_ms2: Self::EARTH_SURFACE_GRAVITY_MS2,
+        }
+    }
 }
 
 /// Calculates the geometric altitude above sea level (m). If `planet` is `None`, the altitude is
@@ -147,7 +166,7 @@ mod tests {
     /// though the distance to the planet center is about 6.36e6 m.
     #[test]
     fn altitude_round_default_planet_keeps_precision() {
-        let planet = PlanetResource::default();
+        let planet = PlanetResource::earth();
         let pos = Position::from_xyz(0.0, 1000.3, 0.0);
 
         assert_near(altitude_m(&pos, Some(&planet)), 1000.3, EPS)
@@ -156,8 +175,8 @@ mod tests {
     #[test]
     fn altitude_round_y_axis() {
         let planet = PlanetResource {
-            center: RVector::default(),
-            radius_m: EARTH_RADIUS_M,
+            center: RVector::ZERO,
+            ..PlanetResource::earth()
         };
         let pos = Position::from_xyz(0.0, EARTH_RADIUS_M + 1000.0, 0.0);
 
@@ -167,8 +186,8 @@ mod tests {
     #[test]
     fn altitude_round_x_axis() {
         let planet = PlanetResource {
-            center: RVector::default(),
-            radius_m: EARTH_RADIUS_M,
+            center: RVector::ZERO,
+            ..PlanetResource::earth()
         };
         let pos = Position::from_xyz(EARTH_RADIUS_M + 1000.0, 0.0, 0.0);
 
@@ -177,12 +196,7 @@ mod tests {
 
     #[test]
     fn altitude_round_offset_center() {
-        let center = RVector::new(0.0, -EARTH_RADIUS_M, 0.0);
-        let planet = PlanetResource {
-            center,
-            radius_m: EARTH_RADIUS_M,
-        };
-
+        let planet = PlanetResource::earth();
         let pos = Position::from_xyz(0.0, 1000.0, 0.0);
 
         assert_near(altitude_m(&pos, Some(&planet)), 1000.0, EPS)
@@ -190,7 +204,7 @@ mod tests {
 
     #[test]
     fn altitude_round_below_sea_level() {
-        let planet = PlanetResource::default();
+        let planet = PlanetResource::earth();
         let pos = Position::from_xyz(0.0, -100.0, 0.0);
 
         assert_near(altitude_m(&pos, Some(&planet)), -100.0, EPS)
@@ -202,8 +216,8 @@ mod tests {
     #[cfg(feature = "f64")]
     fn altitude_round_f64_precision() {
         let planet = PlanetResource {
-            center: RVector::default(),
-            radius_m: EARTH_RADIUS_M,
+            center: RVector::ZERO,
+            ..PlanetResource::earth()
         };
         let distance_from_center = EARTH_RADIUS_M + 500.0;
         let angle: Real = 0.7;
@@ -214,5 +228,14 @@ mod tests {
         );
 
         assert_near(altitude_m(&pos, Some(&planet)), 500.0, 1e-3)
+    }
+
+    #[test]
+    fn default_is_earth() {
+        let default = PlanetResource::default();
+        let earth = PlanetResource::earth();
+        assert_eq!(default.center, earth.center);
+        assert_eq!(default.radius_m, earth.radius_m);
+        assert_eq!(default.surface_gravity_ms2, earth.surface_gravity_ms2);
     }
 }
