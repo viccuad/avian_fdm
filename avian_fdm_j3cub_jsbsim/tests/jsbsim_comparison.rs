@@ -7,11 +7,11 @@
 //! ## Tests
 //!
 //! * **`jsbsim_j3cub_comparison`** — powered flight (throttle ramp 50-75%).
-//!   Always runs with `--features presets`. Fails if the AoA error exceeds
-//!   `TARGET_AOA_DEG` at any sample.
+//!   Ignored by default; `make jsbsim` runs it. Fails if the AoA error
+//!   exceeds `TARGET_AOA_DEG` at any sample.
 //!
 //! * **`jsbsim_j3cub_glide_comparison`** — engine off, unpowered glide.
-//!   Always runs with `--features presets`. Uses `Failure { remaining: 0.0 }`
+//!   Ignored by default; `make jsbsim` runs it. Uses `Failure { remaining: 0.0 }`
 //!   on the engine zone to exercise the damage model path. Fails if the AoA
 //!   error exceeds `TARGET_AOA_DEG` at any sample.
 //!
@@ -193,6 +193,7 @@ fn run_avian_fdm() -> Vec<Sample> {
 // ── Main comparison test (always runs) ───────────────────────────────────────
 
 #[test]
+#[ignore = "enforces the JSBSim AoA target; run with `make jsbsim`"]
 fn jsbsim_j3cub_comparison() {
     // ── Load committed JSBSim reference data ─────────────────────────────
     let jsbsim_data = parse_csv(REFERENCE_CSV);
@@ -327,6 +328,7 @@ fn run_avian_fdm_glide() -> Vec<Sample> {
 // ── Glide comparison test ─────────────────────────────────────────────────────
 
 #[test]
+#[ignore = "enforces the JSBSim AoA target; run with `make jsbsim`"]
 fn jsbsim_j3cub_glide_comparison() {
     let jsbsim_data = parse_csv(REFERENCE_CSV_GLIDE);
     assert!(
