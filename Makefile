@@ -35,7 +35,7 @@ build:
 
 .PHONY: jsbsim
 jsbsim:
-	cargo test $(CARGO_FLAGS) -p avian_fdm_j3cub_jsbsim -- jsbsim --nocapture
+	cargo test $(CARGO_FLAGS) -p avian_fdm_j3cub_jsbsim -- jsbsim --include-ignored --nocapture
 	
 .PHONY: j3cub-jsbsim
 j3cub-jsbsim:
