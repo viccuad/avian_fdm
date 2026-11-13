@@ -12,10 +12,9 @@
 //! rotations and `atan2` calls. They do not depend on an atmosphere model.
 
 use crate::_bevy::*;
-use crate::atmosphere::systems::altitude_m;
 use crate::atmosphere::WindResource;
 use crate::components::{AtmosphereState, FlightState};
-use crate::planet::PlanetResource;
+use crate::planet::{altitude_m, PlanetResource};
 use avian3d::prelude::{Position, Rotation};
 
 /// Updates [`FlightState`] on each aircraft from the velocity and the atmosphere.
@@ -27,7 +26,7 @@ use avian3d::prelude::{Position, Rotation};
 /// Mach, and the body rates.
 ///
 /// The altitude comes from the Avian [`Position`], through
-/// [`crate::atmosphere::systems::altitude_m`]. This is the same value that
+/// [`crate::planet::altitude_m`]. This is the same value that
 /// [`crate::atmosphere::update_atmosphere`] uses. If a [`PlanetResource`]
 /// exists, the altitude is the distance from the planet center minus
 /// `radius_m`. If not, the altitude is the `y` component of `Position`.
