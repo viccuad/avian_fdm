@@ -40,6 +40,7 @@ emergent behaviors appear when computing the AeroZones together.
 ## Features
 
 - ISA atmosphere (0-20 km) with density, pressure, temperature, viscosity
+- Optional spherical planet: radial altitude, and radial gravity for the app to apply
 - Per-zone lift, drag, and side-force from tabulated coefficients (1D or 2D)
   - Reynolds-number-dependent coefficient lookup
   - Post-stall aerodynamics via Viterna-Corrigan extrapolation

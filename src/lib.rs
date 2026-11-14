@@ -26,17 +26,18 @@
 //! 3. [Terms and Symbols](#terms-and-symbols)
 //! 4. [Coordinate Frames](#coordinate-frames)
 //! 5. [The Equations of Motion](#the-equations-of-motion)
-//! 6. [The Atmosphere](#the-atmosphere)
-//! 7. [Aerodynamic Forces and Moments](#aerodynamic-forces-and-moments)
-//! 8. [Propulsion Coupling](#propulsion-coupling)
-//! 9. [Emergent Behavior](#emergent-behavior)
-//! 10. [Zone Decomposition and Damage](#zone-decomposition-and-damage)
+//! 6. [The Planet: Altitude and Gravity](#the-planet-altitude-and-gravity)
+//! 7. [The Atmosphere](#the-atmosphere)
+//! 8. [Aerodynamic Forces and Moments](#aerodynamic-forces-and-moments)
+//! 9. [Propulsion Coupling](#propulsion-coupling)
+//! 10. [Emergent Behavior](#emergent-behavior)
+//! 11. [Zone Decomposition and Damage](#zone-decomposition-and-damage)
 //!     - [Collider strategy](#collider-strategy)
-//! 11. [Reading Simulation Output](#reading-simulation-output)
-//! 12. [Data Flow](#data-flow)
-//! 13. [Numeric Precision](#numeric-precision)
-//! 14. [Feature Flags](#feature-flags)
-//! 15. [Further Reading](#further-reading)
+//! 12. [Reading Simulation Output](#reading-simulation-output)
+//! 13. [Data Flow](#data-flow)
+//! 14. [Numeric Precision](#numeric-precision)
+//! 15. [Feature Flags](#feature-flags)
+//! 16. [Further Reading](#further-reading)
 //!
 //! ---
 //!
@@ -262,7 +263,8 @@
 //! - Aerodynamic: lift, drag, and side force from each [`components::AeroZone`]
 //! - Propulsive: thrust from each [`components::EngineZone`]
 //!
-//! Avian applies gravity with its own gravity system.
+//! Avian applies gravity with its own gravity system. With a spherical planet,
+//! refer to [The Planet: Altitude and Gravity](#the-planet-altitude-and-gravity).
 //!
 //! ### Rotational dynamics (Euler's equations)
 //!
@@ -293,6 +295,44 @@
 //! pure torque from its moment coefficients (CM, Croll, Cn). Avian does the
 //! quaternion normalization, the substeps, and the coupling between
 //! translation and rotation.
+//!
+//! ---
+//!
+//! ## The Planet: Altitude and Gravity
+//!
+//! The `planet` module in the source code has the full implementation.
+//!
+//! By default, the world is flat. Sea level is at `y = 0`, the altitude is the
+//! `y` component of the Avian `Position`, and the Avian `Gravity` resource
+//! pulls along `-Y`.
+//!
+//! To fly over a spherical planet, insert a [`components::PlanetResource`],
+//! for example [`components::PlanetResource::earth`]. The altitude is then
+//! the distance from the planet center minus the planet radius. Thus "up" is
+//! different at each position: it points away from the center.
+//!
+//! In both cases, one helper calculates the altitude. Both systems that need
+//! an altitude (`update_atmosphere` and `update_flight_state`) call it, so
+//! [`components::AtmosphereState`] and `FlightState::altitude_m` always agree.
+//! This altitude is the geometric altitude, that is the true height above sea
+//! level.
+//!
+//! **The planet is geometry only.** It decides how high the aircraft is. The
+//! fixed ISA decides what air is at that height (refer to
+//! [The Atmosphere](#the-atmosphere)). `radius_m` decides where sea level is,
+//! so it must match the ground of your world. A wrong radius moves sea level,
+//! and every aircraft flies in air of the wrong density.
+//!
+//! **The crate does not apply the planet gravity.** The Avian `Gravity`
+//! resource is one vector for all bodies, but over a sphere the direction is
+//! different at each position.
+//! [`components::PlanetResource::gravity_at`] calculates the radial gravity at
+//! a position. The doc of [`components::PlanetResource`] shows a system that
+//! applies it to one aircraft.
+//!
+//! A planet of real size puts its center about 6,360 km from the aircraft.
+//! Only the distance of the aircraft from the world origin matters for
+//! precision. Refer to [Numeric Precision](#numeric-precision).
 //!
 //! ---
 //!
@@ -330,27 +370,15 @@
 //! The `atmosphere` module implements the International Standard Atmosphere
 //! (ISA, ICAO Doc 7488) from 0 to 20 km. In each physics step,
 //! `update_atmosphere` writes a new [`components::AtmosphereState`] to the
-//! root entity.
-//!
-//! By default, the world is flat. Sea level is at `y = 0`, and the altitude is
-//! the `y` component of the Avian `Position`. To use a spherical planet,
-//! insert a [`components::PlanetResource`]. The altitude is then the distance
-//! from the planet center minus the planet radius. Both systems that need an
-//! altitude (`update_atmosphere` and `update_flight_state`) use the same
-//! helper, so `AtmosphereState` and `FlightState::altitude_m` always agree.
-//!
-//! Gravity is not part of this resource. With a planet, you must set gravity
-//! yourself, because the Avian `Gravity` resource points in one fixed
-//! direction.
+//! root entity. Its input is the geometric altitude of the aircraft. Refer to
+//! [The Planet: Altitude and Gravity](#the-planet-altitude-and-gravity).
 //!
 //! `FlightState::altitude_m` is the geometric altitude. ICAO defines the ISA
 //! in geopotential altitude, which corrects for the decrease of gravity with
 //! height. `update_atmosphere` converts the geometric altitude to the
 //! geopotential altitude before it applies the ISA formulas.
 //! The conversion uses the ISA radius `r0` = 6 356 766 m, never the radius of
-//! the [`components::PlanetResource`]. The planet is geometry only: it decides
-//! how high the aircraft is, and the fixed ISA decides what air is at that
-//! height.
+//! the [`components::PlanetResource`].
 //!
 //! ---
 //!

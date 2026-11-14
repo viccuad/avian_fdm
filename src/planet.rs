@@ -49,14 +49,43 @@ use serde::{Deserialize, Serialize};
 /// altitude is offset by that mismatch, and every aircraft flies in air of
 /// the wrong density.
 ///
-/// # Example
+/// # Gravity
+///
+/// The crate does not apply the planet gravity. [`PlanetResource::gravity_at`]
+/// calculates it, and the app applies it. In a single-aircraft app, a small
+/// system can set the Avian [`Gravity`](avian3d::prelude::Gravity) resource to
+/// the radial value at the aircraft in each physics step:
+///
 /// ```rust,no_run
-/// # use avian_fdm::components::PlanetResource;
+/// # use avian_fdm::components::{AircraftGeometry, PlanetResource};
+/// # use avian3d::prelude::*;
 /// # use bevy::prelude::*;
+/// fn radial_gravity(
+///     planet: Res<PlanetResource>,
+///     aircraft: Query<&Position, With<AircraftGeometry>>,
+///     mut gravity: ResMut<Gravity>,
+/// ) {
+///     if let Ok(pos) = aircraft.single() {
+///         gravity.0 = planet.gravity_at(pos.0);
+///     }
+/// }
+///
 /// # let mut app = App::new();
-/// // Sea level at y = 0, with the planet center below the origin.
 /// app.insert_resource(PlanetResource::earth());
+/// // Avian applies `Gravity` in `PhysicsStepSystems::Solver`. `First` runs before it.
+/// app.add_systems(
+///     PhysicsSchedule,
+///     radial_gravity.in_set(PhysicsStepSystems::First),
+/// );
 /// ```
+///
+/// [`Gravity`](avian3d::prelude::Gravity) is one vector for all bodies. Thus,
+/// this method is correct only for one aircraft, and for bodies near it.
+/// Never add the radial value to the default `-Y` gravity: the system
+/// replaces it.
+///
+/// The gravity model is a point mass. It has no planet rotation, no
+/// flattening (J2), and no Coriolis or centrifugal force.
 #[derive(Resource, Reflect, Serialize, Deserialize, Clone, Debug)]
 #[reflect(Resource, Serialize, Deserialize)]
 pub struct PlanetResource {
