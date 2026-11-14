@@ -66,8 +66,8 @@ pub struct PlanetResource {
     /// altitude is zero. The ISA does not use it (see "The planet is
     /// geometry only" above).
     pub radius_m: Real,
-    /// The gravity at sea level (m/s²). The ISA does not use it: the ISA has
-    /// its own fixed gravity.
+    /// The gravity at sea level (m/s^2). [`PlanetResource::gravity_at`] uses
+    /// it. The ISA does not use it: the ISA has its own fixed gravity.
     pub surface_gravity_ms2: f32,
 }
 
@@ -108,6 +108,26 @@ impl PlanetResource {
             surface_gravity_ms2: Self::EARTH_SURFACE_GRAVITY_MS2,
         }
     }
+
+    /// Gravity at the world position `pos` (m/s^2). It points to the planet
+    /// center. Its size is `surface_gravity_ms2 * (radius_m / r)^2`, where `r`
+    /// is the distance from the center (point-mass model). At the center, it
+    /// is zero.
+    pub fn gravity_at(&self, pos: RVector) -> Vec3 {
+        // This calculation does not need f64, unlike `altitude_m`. The altitude
+        // subtracts two large, nearly equal values (the distance to the center
+        // minus the radius), so f32 loses the leading digits. Gravity only
+        // divides: the direction `offset / |offset|` and the ratio `R / r` keep
+        // the relative precision of f32 (about 1e-7). With the default planet in
+        // an f32 build, the offset is about 6,361 km and rounds to 0.5 m. That
+        // gives a direction error of about 8e-8 rad. Thus the function subtracts
+        // in `Real` and converts once to `Vec3`, the type of Avian accelerations.
+        let offset = (pos - self.center).f32();
+        let Some(down) = (-offset).try_normalize() else {
+            return Vec3::ZERO;
+        };
+        down * self.surface_gravity_ms2 * (self.radius_m.f32() / offset.length()).powi(2)
+    }
 }
 
 /// Calculates the geometric altitude above sea level (m). If `planet` is `None`, the altitude is
@@ -137,9 +157,10 @@ pub(crate) fn altitude_m(pos: &Position, planet: Option<&PlanetResource>) -> f32
 mod tests {
     use super::{altitude_m, PlanetResource};
     use avian3d::{
-        math::{RVector, Real},
+        math::{RVector, Real, ToF32Precision},
         physics_transform::Position,
     };
+    use bevy_math::Vec3;
 
     /// `altitude_m` calculates in `f64` in both builds, and the test positions
     /// are exact in `f32`. Thus both builds use the same tolerance.
@@ -230,6 +251,21 @@ mod tests {
         assert_near(altitude_m(&pos, Some(&planet)), 500.0, 1e-3)
     }
 
+    const G0: f32 = PlanetResource::EARTH_SURFACE_GRAVITY_MS2;
+
+    /// Point-mass gravity at `altitude_m` above sea level.
+    fn expected_g(altitude_m: f32) -> f32 {
+        let r = EARTH_RADIUS_M.f32();
+        G0 * (r / (r + altitude_m)).powi(2)
+    }
+
+    fn assert_vec_near(actual: Vec3, expected: Vec3, eps: f32) {
+        assert!(
+            (actual - expected).length() <= eps,
+            "actual {actual}, expected {expected}, tolerance {eps}"
+        );
+    }
+
     #[test]
     fn default_is_earth() {
         let default = PlanetResource::default();
@@ -237,5 +273,65 @@ mod tests {
         assert_eq!(default.center, earth.center);
         assert_eq!(default.radius_m, earth.radius_m);
         assert_eq!(default.surface_gravity_ms2, earth.surface_gravity_ms2);
+    }
+
+    #[test]
+    fn gravity_points_to_center_y() {
+        let planet = PlanetResource {
+            center: RVector::ZERO,
+            ..PlanetResource::earth()
+        };
+        let pos = RVector::new(0.0, EARTH_RADIUS_M + 1000.0, 0.0);
+
+        let expected = Vec3::new(0.0, -expected_g(1000.0), 0.0);
+        assert_vec_near(planet.gravity_at(pos), expected, 1e-5)
+    }
+
+    #[test]
+    fn gravity_points_to_center_x() {
+        let planet = PlanetResource {
+            center: RVector::ZERO,
+            ..PlanetResource::earth()
+        };
+        let pos = RVector::new(EARTH_RADIUS_M + 1000.0, 0.0, 0.0);
+
+        let expected = Vec3::new(-expected_g(1000.0), 0.0, 0.0);
+        assert_vec_near(planet.gravity_at(pos), expected, 1e-5)
+    }
+
+    #[test]
+    fn gravity_at_surface() {
+        let planet = PlanetResource::earth();
+
+        let g = planet.gravity_at(RVector::ZERO);
+        assert_vec_near(g, Vec3::new(0.0, -G0, 0.0), 1e-5)
+    }
+
+    #[test]
+    fn gravity_at_center() {
+        let planet = PlanetResource::earth();
+
+        let g = planet.gravity_at(planet.center);
+        assert_eq!(g, Vec3::ZERO);
+    }
+
+    /// Off the axis, gravity still points from the position to the center.
+    #[test]
+    fn gravity_direction_off_axis() {
+        let planet = PlanetResource::earth();
+        let pos = RVector::new(30_000.0, 1000.0, -20_000.0);
+
+        let down = planet.gravity_at(pos).normalize();
+        let expected = (planet.center - pos).normalize().f32();
+        // Compare the unit vectors, not the angle. `Vec3::angle_between` uses
+        // `acos` of the dot product. Near a dot product of 1, the smallest step of
+        // f32 gives an angle of about 3.5e-4 rad. Thus `acos` returns either 0 or
+        // a value far above a tolerance of 1e-6, and the test passes or fails by
+        // rounding. For small angles, the length of the difference of two unit
+        // vectors is equal to the angle, with no such step.
+        assert!(
+            (down - expected).length() < 1e-6,
+            "down {down}, expected {expected}"
+        );
     }
 }
