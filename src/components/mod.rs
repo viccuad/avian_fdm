@@ -10,7 +10,7 @@ pub mod zone_force;
 
 pub use crate::atmosphere::WindResource;
 pub use crate::gizmo_shape::{GizmoContours, GizmoShape};
-pub use crate::planet::PlanetResource;
+pub use crate::planet::{PlanetGravity, PlanetResource};
 pub use aero_coeff::AeroCoeff;
 pub use aero_zone::{AeroZone, AeroZoneBundle, ControlSurfaceRole};
 pub use aircraft::{AircraftCoreBundle, AircraftGeometry, InducedDrag, LodDamping};

@@ -21,7 +21,7 @@
 
 use crate::_bevy::*;
 use avian3d::math::{RVector, Real, ToF32Precision};
-use avian3d::prelude::Position;
+use avian3d::prelude::{ConstantLinearAcceleration, Position};
 use bevy_math::DVec3;
 use serde::{Deserialize, Serialize};
 
@@ -159,6 +159,25 @@ impl PlanetResource {
     }
 }
 
+/// Marks a body that gets the planet gravity.
+///
+/// If a [`PlanetResource`] exists, the crate writes the radial gravity of the
+/// planet at the position of each marked body into its
+/// [`ConstantLinearAcceleration`]. The crate then owns that component on the
+/// body: do not write it yourself. If no `PlanetResource` exists, the crate
+/// sets it to zero, and the Avian [`Gravity`](avian3d::prelude::Gravity)
+/// resource applies as usual.
+///
+/// Each aircraft has this marker from
+/// [`AircraftCoreBundle`](crate::components::AircraftCoreBundle). Add it to
+/// other dynamic bodies that must fall to the planet, for example cargo or
+/// ground vehicles. It adds [`ConstantLinearAcceleration`] if the body does
+/// not have it.
+#[derive(Component, Reflect, Serialize, Deserialize, Clone, Copy, Debug, Default)]
+#[reflect(Component, Serialize, Deserialize)]
+#[require(ConstantLinearAcceleration)]
+pub struct PlanetGravity;
+
 /// Calculates the geometric altitude above sea level (m). If `planet` is `None`, the altitude is
 /// the world Y position.
 ///
@@ -184,10 +203,11 @@ pub(crate) fn altitude_m(pos: &Position, planet: Option<&PlanetResource>) -> f32
 
 #[cfg(test)]
 mod tests {
-    use super::{altitude_m, PlanetResource};
+    use super::{altitude_m, PlanetGravity, PlanetResource};
     use avian3d::{
         math::{RVector, Real, ToF32Precision},
         physics_transform::Position,
+        prelude::ConstantLinearAcceleration,
     };
     use bevy_math::Vec3;
 
@@ -361,6 +381,18 @@ mod tests {
         assert!(
             (down - expected).length() < 1e-6,
             "down {down}, expected {expected}"
+        );
+    }
+
+    /// A body that the user marks gets the component that the crate writes.
+    #[test]
+    fn planet_gravity_adds_constant_linear_acceleration() {
+        let mut world = bevy_ecs::world::World::new();
+        let body = world.spawn(PlanetGravity).id();
+
+        assert_eq!(
+            world.get::<ConstantLinearAcceleration>(body),
+            Some(&ConstantLinearAcceleration::default())
         );
     }
 }
