@@ -44,6 +44,12 @@ use serde::{Deserialize, Serialize};
 /// [`ConstantForce`] and [`ConstantTorque`] components of this bundle. Avian
 /// then applies them with `ForceSystems::ApplyConstantForces`.
 ///
+/// With a [`PlanetResource`](crate::components::PlanetResource), the crate
+/// also writes the radial gravity into the
+/// [`ConstantLinearAcceleration`](avian3d::prelude::ConstantLinearAcceleration)
+/// of the aircraft. The [`PlanetGravity`](crate::components::PlanetGravity)
+/// field of this bundle adds that component.
+///
 /// A `RigidBody::Dynamic` has [`LinearVelocity`] and [`AngularVelocity`]. This
 /// bundle includes them with zero values. To set an initial velocity, replace
 /// them after the spawn.
@@ -97,6 +103,10 @@ pub struct AircraftCoreBundle {
     /// Sum of the aerodynamic and propulsive torques. The crate writes it in
     /// each physics step. Avian applies it with `ForceSystems::ApplyConstantForces`.
     pub constant_torque: ConstantTorque,
+    /// Marks the aircraft for the planet gravity. If a `PlanetResource`
+    /// exists, the crate writes the radial gravity into the
+    /// `ConstantLinearAcceleration` of the aircraft in each physics step.
+    pub planet_gravity: crate::components::PlanetGravity,
     /// Linear velocity in world space. `update_flight_state` needs it.
     /// To start with an initial airspeed, set a non-zero value after the spawn.
     pub linear_velocity: LinearVelocity,
