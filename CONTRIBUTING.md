@@ -15,9 +15,9 @@
 The majority of code conventions are enforced by gating CI jobs (format,
 clippy, test coverage, enforce docstrings, pub(crate), etc). Please use
 the provided `make` targets locally before submitting a PR.
-The project is configured to emit compiler warnings when developing (see
-provided make targets) for an easy development lopp, and all those warnings are
-treated as errors in CI by passing `RUSTFLAGS="-D warnings".
+The project is configured to emit compiler warnings for an easy development
+loop (see provided make targets), and all those warnings are treated as errors
+in CI by passing `RUSTFLAGS="-D warnings".
 
 Most questions can be answered by matching the conventions and style of nearby
 code.
@@ -51,8 +51,8 @@ PRs from branches on the repo are autolabeled by autolabeler, depending on their
 "conventional commit" title. This is not enabled for branches from forks for
 security reasons.
 
-For issues, please list the acceptance criteria that the issue must fulfill
-for it to be closed. Maintainers of course may edit the issue as needed.
+For issues for features, please list the acceptance criteria that the issue
+must fulfill for it to be closed.
 
 ## Testing
 
