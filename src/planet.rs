@@ -21,7 +21,7 @@
 
 use crate::_bevy::*;
 use avian3d::math::{RVector, Real, ToF32Precision};
-use avian3d::prelude::{ConstantLinearAcceleration, Position};
+use avian3d::prelude::{ConstantLinearAcceleration, Gravity, GravityScale, Position};
 use bevy_math::DVec3;
 use serde::{Deserialize, Serialize};
 
@@ -53,7 +53,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// The crate does not apply the planet gravity. [`PlanetResource::gravity_at`]
 /// calculates it, and the app applies it. In a single-aircraft app, a small
-/// system can set the Avian [`Gravity`](avian3d::prelude::Gravity) resource to
+/// system can set the Avian [`Gravity`] resource to
 /// the radial value at the aircraft in each physics step:
 ///
 /// ```rust,no_run
@@ -79,7 +79,7 @@ use serde::{Deserialize, Serialize};
 /// );
 /// ```
 ///
-/// [`Gravity`](avian3d::prelude::Gravity) is one vector for all bodies. Thus,
+/// [`Gravity`] is one vector for all bodies. Thus,
 /// this method is correct only for one aircraft, and for bodies near it.
 /// Never add the radial value to the default `-Y` gravity: the system
 /// replaces it.
@@ -165,7 +165,7 @@ impl PlanetResource {
 /// planet at the position of each marked body into its
 /// [`ConstantLinearAcceleration`]. The crate then owns that component on the
 /// body: do not write it yourself. If no `PlanetResource` exists, the crate
-/// sets it to zero, and the Avian [`Gravity`](avian3d::prelude::Gravity)
+/// sets it to zero, and the Avian [`Gravity`]
 /// resource applies as usual.
 ///
 /// Each aircraft has this marker from
@@ -177,6 +177,50 @@ impl PlanetResource {
 #[reflect(Component, Serialize, Deserialize)]
 #[require(ConstantLinearAcceleration)]
 pub struct PlanetGravity;
+
+/// Writes the planet gravity into the [`ConstantLinearAcceleration`] of each
+/// body with [`PlanetGravity`].
+///
+/// With a [`PlanetResource`], the value is [`PlanetResource::gravity_at`] at
+/// the [`Position`] of the body, times its [`GravityScale`] if it has one.
+/// Avian applies `GravityScale` only to the global [`Gravity`], so the system
+/// applies it here. Thus `GravityScale` has the same effect with a planet.
+///
+/// Without a `PlanetResource`, the value is zero. Then the global `Gravity`
+/// applies alone, and a value from an earlier planet does not stay on the
+/// body.
+///
+/// With a `PlanetResource`, the global `Gravity` must be zero. Otherwise, the
+/// marked bodies get both, and the system warns once.
+pub(crate) fn update_planet_gravity(
+    planet: Option<Res<PlanetResource>>,
+    gravity: Res<Gravity>,
+    mut bodies: Query<
+        (
+            &Position,
+            Option<&GravityScale>,
+            &mut ConstantLinearAcceleration,
+        ),
+        With<PlanetGravity>,
+    >,
+) {
+    let Some(planet) = planet else {
+        for (_, _, mut acceleration) in &mut bodies {
+            acceleration.set_if_neq(ConstantLinearAcceleration::default());
+        }
+        return;
+    };
+    if gravity.0 != Vec3::ZERO {
+        warn_once!(
+            "A PlanetResource exists, but the Avian Gravity resource is not zero. Bodies \
+             with PlanetGravity get both. Insert Gravity::ZERO."
+        );
+    }
+    for (pos, scale, mut acceleration) in &mut bodies {
+        let scale = scale.map_or(1.0, |s| s.0);
+        acceleration.0 = planet.gravity_at(pos.0) * scale;
+    }
+}
 
 /// Calculates the geometric altitude above sea level (m). If `planet` is `None`, the altitude is
 /// the world Y position.
