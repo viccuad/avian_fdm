@@ -63,3 +63,6 @@ autolabeler:
   - label: "kind/chore"
     title:
       - "chore"
+  - label: "kind/documentation"
+    title:
+      - "docs"
