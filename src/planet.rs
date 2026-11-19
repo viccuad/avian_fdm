@@ -1,11 +1,13 @@
-//! Planet geometry: where sea level is, and the altitude above it.
+//! The planet: where sea level is, the altitude above it, and the gravity.
 //!
 //! If no [`PlanetResource`] exists, the world is flat. Sea level is at `y = 0`,
-//! and the altitude is the world Y position. If a [`PlanetResource`] exists,
-//! the planet is a sphere, and the altitude is the distance from its center
-//! minus its radius.
+//! the altitude is the world Y position, and the Avian [`Gravity`] resource
+//! applies. If a [`PlanetResource`] exists, the planet is a sphere. The
+//! altitude is the distance from its center minus its radius, and
+//! [`update_planet_gravity`] writes the radial gravity on each body with
+//! [`PlanetGravity`].
 //!
-//! This module is geometry only. It does not describe the air. The atmosphere
+//! The planet does not change the air. The atmosphere
 //! takes the geometric altitude from [`altitude_m`], and then applies the
 //! standard atmosphere. The ISA converts the geometric altitude to geopotential
 //! altitude with its own fixed radius, not with [`PlanetResource::radius_m`].
@@ -36,7 +38,7 @@ use serde::{Deserialize, Serialize};
 /// both use this altitude. If this resource is absent, the world is flat, sea
 /// level is at `y = 0`, and the altitude is the world Y position.
 ///
-/// # The planet is geometry only
+/// # The planet does not change the air
 ///
 /// This resource answers one question: how high is the aircraft above sea
 /// level? The atmosphere model itself does not change with the planet. The
@@ -51,38 +53,27 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Gravity
 ///
-/// The crate does not apply the planet gravity. [`PlanetResource::gravity_at`]
-/// calculates it, and the app applies it. In a single-aircraft app, a small
-/// system can set the Avian [`Gravity`] resource to
-/// the radial value at the aircraft in each physics step:
+/// With this resource, the crate applies the planet gravity. In each physics
+/// step, it writes [`PlanetResource::gravity_at`] at the position of each body
+/// with [`PlanetGravity`] into the
+/// [`ConstantLinearAcceleration`] of that body. Each aircraft has
+/// `PlanetGravity` from
+/// [`AircraftCoreBundle`](crate::components::AircraftCoreBundle). Add it to
+/// other dynamic bodies that must fall to the planet.
+///
+/// The Avian [`Gravity`] resource is one vector for all bodies, so it cannot
+/// point to the center for each body. Set it to zero. Otherwise, the marked
+/// bodies get both gravities, and the crate warns once. Bodies without
+/// `PlanetGravity` then have no gravity.
 ///
 /// ```rust,no_run
-/// # use avian_fdm::components::{AircraftGeometry, PlanetResource};
+/// # use avian_fdm::components::PlanetResource;
 /// # use avian3d::prelude::*;
 /// # use bevy::prelude::*;
-/// fn radial_gravity(
-///     planet: Res<PlanetResource>,
-///     aircraft: Query<&Position, With<AircraftGeometry>>,
-///     mut gravity: ResMut<Gravity>,
-/// ) {
-///     if let Ok(pos) = aircraft.single() {
-///         gravity.0 = planet.gravity_at(pos.0);
-///     }
-/// }
-///
 /// # let mut app = App::new();
-/// app.insert_resource(PlanetResource::earth());
-/// // Avian applies `Gravity` in `PhysicsStepSystems::Solver`. `First` runs before it.
-/// app.add_systems(
-///     PhysicsSchedule,
-///     radial_gravity.in_set(PhysicsStepSystems::First),
-/// );
+/// app.insert_resource(PlanetResource::earth())
+///     .insert_resource(Gravity::ZERO);
 /// ```
-///
-/// [`Gravity`] is one vector for all bodies. Thus,
-/// this method is correct only for one aircraft, and for bodies near it.
-/// Never add the radial value to the default `-Y` gravity: the system
-/// replaces it.
 ///
 /// The gravity model is a point mass. It has no planet rotation, no
 /// flattening (J2), and no Coriolis or centrifugal force.
@@ -92,8 +83,8 @@ pub struct PlanetResource {
     /// The center of the planet in world space (m).
     pub center: RVector,
     /// The distance from the center to sea level (m). It defines where the
-    /// altitude is zero. The ISA does not use it (see "The planet is
-    /// geometry only" above).
+    /// altitude is zero. The ISA does not use it (see "The planet does not
+    /// change the air" above).
     pub radius_m: Real,
     /// The gravity at sea level (m/s^2). [`PlanetResource::gravity_at`] uses
     /// it. The ISA does not use it: the ISA has its own fixed gravity.
@@ -164,9 +155,11 @@ impl PlanetResource {
 /// If a [`PlanetResource`] exists, the crate writes the radial gravity of the
 /// planet at the position of each marked body into its
 /// [`ConstantLinearAcceleration`]. The crate then owns that component on the
-/// body: do not write it yourself. If no `PlanetResource` exists, the crate
-/// sets it to zero, and the Avian [`Gravity`]
-/// resource applies as usual.
+/// body: do not write it yourself. Then also set the Avian [`Gravity`]
+/// resource to zero. Otherwise, the body gets both gravities. Refer to the
+/// "Gravity" section of [`PlanetResource`]. If no `PlanetResource` exists, the
+/// crate sets the component to zero, and the Avian `Gravity` resource applies
+/// as usual.
 ///
 /// Each aircraft has this marker from
 /// [`AircraftCoreBundle`](crate::components::AircraftCoreBundle). Add it to

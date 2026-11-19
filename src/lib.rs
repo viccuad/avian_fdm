@@ -304,7 +304,7 @@
 //!
 //! By default, the world is flat. Sea level is at `y = 0`, the altitude is the
 //! `y` component of the Avian `Position`, and the Avian `Gravity` resource
-//! pulls along `-Y`.
+//! pulls all bodies along `-Y`.
 //!
 //! To fly over a spherical planet, insert a [`components::PlanetResource`],
 //! for example [`components::PlanetResource::earth`]. The altitude is then
@@ -317,18 +317,29 @@
 //! This altitude is the geometric altitude, that is the true height above sea
 //! level.
 //!
-//! **The planet is geometry only.** It decides how high the aircraft is. The
+//! **The planet does not change the air.** It decides how high the aircraft is. The
 //! fixed ISA decides what air is at that height (refer to
 //! [The Atmosphere](#the-atmosphere)). `radius_m` decides where sea level is,
 //! so it must match the ground of your world. A wrong radius moves sea level,
 //! and every aircraft flies in air of the wrong density.
 //!
-//! **The crate does not apply the planet gravity.** The Avian `Gravity`
-//! resource is one vector for all bodies, but over a sphere the direction is
-//! different at each position.
-//! [`components::PlanetResource::gravity_at`] calculates the radial gravity at
-//! a position. The doc of [`components::PlanetResource`] shows a system that
-//! applies it to one aircraft.
+//! **The crate applies the planet gravity.** Over a sphere, gravity points to
+//! the center, so its direction is different for each body. The Avian
+//! `Gravity` resource is one vector for all bodies, so it cannot do this. In
+//! each physics step, `update_planet_gravity` writes
+//! [`components::PlanetResource::gravity_at`] into the Avian
+//! `ConstantLinearAcceleration` of each body with
+//! [`components::PlanetGravity`]. It respects `GravityScale`.
+//!
+//! - Each aircraft has `PlanetGravity` from [`components::AircraftCoreBundle`].
+//! - Add `PlanetGravity` to other dynamic bodies that must fall to the planet,
+//!   for example cargo, or surface vehicles. Then the crate owns their
+//!   `ConstantLinearAcceleration`.
+//! - Set the Avian `Gravity` resource to `Gravity::ZERO`. Otherwise, the marked
+//!   bodies get both gravities, and the crate warns once.
+//!
+//! The gravity model is a point mass. It has no planet rotation, no
+//! flattening (J2), and no Coriolis or centrifugal force.
 //!
 //! A planet of real size puts its center about 6,360 km from the aircraft.
 //! Only the distance of the aircraft from the world origin matters for
@@ -778,6 +789,11 @@
 //!
 //! ```text
 //! +-- PhysicsStepSystems::BroadPhase (once per physics step) ---------------+
+//! |  0. update_planet_gravity      reads:  Position, GravityScale,          |
+//! |                                        PlanetResource, Gravity          |
+//! |                                writes: ConstantLinearAcceleration       |
+//! |                                        (bodies with PlanetGravity)      |
+//! |                                                                         |
 //! |  1. update_atmosphere          reads:  Position(root),                  |
 //! |                                        PlanetResource                   |
 //! |                                writes: AtmosphereState                  |
