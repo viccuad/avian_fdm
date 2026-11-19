@@ -183,29 +183,27 @@ fn planet_gravity_not_on_unmarked_body() {
     assert_eq!(acceleration(&app, body), user_value);
 }
 
-/// An aircraft with no zones at circular-orbit speed stays at the same
-/// distance from the center. This checks the sign and the 1/r^2 law end to
-/// end, through Avian.
+/// Flies an aircraft with no zones at circular-orbit speed, 100 km above sea
+/// level, for 30 s. Returns the largest change of its distance from the
+/// center (m).
 ///
-/// Only in the `f64` build: in 30 s, the aircraft flies 235 km from the
-/// origin, beyond the limit of f32 positions.
-#[test]
+/// Tolerance for the result: the correct law gives 0.28 m, from the time
+/// steps. A constant gravity without the 1/r^2 law gives about 130 m, and no
+/// gravity gives about 4,300 m.
 #[cfg(feature = "f64")]
-fn orbit_free_fall() {
+fn orbit_radius_error_m(planet: PlanetResource) -> f64 {
     const ALTITUDE_M: f64 = 100_000.0;
     const STEPS: usize = 1800;
-    /// Measured: 0.28 m in 30 s, from the time steps. A constant gravity
-    /// without the 1/r^2 law gives about 130 m, and no gravity gives about
-    /// 4,300 m.
-    const RADIUS_TOL_M: f64 = 2.0;
 
-    let planet = PlanetResource::earth();
     let r0 = planet.radius_m + ALTITUDE_M;
     let g = f64::from(planet.surface_gravity_ms2) * (planet.radius_m / r0).powi(2);
     let speed = (g * r0).sqrt();
+    // The start positions of both tests are integers below 2^24, so they are
+    // exact in the f32 `Transform`.
+    let start = (planet.center + RVector::new(0.0, r0, 0.0)).f32();
 
     let mut app = app(Some(planet.clone()));
-    let aircraft = spawn_aircraft(&mut app, Vec3::new(0.0, ALTITUDE_M as f32, 0.0));
+    let aircraft = spawn_aircraft(&mut app, start);
     app.world_mut()
         .entity_mut(aircraft)
         .insert(LinearVelocity(Vec3::new(speed as f32, 0.0, 0.0)));
@@ -216,9 +214,36 @@ fn orbit_free_fall() {
         let pos = app.world().get::<Position>(aircraft).unwrap().0;
         max_error_m = max_error_m.max(((pos - planet.center).length() - r0).abs());
     }
+    max_error_m
+}
 
+#[cfg(feature = "f64")]
+const ORBIT_RADIUS_TOL_M: f64 = 2.0;
+
+/// An orbit stays at the same distance from the center. This checks the sign
+/// and the 1/r^2 law end to end, through Avian.
+///
+/// Only in the `f64` build: in 30 s, the aircraft flies 235 km from the
+/// origin, beyond the limit of f32 positions.
+#[test]
+#[cfg(feature = "f64")]
+fn orbit_free_fall() {
+    let error_m = orbit_radius_error_m(PlanetResource::earth());
     assert!(
-        max_error_m < RADIUS_TOL_M,
-        "the distance from the center changed by up to {max_error_m:.2} m"
+        error_m < ORBIT_RADIUS_TOL_M,
+        "the distance from the center changed by up to {error_m:.2} m"
+    );
+}
+
+/// The same orbit, with the world origin at the planet center. Then the
+/// aircraft is 6,460 km from the origin, where only f64 positions are precise.
+#[test]
+#[cfg(feature = "f64")]
+#[ignore = "Avian 0.8 seems to have a rounding bug in parry-f64 builds. Remove #[ignore] after the Avian upgrade with the fix."]
+fn orbit_free_fall_origin_at_center() {
+    let error_m = orbit_radius_error_m(planet_at_origin());
+    assert!(
+        error_m < ORBIT_RADIUS_TOL_M,
+        "the distance from the center changed by up to {error_m:.2} m"
     );
 }
