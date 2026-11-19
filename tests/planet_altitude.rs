@@ -92,7 +92,7 @@ fn flat_world_altitude_is_world_y() {
 /// world, for an aircraft above the origin.
 #[test]
 fn round_planet_below_origin_matches_flat_world() {
-    let planet = PlanetResource::default();
+    let planet = PlanetResource::earth();
     let (atm_round, fs_round) = fly(Some(planet), Vec3::new(0.0, 3000.0, 0.0));
     let (atm_flat, fs_flat) = fly(None, Vec3::new(0.0, 3000.0, 0.0));
 
@@ -111,7 +111,7 @@ fn round_planet_below_origin_matches_flat_world() {
 fn round_planet_up_is_radial() {
     let planet = PlanetResource {
         center: RVector::ZERO,
-        radius_m: R,
+        ..PlanetResource::earth()
     };
     let (atm_x, fs_x) = fly(
         Some(planet.clone()),
@@ -137,7 +137,7 @@ fn round_planet_up_is_radial() {
 fn atmosphere_matches_flight_state_altitude() {
     let planet = PlanetResource {
         center: RVector::new(100.0, 0.0, -50.0),
-        radius_m: R,
+        ..PlanetResource::earth()
     };
     // The aircraft is far from the Y axis. A system that reads the world Y
     // position gets about 20 m, and not about 4000 m.

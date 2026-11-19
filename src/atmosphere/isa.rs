@@ -170,7 +170,7 @@ pub(crate) fn sutherland_viscosity(t: f32) -> f32 {
 
 /// Returns an [`AtmosphereState`] for the geometric altitude `h` (m).
 ///
-/// It converts `h` to the geopotential altitude with
+/// It converts `h` to the geopotential altitude `H` with
 /// [`geopotential_altitude`], then applies the ISA formulas.
 pub(crate) fn atmosphere_at(h: f32) -> AtmosphereState {
     let h_gp = geopotential_altitude(h);

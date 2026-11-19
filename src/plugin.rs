@@ -3,7 +3,7 @@
 //! ## Execution order in `PhysicsStepSystems::BroadPhase`
 //!
 //! ```text
-//! Atmosphere -> FlightState -> Forces
+//! Gravity -> Atmosphere -> FlightState -> Forces
 //! ```
 //!
 //! The FDM chain runs in `BroadPhase`, not in `First`. This prevents a static
@@ -14,8 +14,8 @@
 //! correct.
 //!
 //! The Avian set `ForceSystems::ApplyConstantForces` runs in `Solver`, after
-//! `BroadPhase`. Thus, the FDM always writes the forces before Avian reads
-//! them.
+//! `BroadPhase`. Thus, the FDM always writes the forces and the planet gravity
+//! before Avian reads them, in the same physics step.
 //!
 //! ## Add a custom system (for example, an autopilot)
 //!
@@ -37,11 +37,12 @@ use avian3d::prelude::{PhysicsSchedule, PhysicsStepSystems};
 use crate::aerodynamics::compute_aero_forces;
 use crate::atmosphere::update_atmosphere;
 use crate::kinematics::update_flight_state;
+use crate::planet::update_planet_gravity;
 use crate::propulsion::compute_engine_zone_forces;
 
 /// Named system sets for the FDM pipeline. Use them to add custom systems.
 ///
-/// Execution order: `Atmosphere` -> `FlightState` -> `Forces`
+/// Execution order: `Gravity` -> `Atmosphere` -> `FlightState` -> `Forces`
 ///
 /// All sets run in `PhysicsStepSystems::BroadPhase`.
 ///
@@ -57,6 +58,9 @@ use crate::propulsion::compute_engine_zone_forces;
 /// ```
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum AircraftFdmSystems {
+    /// Writes the planet gravity into `ConstantLinearAcceleration`, if a
+    /// `PlanetResource` exists.
+    Gravity,
     /// Updates the ISA atmosphere: density, pressure, temperature, and speed of sound.
     Atmosphere,
     /// Calculates `FlightState` (alpha, beta, airspeed, altitude) from the physics state.
@@ -117,7 +121,8 @@ impl Plugin for AircraftFdmPlugin {
 
         use crate::components::{
             AeroZone, AircraftGeometry, AtmosphereState, ControlInputs, EngineZone, Failure,
-            FlightState, GizmoContours, GizmoShape, InducedDrag, LodDamping, ZoneForce,
+            FlightState, GizmoContours, GizmoShape, InducedDrag, LodDamping, PlanetGravity,
+            ZoneForce,
         };
         app.register_type::<AircraftGeometry>()
             .register_type::<ControlInputs>()
@@ -130,7 +135,8 @@ impl Plugin for AircraftFdmPlugin {
             .register_type::<Failure>()
             .register_type::<InducedDrag>()
             .register_type::<LodDamping>()
-            .register_type::<EngineZone>();
+            .register_type::<EngineZone>()
+            .register_type::<PlanetGravity>();
 
         use crate::airfoil::{resolve_airfoil_names, AirfoilLibrary};
         app.init_resource::<AirfoilLibrary>()
@@ -149,6 +155,7 @@ fn register_fdm_systems(app: &mut App) {
     app.configure_sets(
         PhysicsSchedule,
         (
+            AircraftFdmSystems::Gravity,
             AircraftFdmSystems::Atmosphere,
             AircraftFdmSystems::FlightState,
             AircraftFdmSystems::Forces,
@@ -157,6 +164,10 @@ fn register_fdm_systems(app: &mut App) {
             .in_set(PhysicsStepSystems::BroadPhase),
     );
 
+    app.add_systems(
+        PhysicsSchedule,
+        update_planet_gravity.in_set(AircraftFdmSystems::Gravity),
+    );
     app.add_systems(
         PhysicsSchedule,
         update_atmosphere.in_set(AircraftFdmSystems::Atmosphere),

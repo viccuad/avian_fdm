@@ -26,17 +26,18 @@
 //! 3. [Terms and Symbols](#terms-and-symbols)
 //! 4. [Coordinate Frames](#coordinate-frames)
 //! 5. [The Equations of Motion](#the-equations-of-motion)
-//! 6. [The Atmosphere](#the-atmosphere)
-//! 7. [Aerodynamic Forces and Moments](#aerodynamic-forces-and-moments)
-//! 8. [Propulsion Coupling](#propulsion-coupling)
-//! 9. [Emergent Behavior](#emergent-behavior)
-//! 10. [Zone Decomposition and Damage](#zone-decomposition-and-damage)
+//! 6. [The Planet: Altitude and Gravity](#the-planet-altitude-and-gravity)
+//! 7. [The Atmosphere](#the-atmosphere)
+//! 8. [Aerodynamic Forces and Moments](#aerodynamic-forces-and-moments)
+//! 9. [Propulsion Coupling](#propulsion-coupling)
+//! 10. [Emergent Behavior](#emergent-behavior)
+//! 11. [Zone Decomposition and Damage](#zone-decomposition-and-damage)
 //!     - [Collider strategy](#collider-strategy)
-//! 11. [Reading Simulation Output](#reading-simulation-output)
-//! 12. [Data Flow](#data-flow)
-//! 13. [Numeric Precision](#numeric-precision)
-//! 14. [Feature Flags](#feature-flags)
-//! 15. [Further Reading](#further-reading)
+//! 12. [Reading Simulation Output](#reading-simulation-output)
+//! 13. [Data Flow](#data-flow)
+//! 14. [Numeric Precision](#numeric-precision)
+//! 15. [Feature Flags](#feature-flags)
+//! 16. [Further Reading](#further-reading)
 //!
 //! ---
 //!
@@ -262,7 +263,8 @@
 //! - Aerodynamic: lift, drag, and side force from each [`components::AeroZone`]
 //! - Propulsive: thrust from each [`components::EngineZone`]
 //!
-//! Avian applies gravity with its own gravity system.
+//! Avian applies gravity with its own gravity system. With a spherical planet,
+//! refer to [The Planet: Altitude and Gravity](#the-planet-altitude-and-gravity).
 //!
 //! ### Rotational dynamics (Euler's equations)
 //!
@@ -293,6 +295,55 @@
 //! pure torque from its moment coefficients (CM, Croll, Cn). Avian does the
 //! quaternion normalization, the substeps, and the coupling between
 //! translation and rotation.
+//!
+//! ---
+//!
+//! ## The Planet: Altitude and Gravity
+//!
+//! The `planet` module in the source code has the full implementation.
+//!
+//! By default, the world is flat. Sea level is at `y = 0`, the altitude is the
+//! `y` component of the Avian `Position`, and the Avian `Gravity` resource
+//! pulls all bodies along `-Y`.
+//!
+//! To fly over a spherical planet, insert a [`components::PlanetResource`],
+//! for example [`components::PlanetResource::earth`]. The altitude is then
+//! the distance from the planet center minus the planet radius. Thus "up" is
+//! different at each position: it points away from the center.
+//!
+//! In both cases, one helper calculates the altitude. Both systems that need
+//! an altitude (`update_atmosphere` and `update_flight_state`) call it, so
+//! [`components::AtmosphereState`] and `FlightState::altitude_m` always agree.
+//! This altitude is the geometric altitude, that is the true height above sea
+//! level.
+//!
+//! **The planet does not change the air.** It decides how high the aircraft is. The
+//! fixed ISA decides what air is at that height (refer to
+//! [The Atmosphere](#the-atmosphere)). `radius_m` decides where sea level is,
+//! so it must match the ground of your world. A wrong radius moves sea level,
+//! and every aircraft flies in air of the wrong density.
+//!
+//! **The crate applies the planet gravity.** Over a sphere, gravity points to
+//! the center, so its direction is different for each body. The Avian
+//! `Gravity` resource is one vector for all bodies, so it cannot do this. In
+//! each physics step, `update_planet_gravity` writes
+//! [`components::PlanetResource::gravity_at`] into the Avian
+//! `ConstantLinearAcceleration` of each body with
+//! [`components::PlanetGravity`]. It respects `GravityScale`.
+//!
+//! - Each aircraft has `PlanetGravity` from [`components::AircraftCoreBundle`].
+//! - Add `PlanetGravity` to other dynamic bodies that must fall to the planet,
+//!   for example cargo, or surface vehicles. Then the crate owns their
+//!   `ConstantLinearAcceleration`.
+//! - Set the Avian `Gravity` resource to `Gravity::ZERO`. Otherwise, the marked
+//!   bodies get both gravities, and the crate warns once.
+//!
+//! The gravity model is a point mass. It has no planet rotation, no
+//! flattening (J2), and no Coriolis or centrifugal force.
+//!
+//! A planet of real size puts its center about 6,360 km from the aircraft.
+//! Only the distance of the aircraft from the world origin matters for
+//! precision. Refer to [Numeric Precision](#numeric-precision).
 //!
 //! ---
 //!
@@ -330,27 +381,15 @@
 //! The `atmosphere` module implements the International Standard Atmosphere
 //! (ISA, ICAO Doc 7488) from 0 to 20 km. In each physics step,
 //! `update_atmosphere` writes a new [`components::AtmosphereState`] to the
-//! root entity.
-//!
-//! By default, the world is flat. Sea level is at `y = 0`, and the altitude is
-//! the `y` component of the Avian `Position`. To use a spherical planet,
-//! insert a [`components::PlanetResource`]. The altitude is then the distance
-//! from the planet center minus the planet radius. Both systems that need an
-//! altitude (`update_atmosphere` and `update_flight_state`) use the same
-//! helper, so `AtmosphereState` and `FlightState::altitude_m` always agree.
-//!
-//! Gravity is not part of this resource. With a planet, you must set gravity
-//! yourself, because the Avian `Gravity` resource points in one fixed
-//! direction.
+//! root entity. Its input is the geometric altitude of the aircraft. Refer to
+//! [The Planet: Altitude and Gravity](#the-planet-altitude-and-gravity).
 //!
 //! `FlightState::altitude_m` is the geometric altitude. ICAO defines the ISA
 //! in geopotential altitude, which corrects for the decrease of gravity with
 //! height. `update_atmosphere` converts the geometric altitude to the
 //! geopotential altitude before it applies the ISA formulas.
 //! The conversion uses the ISA radius `r0` = 6 356 766 m, never the radius of
-//! the [`components::PlanetResource`]. The planet is geometry only: it decides
-//! how high the aircraft is, and the fixed ISA decides what air is at that
-//! height.
+//! the [`components::PlanetResource`].
 //!
 //! ---
 //!
@@ -750,6 +789,11 @@
 //!
 //! ```text
 //! +-- PhysicsStepSystems::BroadPhase (once per physics step) ---------------+
+//! |  0. update_planet_gravity      reads:  Position, GravityScale,          |
+//! |                                        PlanetResource, Gravity          |
+//! |                                writes: ConstantLinearAcceleration       |
+//! |                                        (bodies with PlanetGravity)      |
+//! |                                                                         |
 //! |  1. update_atmosphere          reads:  Position(root),                  |
 //! |                                        PlanetResource                   |
 //! |                                writes: AtmosphereState                  |
@@ -840,8 +884,8 @@
 //!   `f64` feature.
 //!
 //! An `f32` value has about 7 significant digits. This is much more than the
-//! accuracy of the aerodynamic data. The FDM does not lose precision far from
-//! the origin, because it never subtracts two world positions:
+//! accuracy of the aerodynamic data. The FDM math does not lose precision far
+//! from the origin, because it never subtracts two world positions:
 //!
 //! - It calculates the moment arm of each zone in the body frame, relative to
 //!   the center of mass. Then it rotates the arm to world orientation.
@@ -850,16 +894,27 @@
 //!   it subtracts the planet center and the radius in `f64` in all builds,
 //!   and then converts the small result to `f32`.
 //!
-//! Use the `parry-f64` feature when bodies move far from the origin. At
-//! 10,000 km, an `f32` position has a resolution of about 1 m. With `f64`,
-//! Avian keeps positions and contact points in `f64`, and it calculates
-//! contacts with `f64` poses. The broad phase stores its bounding boxes in
-//! `f32`, but it rounds them outward. Far from the origin, this costs
+//! **Rule: if an aircraft flies more than 100 km from the world origin, use
+//! the `parry-f64` feature or a floating origin.** In an `f32` build, the
+//! crate warns once when an aircraft passes this limit.
+//!
+//! The reason is Avian, not the FDM math. Avian adds the movement of each
+//! physics step to `Position` in one addition. Far from the origin, `f32`
+//! rounds this movement: at 100 km to about 8 mm, at 6,360 km to 0.5 m. At
+//! 60 Hz, an aircraft at 50 m/s moves 0.83 m per step, so 0.5 m steps give an
+//! error of up to 40%. No later calculation can recover this precision.
+//!
+//! With `f64`, Avian keeps positions and contact points in `f64`, and it
+//! calculates contacts with `f64` poses. The broad phase stores its bounding
+//! boxes in `f32`, but it rounds them outward. Far from the origin, this costs
 //! performance, but it does not miss contacts. Bevy `Transform` is `f32`, so
-//! the rendering of a large world needs a floating origin.
-//! A [`components::PlanetResource`] of real size has the same limit. If
-//! the world origin is at the planet center, all positions are about 6,360 km
-//! from the origin, with a resolution of 0.5 m in `f32`.
+//! the rendering of a large world needs a floating origin in all builds.
+//!
+//! With a [`components::PlanetResource`], only the distance of the aircraft
+//! from the origin counts, not the distance of the planet center. The default
+//! planet puts sea level at the origin, so `parry-f32` is sufficient. If the
+//! world origin is at the planet center, every aircraft is 6,360 km from the
+//! origin. Then the rule applies, and the warning tells you.
 //!
 //! ### Precision is not tunneling
 //!
@@ -1019,6 +1074,7 @@ pub mod components;
 pub(crate) mod gizmo_shape;
 pub(crate) mod kinematics;
 pub(crate) mod math;
+pub(crate) mod planet;
 pub mod plugin;
 pub(crate) mod propulsion;
 

@@ -40,6 +40,7 @@ emergent behaviors appear when computing the AeroZones together.
 ## Features
 
 - ISA atmosphere (0-20 km) with density, pressure, temperature, viscosity
+- Optional spherical planet: radial altitude and radial gravity
 - Per-zone lift, drag, and side-force from tabulated coefficients (1D or 2D)
   - Reynolds-number-dependent coefficient lookup
   - Post-stall aerodynamics via Viterna-Corrigan extrapolation
@@ -123,9 +124,9 @@ The features mirror the precision features of avian3d. Enable exactly one of
 The FDM calculates in `f32`, like Avian 0.8. Only world positions use `f64`
 when the `f64` feature is on. The FDM never subtracts two world positions:
 it calculates moment arms in the body frame, relative to the center of mass.
-Thus, it keeps its precision far from the origin. Use `parry-f64` when bodies
-move far from the origin. At 10,000 km, an `f32` position has a resolution of
-about 1 m.
+Thus, it keeps its precision far from the origin. Use `parry-f64` when aircraft
+fly more than about 100 km from the world origin. In an `f32` build, the crate
+warns when this happens.
 
 Fast bodies that pass through each other are a time-step problem, not a
 precision problem. Refer to the "Numeric Precision" section of the crate
